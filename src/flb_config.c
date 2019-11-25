@@ -43,6 +43,8 @@
 #include <fluent-bit/flb_plugin.h>
 #include <fluent-bit/flb_utils.h>
 
+const char *FLB_CONF_ENV_LOGLEVEL = "FLB_LOG_LEVEL";
+
 int flb_regex_init();
 
 struct flb_service_config service_configs[] = {
@@ -390,12 +392,21 @@ int flb_config_set_property(struct flb_config *config,
     while (key != NULL) {
         if (prop_key_check(key, k,len) == 0) {
             if (!strncasecmp(key, FLB_CONF_STR_LOGLEVEL, 256)) {
-                tmp = flb_env_var_translate(config->env, v);
-                if (tmp) {
+                char *val = NULL;
+                val = flb_env_get(config->env, FLB_CONF_ENV_LOGLEVEL);
+                if (val) {
+                    tmp = flb_sds_create(val);
                     ret = set_log_level(config, tmp);
                     flb_sds_destroy(tmp);
+                    flb_free(val)
                     tmp = NULL;
                 }
+                // tmp = flb_env_var_translate(config->env, v);
+                // if (tmp) {
+                //     ret = set_log_level(config, tmp);
+                //     flb_sds_destroy(tmp);
+                //     tmp = NULL;
+                // }
                 else {
                     ret = set_log_level(config, v);
                 }
