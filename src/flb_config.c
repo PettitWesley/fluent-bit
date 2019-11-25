@@ -398,8 +398,8 @@ int flb_config_set_property(struct flb_config *config,
                 val = flb_env_get(config->env, FLB_CONF_ENV_LOGLEVEL);
                 flb_info("[log_level] Setting the log level");
                 if (val) {
+                    flb_info(val);
                     ret = set_log_level(config, val);
-                    flb_free(val);
                 }
                 // tmp = flb_env_var_translate(config->env, v);
                 // if (tmp) {
