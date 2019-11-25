@@ -392,13 +392,13 @@ int flb_config_set_property(struct flb_config *config,
     while (key != NULL) {
         if (prop_key_check(key, k,len) == 0) {
             if (!strncasecmp(key, FLB_CONF_STR_LOGLEVEL, 256)) {
-                char *val = NULL;
+                const char *val = NULL;
                 val = flb_env_get(config->env, FLB_CONF_ENV_LOGLEVEL);
                 if (val) {
                     tmp = flb_sds_create(val);
                     ret = set_log_level(config, tmp);
                     flb_sds_destroy(tmp);
-                    flb_free(val)
+                    flb_free(val);
                     tmp = NULL;
                 }
                 // tmp = flb_env_var_translate(config->env, v);
