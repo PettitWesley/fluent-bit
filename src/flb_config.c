@@ -380,6 +380,8 @@ static int set_log_level(struct flb_config *config, const char *v_str)
 int flb_config_set_property(struct flb_config *config,
                             const char *k, const char *v)
 {
+
+    flb_info("[log_level] flb_config_set_property()");
     int i=0;
     int ret = -1;
     int *i_val;
@@ -394,12 +396,10 @@ int flb_config_set_property(struct flb_config *config,
             if (!strncasecmp(key, FLB_CONF_STR_LOGLEVEL, 256)) {
                 const char *val = NULL;
                 val = flb_env_get(config->env, FLB_CONF_ENV_LOGLEVEL);
+                flb_info("[log_level] Setting the log level");
                 if (val) {
-                    tmp = flb_sds_create(val);
-                    ret = set_log_level(config, tmp);
-                    flb_sds_destroy(tmp);
+                    ret = set_log_level(config, val);
                     flb_free(val);
-                    tmp = NULL;
                 }
                 // tmp = flb_env_var_translate(config->env, v);
                 // if (tmp) {
