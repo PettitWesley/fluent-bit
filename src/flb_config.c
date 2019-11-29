@@ -43,6 +43,8 @@
 #include <fluent-bit/flb_plugin.h>
 #include <fluent-bit/flb_utils.h>
 
+const char *FLB_CONF_ENV_LOGLEVEL = "FLB_LOG_LEVEL";
+
 int flb_regex_init();
 
 struct flb_service_config service_configs[] = {
@@ -384,6 +386,16 @@ static int set_log_level(struct flb_config *config, const char *v_str)
     return 0;
 }
 
+int set_log_level_from_env(struct flb_config *config)
+{
+    const char *val = NULL;
+    val = flb_env_get(config->env, FLB_CONF_ENV_LOGLEVEL);
+    if (val) {
+        return set_log_level(config, val);
+    }
+    return -1;
+}
+
 int flb_config_set_property(struct flb_config *config,
                             const char *k, const char *v)
 {
@@ -399,14 +411,16 @@ int flb_config_set_property(struct flb_config *config,
     while (key != NULL) {
         if (prop_key_check(key, k,len) == 0) {
             if (!strncasecmp(key, FLB_CONF_STR_LOGLEVEL, 256)) {
-                tmp = flb_env_var_translate(config->env, v);
-                if (tmp) {
-                    ret = set_log_level(config, tmp);
-                    flb_sds_destroy(tmp);
-                    tmp = NULL;
-                }
-                else {
-                    ret = set_log_level(config, v);
+                if (set_log_level_from_env(config) < 0) {
+                    tmp = flb_env_var_translate(config->env, v);
+                    if (tmp) {
+                        ret = set_log_level(config, tmp);
+                        flb_sds_destroy(tmp);
+                        tmp = NULL;
+                    }
+                    else {
+                        ret = set_log_level(config, v);
+                    }
                 }
             }
             else if (!strncasecmp(key, FLB_CONF_STR_PARSERS_FILE, 32)) {
