@@ -33,7 +33,7 @@ struct flb_env {
 struct flb_env *flb_env_create();
 void flb_env_destroy(struct flb_env *env);
 int flb_env_set(struct flb_env *env, const char *key, const char *val);
-const char *flb_env_get(struct flb_env *env, const char *key);
+const char *flb_env_get_TMP(struct flb_env *env, const char *key);
 flb_sds_t flb_env_var_translate(struct flb_env *env, const char *value);
 
 #endif
