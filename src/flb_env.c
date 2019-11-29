@@ -121,7 +121,7 @@ int flb_env_set(struct flb_env *env, const char *key, const char *val)
     return id;
 }
 
-const char *flb_env_get_TMP(struct flb_env *env, const char *key)
+const char *flb_env_get(struct flb_env *env, const char *key)
 {
     int len;
     int ret;
