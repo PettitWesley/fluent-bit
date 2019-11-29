@@ -380,7 +380,7 @@ static int set_log_level(struct flb_config *config, const char *v_str)
 int set_log_level_from_env(struct flb_config *config)
 {
     const char *val = NULL;
-    val = flb_env_get_TMP(config->env, FLB_CONF_ENV_LOGLEVEL);
+    val = flb_env_get(config->env, FLB_CONF_ENV_LOGLEVEL);
     if (val) {
         return set_log_level(config, val);
     }
