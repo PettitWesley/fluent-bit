@@ -747,7 +747,9 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
     }
 
     // append header
-    out_tmp = flb_sds_cat(out_buf, "{\"DeliveryStreamName\":\"log-loss-test\",\"Records\":[", 50);
+    // flb_sds_t header;
+    // header =
+    out_tmp = flb_sds_cat(out_buf, "{\"DeliveryStreamName\":\"log-loss-test\",\"Records\":[", 49);
     if (!out_tmp) {
         msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(out_buf);
@@ -869,7 +871,7 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
 
 
             // append header
-            out_tmp = flb_sds_cat(out_buf, "{\"Data\":\"", 10);
+            out_tmp = flb_sds_cat(out_buf, "{\"Data\":\"", 9);
             if (!out_tmp) {
                 msgpack_sbuffer_destroy(&tmp_sbuf);
                 flb_sds_destroy(out_buf);
@@ -903,7 +905,7 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
             }
 
             // append footer
-            out_tmp = flb_sds_cat(out_buf, "\"},", 4);
+            out_tmp = flb_sds_cat(out_buf, "\"},", 3);
             if (!out_tmp) {
                 msgpack_sbuffer_destroy(&tmp_sbuf);
                 flb_sds_destroy(out_buf);
@@ -948,7 +950,7 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
     }
 
     // append footer
-    out_tmp = flb_sds_cat(out_buf, "{\"Data\":\"hacky_hacks\"}]}", 25);
+    out_tmp = flb_sds_cat(out_buf, "{\"Data\":\"hacky_hacks\"}]}", 24);
     if (!out_tmp) {
         msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(out_buf);
