@@ -63,7 +63,7 @@ static int http_post(struct flb_out_http *ctx,
     // const char *ending = "";
     //flb_sds_t json = body;
     // flb_sds_t body = flb_sds_create_size(10);
-    printf("\n\n\tHTTP Body: \n");
+    printf("\n\n\tFirehose request Body: \n");
     printf(body);
     printf("\n\n\n");
     // int ret;
