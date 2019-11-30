@@ -65,7 +65,7 @@ static int http_post(struct flb_out_http *ctx,
     // flb_sds_t body = flb_sds_create_size(10);
     printf("\n\n\tHTTP Body: \n");
     printf(body);
-    printf("\n");
+    printf("\n\n\n");
     // int ret;
     // int out_ret = FLB_OK;
     // int compressed = FLB_FALSE;
