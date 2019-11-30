@@ -59,7 +59,7 @@ static int http_post(struct flb_out_http *ctx,
                      const void *body, size_t body_len,
                      const char *tag, int tag_len)
 {
-    printf(body)
+    printf(body);
     // int ret;
     // int out_ret = FLB_OK;
     // int compressed = FLB_FALSE;
