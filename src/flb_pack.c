@@ -30,6 +30,7 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_unescape.h>
+#include <fluent-bit/flb_log.h>
 
 #include <msgpack.h>
 #include <jsmn/jsmn.h>
@@ -738,6 +739,23 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
         }
     }
 
+    // guess (because I am lazy) and err towards over-allocation just to be safe
+    if (json_format == FLB_PACK_JSON_FORMAT_FIREHOSE) {
+        out_buf = flb_sds_create_size(bytes * 3);
+    }
+
+    // append header
+    out_tmp = flb_sds_cat(out_buf, "{\"DeliveryStreamName\":\"log-loss-test\",\"Records\":[", 50);
+    if (!out_tmp) {
+        msgpack_sbuffer_destroy(&tmp_sbuf);
+        flb_sds_destroy(out_buf);
+        return NULL;
+    }
+    if (out_tmp != out_buf) {
+        flb_warn("[pack] re-alloc");
+        out_buf = out_tmp;
+    }
+
     /* Create temporal msgpack buffer */
     msgpack_sbuffer_init(&tmp_sbuf);
     msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
@@ -831,8 +849,11 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
          *
          *     {'ts':abc,'k1':1}{'ts':abc,'k1':2}{N}
          */
+
+         // Wesley: this only works for Firehose now
         if (json_format == FLB_PACK_JSON_FORMAT_LINES ||
-            json_format == FLB_PACK_JSON_FORMAT_STREAM) {
+            json_format == FLB_PACK_JSON_FORMAT_STREAM ||
+            json_format == FLB_PACK_JSON_FORMAT_FIREHOSE) {
 
             /* Encode current record into JSON in a temporal variable */
             out_js = flb_msgpack_raw_to_json_sds(tmp_sbuf.data, tmp_sbuf.size);
@@ -841,6 +862,20 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
                 flb_sds_destroy(out_buf);
                 return NULL;
             }
+
+
+            // append header
+            out_tmp = flb_sds_cat(out_buf, "{\"Data\":\"", 10);
+            if (!out_tmp) {
+                msgpack_sbuffer_destroy(&tmp_sbuf);
+                flb_sds_destroy(out_buf);
+                return NULL;
+            }
+            if (out_tmp != out_buf) {
+                flb_warn("[pack] re-alloc");
+                out_buf = out_tmp;
+            }
+
 
             /*
              * One map record has been converted, now append it to the
@@ -859,6 +894,19 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
 
             /* If a realloc happened, check the returned address */
             if (out_tmp != out_buf) {
+                flb_warn("[pack] re-alloc");
+                out_buf = out_tmp;
+            }
+
+            // append footer
+            out_tmp = flb_sds_cat(out_buf, "\"},", 4);
+            if (!out_tmp) {
+                msgpack_sbuffer_destroy(&tmp_sbuf);
+                flb_sds_destroy(out_buf);
+                return NULL;
+            }
+            if (out_tmp != out_buf) {
+                flb_warn("[pack] re-alloc");
                 out_buf = out_tmp;
             }
 
@@ -874,6 +922,7 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
                     out_buf = out_tmp;
                 }
             }
+
             msgpack_sbuffer_clear(&tmp_sbuf);
         }
     }
@@ -892,6 +941,18 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
     }
     else {
         msgpack_sbuffer_destroy(&tmp_sbuf);
+    }
+
+    // append footer
+    out_tmp = flb_sds_cat(out_buf, "{\"Data\":\"hacky_hacks\"}]}", 25);
+    if (!out_tmp) {
+        msgpack_sbuffer_destroy(&tmp_sbuf);
+        flb_sds_destroy(out_buf);
+        return NULL;
+    }
+    if (out_tmp != out_buf) {
+        flb_warn("[pack] re-alloc");
+        out_buf = out_tmp;
     }
 
     return out_buf;

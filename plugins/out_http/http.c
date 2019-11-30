@@ -59,8 +59,13 @@ static int http_post(struct flb_out_http *ctx,
                      const void *body, size_t body_len,
                      const char *tag, int tag_len)
 {
+    // const char *beginning = "{ \"DeliveryStreamName\": \"some_delivery_stream\",\"Records\": ";
+    // const char *ending = "";
+    //flb_sds_t json = body;
+    // flb_sds_t body = flb_sds_create_size(10);
     printf("\n\n\tHTTP Body: \n");
     printf(body);
+    printf("\n");
     // int ret;
     // int out_ret = FLB_OK;
     // int compressed = FLB_FALSE;
@@ -288,7 +293,7 @@ static void cb_http_flush(const void *data, size_t bytes,
         (ctx->out_format == FLB_PACK_JSON_FORMAT_LINES)) {
 
         json = flb_pack_msgpack_to_json_format(data, bytes,
-                                               ctx->out_format,
+                                               FLB_PACK_JSON_FORMAT_FIREHOSE,
                                                ctx->json_date_format,
                                                ctx->json_date_key);
         if (json != NULL) {
