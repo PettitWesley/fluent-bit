@@ -59,150 +59,151 @@ static int http_post(struct flb_out_http *ctx,
                      const void *body, size_t body_len,
                      const char *tag, int tag_len)
 {
-    int ret;
-    int out_ret = FLB_OK;
-    int compressed = FLB_FALSE;
-    size_t b_sent;
-    void *payload_buf = NULL;
-    size_t payload_size = 0;
-    struct flb_upstream *u;
-    struct flb_upstream_conn *u_conn;
-    struct flb_http_client *c;
-    struct mk_list *head;
-    struct flb_config_map_val *mv;
-    struct flb_slist_entry *key = NULL;
-    struct flb_slist_entry *val = NULL;
-
-    /* Get upstream context and connection */
-    u = ctx->u;
-    u_conn = flb_upstream_conn_get(u);
-    if (!u_conn) {
-        flb_error("[out_http] no upstream connections available to %s:%i",
-                  u->tcp_host, u->tcp_port);
-        return FLB_RETRY;
-    }
-
-    /* Map payload */
-    payload_buf = (void *) body;
-    payload_size = body_len;
-
-    /* Should we compress the payload ? */
-    if (ctx->compress_gzip == FLB_TRUE) {
-        ret = flb_gzip_compress((void *) body, body_len,
-                                &payload_buf, &payload_size);
-        if (ret == -1) {
-            flb_error("[out_http] cannot gzip payload, disabling compression");
-        }
-        else {
-            compressed = FLB_TRUE;
-        }
-    }
-
-    /* Create HTTP client context */
-    c = flb_http_client(u_conn, FLB_HTTP_POST, ctx->uri,
-                        payload_buf, payload_size,
-                        ctx->host, ctx->port,
-                        ctx->proxy, 0);
-
-    /* Append headers */
-    if ((ctx->out_format == FLB_PACK_JSON_FORMAT_JSON) ||
-        (ctx->out_format == FLB_PACK_JSON_FORMAT_STREAM) ||
-        (ctx->out_format == FLB_PACK_JSON_FORMAT_LINES) ||
-        (ctx->out_format == FLB_HTTP_OUT_GELF)) {
-        flb_http_add_header(c,
-                            FLB_HTTP_CONTENT_TYPE,
-                            sizeof(FLB_HTTP_CONTENT_TYPE) - 1,
-                            FLB_HTTP_MIME_JSON,
-                            sizeof(FLB_HTTP_MIME_JSON) - 1);
-    }
-    else {
-        flb_http_add_header(c,
-                            FLB_HTTP_CONTENT_TYPE,
-                            sizeof(FLB_HTTP_CONTENT_TYPE) - 1,
-                            FLB_HTTP_MIME_MSGPACK,
-                            sizeof(FLB_HTTP_MIME_MSGPACK) - 1);
-    }
-
-    if (ctx->header_tag) {
-        flb_http_add_header(c,
-                            ctx->header_tag,
-                            flb_sds_len(ctx->header_tag),
-                            tag, tag_len);
-    }
-
-    /* Content Encoding: gzip */
-    if (compressed == FLB_TRUE) {
-        flb_http_set_content_encoding_gzip(c);
-    }
-
-    /* Basic Auth headers */
-    if (ctx->http_user && ctx->http_passwd) {
-        flb_http_basic_auth(c, ctx->http_user, ctx->http_passwd);
-    }
-
-    flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
-
-    flb_config_map_foreach(head, mv, ctx->headers) {
-        key = mk_list_entry_first(mv->val.list, struct flb_slist_entry, _head);
-        val = mk_list_entry_last(mv->val.list, struct flb_slist_entry, _head);
-
-        flb_http_add_header(c,
-                            key->str, flb_sds_len(key->str),
-                            val->str, flb_sds_len(val->str));
-    }
-
-    ret = flb_http_do(c, &b_sent);
-    if (ret == 0) {
-        /*
-         * Only allow the following HTTP status:
-         *
-         * - 200: OK
-         * - 201: Created
-         * - 202: Accepted
-         * - 203: no authorative resp
-         * - 204: No Content
-         * - 205: Reset content
-         *
-         */
-        if (c->resp.status < 200 || c->resp.status > 205) {
-            flb_error("[out_http] %s:%i, HTTP status=%i",
-                      ctx->host, ctx->port, c->resp.status);
-            out_ret = FLB_RETRY;
-        }
-        else {
-            if (c->resp.payload) {
-                flb_info("[out_http] %s:%i, HTTP status=%i\n%s",
-                         ctx->host, ctx->port,
-                         c->resp.status, c->resp.payload);
-            }
-            else {
-                flb_info("[out_http] %s:%i, HTTP status=%i",
-                         ctx->host, ctx->port,
-                         c->resp.status);
-            }
-        }
-    }
-    else {
-        flb_error("[out_http] could not flush records to %s:%i (http_do=%i)",
-                  ctx->host, ctx->port, ret);
-        out_ret = FLB_RETRY;
-    }
-
-    /*
-     * If the payload buffer is different than incoming records in body, means
-     * we generated a different payload and must be freed.
-     */
-    if (payload_buf != body) {
-        flb_free(payload_buf);
-    }
-
-    /* Destroy HTTP client context */
-    flb_http_client_destroy(c);
-
-    /* Release the TCP connection */
-    flb_upstream_conn_release(u_conn);
-
-    return out_ret;
+    printf(body)
+    // int ret;
+    // int out_ret = FLB_OK;
+    // int compressed = FLB_FALSE;
+    // size_t b_sent;
+    // void *payload_buf = NULL;
+    // size_t payload_size = 0;
+    // struct flb_upstream *u;
+    // struct flb_upstream_conn *u_conn;
+    // struct flb_http_client *c;
+    // struct mk_list *head;
+    // struct flb_config_map_val *mv;
+    // struct flb_slist_entry *key = NULL;
+    // struct flb_slist_entry *val = NULL;
+    //
+    // /* Get upstream context and connection */
+    // u = ctx->u;
+    // u_conn = flb_upstream_conn_get(u);
+    // if (!u_conn) {
+    //     flb_error("[out_http] no upstream connections available to %s:%i",
+    //               u->tcp_host, u->tcp_port);
+    //     return FLB_RETRY;
+    // }
+    //
+    // /* Map payload */
+    // payload_buf = (void *) body;
+    // payload_size = body_len;
+    //
+    // /* Should we compress the payload ? */
+    // if (ctx->compress_gzip == FLB_TRUE) {
+    //     ret = flb_gzip_compress((void *) body, body_len,
+    //                             &payload_buf, &payload_size);
+    //     if (ret == -1) {
+    //         flb_error("[out_http] cannot gzip payload, disabling compression");
+    //     }
+    //     else {
+    //         compressed = FLB_TRUE;
+    //     }
+    // }
+    //
+    // /* Create HTTP client context */
+    // c = flb_http_client(u_conn, FLB_HTTP_POST, ctx->uri,
+    //                     payload_buf, payload_size,
+    //                     ctx->host, ctx->port,
+    //                     ctx->proxy, 0);
+    //
+    // /* Append headers */
+    // if ((ctx->out_format == FLB_PACK_JSON_FORMAT_JSON) ||
+    //     (ctx->out_format == FLB_PACK_JSON_FORMAT_STREAM) ||
+    //     (ctx->out_format == FLB_PACK_JSON_FORMAT_LINES) ||
+    //     (ctx->out_format == FLB_HTTP_OUT_GELF)) {
+    //     flb_http_add_header(c,
+    //                         FLB_HTTP_CONTENT_TYPE,
+    //                         sizeof(FLB_HTTP_CONTENT_TYPE) - 1,
+    //                         FLB_HTTP_MIME_JSON,
+    //                         sizeof(FLB_HTTP_MIME_JSON) - 1);
+    // }
+    // else {
+    //     flb_http_add_header(c,
+    //                         FLB_HTTP_CONTENT_TYPE,
+    //                         sizeof(FLB_HTTP_CONTENT_TYPE) - 1,
+    //                         FLB_HTTP_MIME_MSGPACK,
+    //                         sizeof(FLB_HTTP_MIME_MSGPACK) - 1);
+    // }
+    //
+    // if (ctx->header_tag) {
+    //     flb_http_add_header(c,
+    //                         ctx->header_tag,
+    //                         flb_sds_len(ctx->header_tag),
+    //                         tag, tag_len);
+    // }
+    //
+    // /* Content Encoding: gzip */
+    // if (compressed == FLB_TRUE) {
+    //     flb_http_set_content_encoding_gzip(c);
+    // }
+    //
+    // /* Basic Auth headers */
+    // if (ctx->http_user && ctx->http_passwd) {
+    //     flb_http_basic_auth(c, ctx->http_user, ctx->http_passwd);
+    // }
+    //
+    // flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+    //
+    // flb_config_map_foreach(head, mv, ctx->headers) {
+    //     key = mk_list_entry_first(mv->val.list, struct flb_slist_entry, _head);
+    //     val = mk_list_entry_last(mv->val.list, struct flb_slist_entry, _head);
+    //
+    //     flb_http_add_header(c,
+    //                         key->str, flb_sds_len(key->str),
+    //                         val->str, flb_sds_len(val->str));
+    // }
+    //
+    // ret = flb_http_do(c, &b_sent);
+    // if (ret == 0) {
+    //     /*
+    //      * Only allow the following HTTP status:
+    //      *
+    //      * - 200: OK
+    //      * - 201: Created
+    //      * - 202: Accepted
+    //      * - 203: no authorative resp
+    //      * - 204: No Content
+    //      * - 205: Reset content
+    //      *
+    //      */
+    //     if (c->resp.status < 200 || c->resp.status > 205) {
+    //         flb_error("[out_http] %s:%i, HTTP status=%i",
+    //                   ctx->host, ctx->port, c->resp.status);
+    //         out_ret = FLB_RETRY;
+    //     }
+    //     else {
+    //         if (c->resp.payload) {
+    //             flb_info("[out_http] %s:%i, HTTP status=%i\n%s",
+    //                      ctx->host, ctx->port,
+    //                      c->resp.status, c->resp.payload);
+    //         }
+    //         else {
+    //             flb_info("[out_http] %s:%i, HTTP status=%i",
+    //                      ctx->host, ctx->port,
+    //                      c->resp.status);
+    //         }
+    //     }
+    // }
+    // else {
+    //     flb_error("[out_http] could not flush records to %s:%i (http_do=%i)",
+    //               ctx->host, ctx->port, ret);
+    //     out_ret = FLB_RETRY;
+    // }
+    //
+    // /*
+    //  * If the payload buffer is different than incoming records in body, means
+    //  * we generated a different payload and must be freed.
+    //  */
+    // if (payload_buf != body) {
+    //     flb_free(payload_buf);
+    // }
+    //
+    // /* Destroy HTTP client context */
+    // flb_http_client_destroy(c);
+    //
+    // /* Release the TCP connection */
+    // flb_upstream_conn_release(u_conn);
+    //
+    // return out_ret;
 }
 
 static int http_gelf(struct flb_out_http *ctx,
