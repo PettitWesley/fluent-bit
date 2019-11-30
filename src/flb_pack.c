@@ -486,27 +486,27 @@ static int msgpack2json(char *buf, int *off, size_t left,
         break;
 
     case MSGPACK_OBJECT_STR:
-        if (try_to_write(buf, off, left, "\"", 1) &&
+        if (try_to_write(buf, off, left, "\\\"", 2) &&
             (o->via.str.size > 0 ?
              try_to_write_str(buf, off, left, o->via.str.ptr, o->via.str.size)
              : 1/* nothing to do */) &&
-            try_to_write(buf, off, left, "\"", 1)) {
+            try_to_write(buf, off, left, "\\\"", 2)) {
             ret = FLB_TRUE;
         }
         break;
 
     case MSGPACK_OBJECT_BIN:
-        if (try_to_write(buf, off, left, "\"", 1) &&
+        if (try_to_write(buf, off, left, "\\\"", 2) &&
             (o->via.bin.size > 0 ?
              try_to_write_str(buf, off, left, o->via.bin.ptr, o->via.bin.size)
               : 1 /* nothing to do */) &&
-            try_to_write(buf, off, left, "\"", 1)) {
+            try_to_write(buf, off, left, "\\\"", 2)) {
             ret = FLB_TRUE;
         }
         break;
 
     case MSGPACK_OBJECT_EXT:
-        if (!try_to_write(buf, off, left, "\"", 1)) {
+        if (!try_to_write(buf, off, left, "\\\"", 2)) {
             goto msg2json_end;
         }
         /* ext body. fortmat is similar to printf(1) */
@@ -521,7 +521,7 @@ static int msgpack2json(char *buf, int *off, size_t left,
                 }
             }
         }
-        if (!try_to_write(buf, off, left, "\"", 1)) {
+        if (!try_to_write(buf, off, left, "\\\"", 2)) {
             goto msg2json_end;
         }
         ret = FLB_TRUE;
@@ -866,8 +866,6 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
                 flb_sds_destroy(out_buf);
                 return NULL;
             }
-
-            flb_info(out_js);
 
 
             // append header
