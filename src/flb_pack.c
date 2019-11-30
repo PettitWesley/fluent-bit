@@ -719,8 +719,7 @@ flb_sds_t flb_pack_msgpack_to_json_format(const char *data, uint64_t bytes,
     struct tm tm;
     struct flb_time tms;
 
-    flb_info("json_format: ");
-    flb_info(json_format);
+    flb_info("json_format: %d", json_format);
 
     if (!date_key) {
         return NULL;
