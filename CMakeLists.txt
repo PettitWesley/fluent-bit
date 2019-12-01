@@ -9,6 +9,10 @@ set(FLB_VERSION_STR "${FLB_VERSION_MAJOR}.${FLB_VERSION_MINOR}.${FLB_VERSION_PAT
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(CRYPTO_INCLUDE_DIR)
+   include_directories(SYSTEM ${CRYPTO_INCLUDE_DIR} )
+endif()
+
 # Define macro to identify Windows system (without Cygwin)
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
   set(FLB_SYSTEM_WINDOWS On)
@@ -743,9 +747,18 @@ endif()
 
 include(CPack)
 
+
+set(LibCrypto_INCLUDE_DIR /usr/include)
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+install(FILES "cmake/FindLibCrypto.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/"
+        COMPONENT Development)
+install(FILES "cmake/FindLibCryptoCAL.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/"
+        COMPONENT Development)
 find_package(aws-c-common REQUIRED)
 find_package(aws-c-http REQUIRED)
 find_package(aws-c-mqtt REQUIRED)
 find_package(aws-c-cal REQUIRED)
 find_package(aws-c-auth REQUIRED)
-target_link_libraries(${CMAKE_PROJECT_NAME} AWS::aws-c-common AWS::aws-c-auth AWS::aws-c-cal AWS::aws-c-http AWS::aws-c-mqtt)
+# target_link_libraries( AWS::aws-c-common AWS::aws-c-auth AWS::aws-c-cal AWS::aws-c-http AWS::aws-c-mqtt)
