@@ -17,7 +17,6 @@
  *  limitations under the License.
  */
 
-// todo: not all of these are needed
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_output.h>
 #include <fluent-bit/flb_http_client.h>
@@ -31,15 +30,13 @@
 #include <fluent-bit/flb_io.h>
 #include <msgpack.h>
 
-#include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <errno.h>
 
 #include "aws.h"
 
-static int get_ec2_token(struct flb_filter_aws *ctx);
-static int get_metadata(struct flb_filter_aws *ctx, char *metadata_path, flb_sds_t *metadata, unsigned int *metadata_len);
+static int get_ec2_token(struct flb_filter_aws *ctx, struct flb_upstream_conn *u_conn);
+static int get_metadata(struct flb_filter_aws *ctx, struct flb_upstream_conn *u_conn, char *metadata_path, flb_sds_t *metadata, int *metadata_len);
 
 static int cb_aws_init(struct flb_filter_instance *f_ins,
                                 struct flb_config *config,
@@ -47,6 +44,8 @@ static int cb_aws_init(struct flb_filter_instance *f_ins,
 {
     struct flb_filter_aws *ctx = NULL;
     (void) data;
+
+    flb_debug("[debug_aws] in cb_aws_init");
 
     /* Create context */
     ctx = flb_malloc(sizeof(struct flb_filter_aws));
@@ -95,37 +94,27 @@ static int cb_aws_init(struct flb_filter_instance *f_ins,
         return -1;
     }
 
-    /* Remove async flag from upstream */
-    ctx->ec2_upstream->flags &= ~(FLB_IO_ASYNC);
-
     flb_filter_set_context(f_ins, ctx);
 
     return 0;
 }
 
 /* Get an IMDSv2 token */
-static int get_ec2_token(struct flb_filter_aws *ctx)
+static int get_ec2_token(struct flb_filter_aws *ctx, struct flb_upstream_conn *u_conn)
 {
     struct flb_http_client *client;
     size_t b_sent;
     int ret;
-    struct flb_upstream_conn *u_conn;
 
-    u_conn = flb_upstream_conn_get(ctx->ec2_upstream);
-    if (!u_conn) {
-        flb_error("[filter_aws] connection initialization error");
-        return -1;
-    }
+    flb_debug("[filter_aws] getting an IMDSv2 token");
 
     /* Compose HTTP Client request */
     client = flb_http_client(u_conn, FLB_HTTP_PUT,
                         FLB_FILTER_AWS_IMDS_V2_TOKEN_PATH,
-                        NULL, 0, FLB_FILTER_AWS_IMDS_V2_HOST,
-                        80, NULL, 0);
+                        NULL, 0, NULL, 0, NULL, 0);
 
     if (!client) {
         flb_error("[filter_aws] count not create http client");
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
 
@@ -145,7 +134,6 @@ static int get_ec2_token(struct flb_filter_aws *ctx)
                       client->resp.payload);
         }
         flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
 
@@ -153,33 +141,24 @@ static int get_ec2_token(struct flb_filter_aws *ctx)
     ctx->imds_v2_token_len = client->resp.payload_size;
 
     flb_http_client_destroy(client);
-    flb_upstream_conn_release(u_conn);
     return 0;
 }
 
-static int get_metadata(struct flb_filter_aws *ctx, char *metadata_path, flb_sds_t *metadata, unsigned int *metadata_len)
+static int get_metadata(struct flb_filter_aws *ctx, struct flb_upstream_conn *u_conn, char *metadata_path, flb_sds_t *metadata, int *metadata_len)
 {
     struct flb_http_client *client;
     size_t b_sent;
     int ret;
-    struct flb_upstream_conn *u_conn;
 
-    u_conn = flb_upstream_conn_get(ctx->ec2_upstream);
-    if (!u_conn) {
-        flb_error("[filter_aws] connection initialization error");
-        return -1;
-    }
+    flb_debug("[filter_aws] requesting %s", metadata_path);
 
     /* Compose HTTP Client request */
-    client = flb_http_client(u_conn,
-                        FLB_HTTP_GET, metadata_path,
-                        NULL, 0,
-                        FLB_FILTER_AWS_IMDS_V2_HOST, 80,
-                        NULL, 0);
+    client = flb_http_client(u_conn, FLB_HTTP_GET,
+                        metadata_path,
+                        NULL, 0, NULL, 0, NULL, 0);
 
     if (!client) {
         flb_error("[filter_aws] count not create http client");
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
 
@@ -187,11 +166,6 @@ static int get_metadata(struct flb_filter_aws *ctx, char *metadata_path, flb_sds
                         FLB_FILTER_AWS_IMDS_V2_TOKEN_HEADER_LEN,
                         ctx->imds_v2_token,
                         ctx->imds_v2_token_len);
-
-    flb_http_add_header(client, "Accept",
-                        6,
-                        "*/*",
-                        3);
 
     /* Perform request */
     ret = flb_http_do(client, &b_sent);
@@ -204,7 +178,6 @@ static int get_metadata(struct flb_filter_aws *ctx, char *metadata_path, flb_sds
                       client->resp.payload);
         }
         flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
 
@@ -212,7 +185,6 @@ static int get_metadata(struct flb_filter_aws *ctx, char *metadata_path, flb_sds
     *metadata_len = client->resp.payload_size;
 
     flb_http_client_destroy(client);
-    flb_upstream_conn_release(u_conn);
     return 0;
 }
 
@@ -221,32 +193,46 @@ static int get_metadata(struct flb_filter_aws *ctx, char *metadata_path, flb_sds
    */
 static int get_ec2_metadata(struct flb_filter_aws *ctx)
 {
+    flb_debug("[debug_aws] in get_ec2_metadata");
+    struct flb_upstream_conn *u_conn;
     int ret;
 
+    flb_debug("%p", ctx);
+    flb_debug("%p", ctx->ec2_upstream);
+    u_conn = flb_upstream_conn_get(ctx->ec2_upstream);
+    if (!u_conn) {
+        flb_error("[filter_aws] connection initialization error");
+        return -1;
+    }
+
     if (!ctx->imds_v2_token) {
-        ret = get_ec2_token(ctx);
+        ret = get_ec2_token(ctx, u_conn);
 
         if (ret < 0) {
+            flb_upstream_conn_release(u_conn);
             return -1;
         }
     }
 
     if (ctx->instance_id_include && !ctx->instance_id) {
-        ret = get_metadata(ctx, FLB_FILTER_AWS_IMDS_V2_INSTANCE_ID_PATH, &ctx->instance_id, &ctx->instance_id_len);
+        ret = get_metadata(ctx, u_conn, FLB_FILTER_AWS_IMDS_V2_INSTANCE_ID_PATH, &ctx->instance_id, &ctx->instance_id_len);
 
         if (ret < 0) {
+            flb_upstream_conn_release(u_conn);
             return -1;
         }
     }
 
     if (ctx->availability_zone_include && !ctx->availability_zone) {
-        ret = get_metadata(ctx, FLB_FILTER_AWS_IMDS_V2_AZ_PATH, &ctx->availability_zone, &ctx->availability_zone_len);
+        ret = get_metadata(ctx, u_conn, FLB_FILTER_AWS_IMDS_V2_AZ_PATH, &ctx->availability_zone, &ctx->availability_zone_len);
 
         if (ret < 0) {
+            flb_upstream_conn_release(u_conn);
             return -1;
         }
     }
 
+    flb_upstream_conn_release(u_conn);
     ctx->metadata_retrieved = FLB_TRUE;
     return 0;
 }
@@ -270,6 +256,8 @@ static int cb_aws_filter(const void *data, size_t bytes,
     msgpack_unpacked result;
     msgpack_object  *obj;
     msgpack_object_kv *kv;
+
+    flb_debug("[debug_aws] in cb_aws_filter");
 
     /* First check that the metadata has been retrieved */
     if (!ctx->metadata_retrieved) {
