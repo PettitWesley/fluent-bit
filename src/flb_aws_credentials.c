@@ -17,6 +17,13 @@
  *  limitations under the License.
  */
 
+#include <fluent-bit/flb_info.h>
+#include <fluent-bit/flb_sds.h>
+#include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_aws_credentials.h>
+
+#include <stdlib.h>
+
 /*
  * A provider that wraps other providers and adds a cache.
  */
@@ -77,17 +84,70 @@ struct aws_credentials_provider_default_chain {
 };
 
 
-int get_credentials_fn_environment(struct aws_credentials_provider *provider) {
+aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider *provider) {
+    char *access_key;
+    char *secret_key;
+    char *session_token;
+    aws_credentials *creds;
+
+    access_key = getenv(AWS_ACCESS_KEY_ID);
+    if (!access_key) {
+        return NULL
+    }
+
+    secret_key = getenv(AWS_SECRET_ACCESS_KEY);
+    if (!secret_key) {
+        flb_free(access_key);
+        return NULL
+    }
+
+    creds = flb_malloc(sizeof(struct aws_credentials));
+    if (!creds) {
+        flb_free(access_key);
+        flb_free(secret_key);
+        return NULL
+    }
+
+    creds->access_key_id = flb_sds_create(access_key);
+    creds->secret_access_key = flb_sds_create(secret_key);
+
+    session_token = getenv(AWS_SESSION_TOKEN);
+    if (session_token) {
+        creds->session_token = session_token;
+    }
+
+    return creds;
 
 }
 
-/*
- * Force a refesh of credentials. This is needed for providers that cache
- * credentials. If the client receives a response from AWS indicating that
- * the credentials are expired, they can call this method.
- */
-typedef int(aws_credentials_provider_refresh_fn)(struct aws_credentials_provider *provider);
+/* Refresh is a no-op for the env provider */
+int refresh_fn_environment(struct aws_credentials_provider *provider) {
+    return 0;
+}
 
 
-/* Clean up the underlying provider implementation */
-typedef void(aws_credentials_provider_destroy_fn)(struct aws_credentials_provider *provider);
+/* Destroy is a no-op for the env provider */
+void destroy_fn_environment(struct aws_credentials_provider *provider) {
+    return;
+}
+
+static struct aws_credentials_provider_vtable environment_provider_vtable = {
+    .get_credentials = get_credentials_fn_environment,
+    .refresh = refresh_fn_environment,
+    .destroy = destroy_fn_environment,
+};
+
+struct aws_credentials_provider *new_environment_provider() {
+    struct aws_credentials_provider provider = flb_malloc(
+                                                          sizeof(
+                                                          struct aws_credentials_provider));
+
+    if (!provider) {
+        return NULL;
+    }
+
+    provider->provider_vtable = &environment_provider_vtable;
+    provider->implementation = NULL;
+
+    return provider;
+}

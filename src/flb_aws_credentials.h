@@ -22,17 +22,34 @@
 #ifndef FLB_AWS_CREDENTIALS_H
 #define FLB_AWS_CREDENTIALS_H
 
+
+/* Credentials Environment Variables */
+#define AWS_ACCESS_KEY_ID          "AWS_ACCESS_KEY_ID"
+#define AWS_SECRET_ACCESS_KEY      "AWS_SECRET_ACCESS_KEY"
+#define AWS_SESSION_TOKEN          "AWS_SESSION_TOKEN"
+
+
+
 /*
  * A structure that wraps the sensitive data needed to sign an AWS request
  */
 struct aws_credentials {
-    flb_sds_t *access_key_id;
-    flb_sds_t *secret_access_key;
-    flb_sds_t *session_token;
+    flb_sds_t access_key_id;
+    flb_sds_t secret_access_key;
+    flb_sds_t session_token;
 };
 
-/* Get credentials using the provider */
-typedef int(aws_credentials_provider_get_credentials_fn)(struct aws_credentials_provider *provider);
+/*
+ * Function to free memory used by an aws_credentials structure
+ */
+void aws_credentials_destroy(struct aws_credentials *creds);
+
+/*
+ * Get credentials using the provider.
+ * Client is in charge of freeing the returned credentials struct.
+ * Returns NULL if credentials could not be obtained.
+ */
+typedef aws_credentials*(aws_credentials_provider_get_credentials_fn)(struct aws_credentials_provider *provider);
 
 /*
  * Force a refesh of credentials. This is needed for providers that cache
@@ -42,7 +59,10 @@ typedef int(aws_credentials_provider_get_credentials_fn)(struct aws_credentials_
 typedef int(aws_credentials_provider_refresh_fn)(struct aws_credentials_provider *provider);
 
 
-/* Clean up the underlying provider implementation */
+/*
+ * Clean up the underlying provider implementation
+ * Clients should call this and then free the aws_credentials_provider structure.
+ */
 typedef void(aws_credentials_provider_destroy_fn)(struct aws_credentials_provider *provider);
 
 /*
@@ -68,7 +88,12 @@ struct aws_credentials_provider {
  */
 struct aws_credentials_provider *new_cached_provider(struct
                                                     aws_credentials_provider
-                                                    *provider);
+                                                    *provider, unsigned long ttl);
+
+/*
+ * Standard Environment variables
+ */
+struct aws_credentials_provider *new_environment_provider();
 
 /*
  * New EC2 IMDS provider
