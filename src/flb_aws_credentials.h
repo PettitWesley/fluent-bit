@@ -32,14 +32,14 @@ struct aws_credentials {
 };
 
 /* Get credentials using the provider */
-typedef void(aws_credentials_provider_get_credentials_fn)(struct aws_credentials_provider *provider);
+typedef int(aws_credentials_provider_get_credentials_fn)(struct aws_credentials_provider *provider);
 
 /*
  * Force a refesh of credentials. This is needed for providers that cache
  * credentials. If the client receives a response from AWS indicating that
  * the credentials are expired, they can call this method.
  */
-typedef void(aws_credentials_provider_refresh_fn)(struct aws_credentials_provider *provider);
+typedef int(aws_credentials_provider_refresh_fn)(struct aws_credentials_provider *provider);
 
 
 /* Clean up the underlying provider implementation */
@@ -53,7 +53,6 @@ struct aws_credentials_provider_vtable {
     aws_credentials_provider_get_credentials_fn *get_credentials;
     aws_credentials_provider_refresh_fn *refresh;
     aws_credentials_provider_destroy_fn *destroy;
-    void *implementation;
 };
 
 /*
@@ -65,45 +64,40 @@ struct aws_credentials_provider {
 };
 
 /*
- * A provider that wraps other providers and adds a cache.
+ * A provider that wraps another provider and adds a cache.
  */
-struct aws_credentials_provider_cached {
-    struct aws_credentials *credentials;
-    unsigned long next_refresh;
-    unsigned long ttl;
-
-    /* Underlying provider */
-    struct aws_credentials_provider *provider;
-};
+struct aws_credentials_provider *new_cached_provider(struct
+                                                    aws_credentials_provider
+                                                    *provider);
 
 /*
- * A provider that obtains credentials from an http endpoint.
- * On ECS the ECS Agent vends credentials via a link local IP address.
- * Some customers build local HTTP services that provide the same functionality.
+ * New EC2 IMDS provider
  */
-struct aws_credentials_provider_http {
-    struct aws_credentials *credentials;
-    unsigned long expiration;
-
-    /* upstream connection to host */
-    struct flb_upstream *upstream;
-
-    /* Host and Path to request credentials */
-    char *host;
-    char *path;
-};
+struct aws_credentials_provider *new_imds_provider();
 
 /*
- * A provider that obtains credentials from EC2 IMDS.
+ * New ECS provider
  */
-struct aws_credentials_provider_imds {
-    struct aws_credentials *credentials;
-    unsigned long expiration;
+struct aws_credentials_provider *new_ecs_provider();
 
-    /* upstream connection to IMDS */
-    struct flb_upstream *upstream;
-};
+/*
+ * New http provider
+ */
+struct aws_credentials_provider *new_http_provider();
 
+/*
+ * The standard credential provider chain:
+ * 1. Environment variables
+ * 2. Shared credentials file (AWS Profile)
+ * 3. EC2 IMDS
+ * 4. ECS HTTP credentials endpoint
+ *
+ * This provider will evaluate each provider in order, returning the result
+ * from the first provider that returns valid credentials.
+ *
+ * Note: Client code should use this provider by default.
+ */
+struct aws_credentials_provider *new_standard_chain_provider();
 
 
 #endif
