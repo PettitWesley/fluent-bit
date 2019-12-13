@@ -24,10 +24,15 @@
 
 
 /* Credentials Environment Variables */
-#define AWS_ACCESS_KEY_ID          "AWS_ACCESS_KEY_ID"
-#define AWS_SECRET_ACCESS_KEY      "AWS_SECRET_ACCESS_KEY"
-#define AWS_SESSION_TOKEN          "AWS_SESSION_TOKEN"
+#define AWS_ACCESS_KEY_ID              "AWS_ACCESS_KEY_ID"
+#define AWS_SECRET_ACCESS_KEY          "AWS_SECRET_ACCESS_KEY"
+#define AWS_SESSION_TOKEN              "AWS_SESSION_TOKEN"
 
+/* Refresh creds/token if they will expire in 10 min or less */
+#define FLB_AWS_REFRESH_WINDOW         600
+
+#define FLB_AWS_IMDS_V2_ROLE_PATH      "/latest/meta-data/iam/security-credentials/"
+#define FLB_AWS_IMDS_V2_ROLE_PATH_LEN  43
 
 
 /*

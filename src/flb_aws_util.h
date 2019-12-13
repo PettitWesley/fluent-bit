@@ -19,8 +19,8 @@
 
 #ifdef FLB_HAVE_AWS
 
-#ifndef FLB_AWS_CREDENTIALS_H
-#define FLB_AWS_CREDENTIALS_H
+#ifndef FLB_AWS_UTIL_H
+#define FLB_AWS_UTIL_H
 
 #define FLB_AWS_IMDS_V2_TOKEN_TTL_HEADER           "X-aws-ec2-metadata-token-ttl-seconds"
 #define FLB_AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN       36

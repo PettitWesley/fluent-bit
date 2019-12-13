@@ -71,6 +71,13 @@ static int get_ec2_token(struct flb_upstream *upstream, flb_sds_t *token, unsign
 
     *token = flb_sds_create_len(client->resp.payload,
                                 client->resp.payload_size);
+
+    if (!token) {
+        flb_errno();
+        flb_http_client_destroy(client);
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
     *token_len->imds_v2_token_len = client->resp.payload_size;
 
     flb_http_client_destroy(client);

@@ -21,6 +21,7 @@
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_aws_credentials.h>
+#include <fluent-bit/flb_aws_util.h>
 
 #include <stdlib.h>
 
@@ -65,8 +66,8 @@ static struct aws_credentials_provider_imds {
 
     /* IMDSv2 Token */
     flb_sds_t imds_v2_token;
-    size_t imds_v2_token_len;
-    unsigned long token_expiration;
+    unsigned int imds_v2_token_len;
+    unsigned long token_refresh;
  };
 
 /*
@@ -110,6 +111,7 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
     if (!creds) {
         flb_free(access_key);
         flb_free(secret_key);
+        flb_errno();
         return NULL
     }
 
@@ -148,6 +150,7 @@ struct aws_credentials_provider *new_environment_provider() {
                                                           struct aws_credentials_provider));
 
     if (!provider) {
+        flb_errno();
         return NULL;
     }
 
@@ -170,6 +173,7 @@ aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provid
 
     creds = flb_malloc(sizeof(struct aws_credentials));
     if (!creds) {
+        flb_errno();
         return NULL
     }
 
@@ -183,10 +187,78 @@ aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provid
 }
 
 
-static int imds_request_creds(struct aws_credentials_provider_imds *implementation)
+static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
 {
-    //implementation->token_expiration = (unsigned long) time(NULL) + FLB_AWS_IMDS_V2_TOKEN_TTL
+    int ret;
+    flb_sds_t instance_role;
+    unsigned int instance_role_len;
+    char *cred_path;
+    size_t cred_path_size;
 
+    if (!implementation->imds_v2_token || ((unsigned long) time(NULL) > implementation->token_refresh)) {
+        ret = get_ec2_token(implementation->upstream,
+                            &implementation->imds_v2_token,
+                            &implementation->imds_v2_token_len);
+        if (ret < 0) {
+            return -1;
+        }
+
+        implementation->token_refresh = (unsigned long) time(NULL)
+                                           + FLB_AWS_IMDS_V2_TOKEN_TTL
+                                           - FLB_AWS_REFRESH_WINDOW;
+    }
+
+    /* Get the name of the instance role */
+    ret = get_metadata(implementation->upstream, FLB_AWS_IMDS_V2_ROLE_PATH,
+                       &instance_role, &instance_role_len,
+                       implementation->imds_v2_token,
+                       implementation->imds_v2_token_len);
+
+    if (ret < 0) {
+        return -1;
+    }
+
+    /* Construct path where we will find the credentials */
+    cred_path_size = sizeof(char) * (FLB_AWS_IMDS_V2_ROLE_PATH_LEN + instance_role_len) + 1;
+    cred_path = flb_malloc(cred_path_size);
+    if (!cred_path) {
+        flb_sds_destroy(instance_role);
+        flb_errno();
+    }
+
+    ret = snprintf(cred_path, cred_path_size, "%s%s", FLB_AWS_IMDS_V2_ROLE_PATH, instance_role);
+    if (ret < 0) {
+        flb_sds_destroy(instance_role);
+        flb_free(cred_path);
+        flb_errno();
+    }
+
+    // process creds
+
+    flb_sds_destroy(instance_role);
+    flb_free(cred_path);
+    return 0;
+
+}
+
+static int imds_credentials_request(struct aws_credentials_provider_imds *implementation, char *cred_path)
+{
+    int ret;
+    flb_sds_t credentials_response;
+    unsigned int credentials_response_len;
+
+    ret = get_metadata(implementation->upstream, cred_path,
+                       &credentials_response, &credentials_response_len,
+                       implementation->imds_v2_token,
+                       implementation->imds_v2_token_len);
+
+    if (ret < 0) {
+        return -1;
+    }
+
+    /* process credentials data and set creds on the implementation */
+
+    return 0;
 }
 
 
@@ -196,6 +268,7 @@ struct aws_credentials_provider *new_imds_provider() {
                                                           struct aws_credentials_provider));
 
     if (!provider) {
+        flb_errno();
         return NULL;
     }
 }
