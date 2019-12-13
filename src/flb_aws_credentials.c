@@ -58,10 +58,15 @@ static struct aws_credentials_provider_http {
  */
 static struct aws_credentials_provider_imds {
     struct aws_credentials *credentials;
-    unsigned long expiration;
+    unsigned long refresh;
 
     /* upstream connection to IMDS */
     struct flb_upstream *upstream;
+
+    /* IMDSv2 Token */
+    flb_sds_t imds_v2_token;
+    size_t imds_v2_token_len;
+    unsigned long token_expiration;
  };
 
 /*
@@ -83,7 +88,7 @@ struct aws_credentials_provider_default_chain {
     struct aws_credentials_provider *ecs_provider;
 };
 
-
+/* Environment Provider */
 aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider *provider) {
     char *access_key;
     char *secret_key;
@@ -150,4 +155,47 @@ struct aws_credentials_provider *new_environment_provider() {
     provider->implementation = NULL;
 
     return provider;
+}
+
+/* EC2 IMDS Provider */
+
+aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provider) {
+    aws_credentials *creds;
+    struct aws_credentials_provider_imds *implementation = provider->implementation;
+
+    /* credentials have not been requested yet, or are about to expire */
+    if (!implementation->credentials || ((unsigned long)time(NULL) > implementation->refresh)) {
+        /* todo: make a call to imds to get creds */
+    }
+
+    creds = flb_malloc(sizeof(struct aws_credentials));
+    if (!creds) {
+        return NULL
+    }
+
+    creds->access_key_id = flb_sds_create(implementation->credentials->access_key_id);
+    creds->secret_access_key = flb_sds_create(implementation->credentials->secret_access_key);
+    if (implementation->credentials->session_token) {
+        creds->session_token = flb_sds_create(implementation->credentials->session_token);
+    }
+
+    return creds;
+}
+
+
+static int imds_request_creds(struct aws_credentials_provider_imds *implementation)
+{
+    //implementation->token_expiration = (unsigned long) time(NULL) + FLB_AWS_IMDS_V2_TOKEN_TTL
+
+}
+
+
+struct aws_credentials_provider *new_imds_provider() {
+    struct aws_credentials_provider provider = flb_malloc(
+                                                          sizeof(
+                                                          struct aws_credentials_provider));
+
+    if (!provider) {
+        return NULL;
+    }
 }

@@ -17,7 +17,7 @@
  *  limitations under the License.
  */
 
-#ifdef FLB_HAVE_AWS_CREDS
+#ifdef FLB_HAVE_AWS
 
 #ifndef FLB_AWS_CREDENTIALS_H
 #define FLB_AWS_CREDENTIALS_H
@@ -126,4 +126,4 @@ struct aws_credentials_provider *new_standard_chain_provider();
 
 
 #endif
-#endif /* FLB_HAVE_AWS_CREDS */
+#endif /* FLB_HAVE_AWS */
