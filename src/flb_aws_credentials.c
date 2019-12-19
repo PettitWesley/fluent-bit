@@ -23,6 +23,7 @@
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
 
+#include <jsmn/jsmn.h>
 #include <stdlib.h>
 
 /*
@@ -30,8 +31,8 @@
  */
 static struct aws_credentials_provider_cached {
     struct aws_credentials *credentials;
-    unsigned long next_refresh;
-    unsigned long ttl;
+    time_t next_refresh;
+    time_t ttl;
 
     /* Underlying provider */
     struct aws_credentials_provider *provider;
@@ -44,7 +45,7 @@ static struct aws_credentials_provider_cached {
  */
 static struct aws_credentials_provider_http {
     struct aws_credentials *credentials;
-    unsigned long expiration;
+    time_t expiration;
 
     /* upstream connection to host */
     struct flb_upstream *upstream;
@@ -59,7 +60,6 @@ static struct aws_credentials_provider_http {
  */
 static struct aws_credentials_provider_imds {
     struct aws_credentials *credentials;
-    unsigned long refresh;
 
     /* upstream connection to IMDS */
     struct flb_upstream *upstream;
@@ -67,7 +67,7 @@ static struct aws_credentials_provider_imds {
     /* IMDSv2 Token */
     flb_sds_t imds_v2_token;
     unsigned int imds_v2_token_len;
-    unsigned long token_refresh;
+    time_t token_refresh;
  };
 
 /*
@@ -121,6 +121,8 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
     session_token = getenv(AWS_SESSION_TOKEN);
     if (session_token) {
         creds->session_token = session_token;
+    } else {
+        creds->session_token = NULL;
     }
 
     return creds;
@@ -166,8 +168,7 @@ aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provid
     aws_credentials *creds;
     struct aws_credentials_provider_imds *implementation = provider->implementation;
 
-    /* credentials have not been requested yet, or are about to expire */
-    if (!implementation->credentials || ((unsigned long)time(NULL) > implementation->refresh)) {
+    if (!implementation->credentials) {
         /* todo: make a call to imds to get creds */
     }
 
@@ -181,6 +182,8 @@ aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provid
     creds->secret_access_key = flb_sds_create(implementation->credentials->secret_access_key);
     if (implementation->credentials->session_token) {
         creds->session_token = flb_sds_create(implementation->credentials->session_token);
+    } else {
+        creds->session_token = NULL;
     }
 
     return creds;
@@ -195,7 +198,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
     char *cred_path;
     size_t cred_path_size;
 
-    if (!implementation->imds_v2_token || ((unsigned long) time(NULL) > implementation->token_refresh)) {
+    if (!implementation->imds_v2_token || (time(NULL) > implementation->token_refresh)) {
         ret = get_ec2_token(implementation->upstream,
                             &implementation->imds_v2_token,
                             &implementation->imds_v2_token_len);
@@ -203,9 +206,9 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
             return -1;
         }
 
-        implementation->token_refresh = (unsigned long) time(NULL)
-                                           + FLB_AWS_IMDS_V2_TOKEN_TTL
-                                           - FLB_AWS_REFRESH_WINDOW;
+        implementation->token_refresh = time(NULL)
+                                        + FLB_AWS_IMDS_V2_TOKEN_TTL
+                                        - FLB_AWS_REFRESH_WINDOW;
     }
 
     /* Get the name of the instance role */
@@ -233,7 +236,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
         flb_errno();
     }
 
-    // process creds
+    // request creds
 
     flb_sds_destroy(instance_role);
     flb_free(cred_path);
@@ -246,6 +249,7 @@ static int imds_credentials_request(struct aws_credentials_provider_imds *implem
     int ret;
     flb_sds_t credentials_response;
     unsigned int credentials_response_len;
+    struct aws_credentials *creds;
 
     ret = get_metadata(implementation->upstream, cred_path,
                        &credentials_response, &credentials_response_len,
@@ -257,8 +261,109 @@ static int imds_credentials_request(struct aws_credentials_provider_imds *implem
     }
 
     /* process credentials data and set creds on the implementation */
+    creds = process_http_credentials_response(credentials_response,
+                                              credentials_response_len);
+
+    if (creds == NULL) {
+        return -1;
+    }
+
 
     return 0;
+}
+
+/*
+ * All HTTP credentials endpoints (IMDS, ECS, custom) follow the same spec:
+ * {
+ *   "AccessKeyId": "ACCESS_KEY_ID",
+ *   "Expiration": "2019-12-18T21:27:58Z",
+ *   "SecretAccessKey": "SECRET_ACCESS_KEY",
+ *   "Token": "SECURITY_TOKEN_STRING"
+ * }
+ * (some implementations (IMDS) have additional fields)
+ */
+static struct aws_credentials *process_http_credentials_response(flb_sds_t response,
+                                                          unsigned int response_len)
+{
+    jsmntok_t *tokens;
+    const jsmntok_t *t;
+    char *current_token;
+    jsmn_parser parser;
+    int tokens_size = 10;
+    size_t size;
+    int ret;
+    struct aws_credentials *creds;
+    int i = 0;
+
+    jsmn_init(&parser);
+
+    size = sizeof(jsmntok_t) * tokens_size;
+    tokens = flb_calloc(1, size);
+    if (!tokens) {
+        flb_errno();
+        return -1;
+    }
+
+    ret = jsmn_parse(&parser, response, response_len,
+                     tokens, tokens_size);
+
+    if (ret == JSMN_ERROR_INVAL || ret == JSMN_ERROR_PART) {
+        flb_free(tokens);
+        return NULL;
+    }
+
+    /* return value is number of tokens parsed */
+    tokens_size = ret;
+
+    creds = flb_calloc(sizeof(struct aws_credentials));
+
+    /*
+     * jsmn will create an array of tokens like:
+     * key, value, key, value
+     */
+    while (i < (tokens_size - 1)) {
+        t = &tokens[i];
+
+        if (t->start == -1 || t->end == -1 || (t->start == 0 && t->end == 0)) {
+            break;
+        }
+
+        if (t->type == JSMN_STRING) {
+            current_token = &response[t->start];
+            response[t->end + 1] = '\0';
+
+            if (strcmp(current_token, AWS_HTTP_RESPONSE_ACCESS_KEY) == 0) {
+                i++;
+                t = &tokens[i];
+                current_token = &response[t->start];
+                creds->access_key_id = flb_sds_create_len(current_token, t->size);
+            }
+            if (strcmp(current_token, AWS_HTTP_RESPONSE_SECRET_KEY) == 0) {
+                i++;
+                t = &tokens[i];
+                current_token = &response[t->start];
+                creds->secret_access_key = flb_sds_create_len(current_token, t->size);
+            }
+            if (strcmp(current_token, AWS_HTTP_RESPONSE_TOKEN) == 0) {
+                i++;
+                t = &tokens[i];
+                current_token = &response[t->start];
+                creds->session_token = flb_sds_create_len(current_token, t->size);
+            }
+        }
+
+        i++;
+    }
+
+    flb_free(tokens);
+
+    if (creds->access_key_id == NULL || creds->secret_access_key == NULL ||
+        creds->session_token == NULL) {
+        flb_free(creds);
+        return NULL:
+    }
+
+    return creds;
 }
 
 
