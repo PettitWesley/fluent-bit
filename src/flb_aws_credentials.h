@@ -56,7 +56,7 @@ void aws_credentials_destroy(struct aws_credentials *creds);
 /*
  * Function to free memory used by an aws_credentials_provider structure
  */
-void aws_provider_destroy(struct aws_credentials *creds);
+void aws_provider_destroy(struct aws_credentials_provider *provider));
 
 /*
  * Get credentials using the provider.

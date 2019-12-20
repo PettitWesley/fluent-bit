@@ -103,24 +103,37 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
 
     secret_key = getenv(AWS_SECRET_ACCESS_KEY);
     if (!secret_key) {
-        flb_free(access_key);
         return NULL;
     }
 
     creds = flb_malloc(sizeof(struct aws_credentials));
     if (!creds) {
-        flb_free(access_key);
-        flb_free(secret_key);
         flb_errno();
         return NULL;
     }
 
     creds->access_key_id = flb_sds_create(access_key);
+    if (!creds->access_key_id) {
+        aws_credentials_destroy(creds);
+        flb_errno();
+        return NULL;
+    }
+
     creds->secret_access_key = flb_sds_create(secret_key);
+    if (!creds->secret_access_key) {
+        aws_credentials_destroy(creds);
+        flb_errno();
+        return NULL;
+    }
 
     session_token = getenv(AWS_SESSION_TOKEN);
     if (session_token) {
-        creds->session_token = session_token;
+        creds->session_token = flb_sds_create(session_token);
+        if (!creds->session_token) {
+            aws_credentials_destroy(creds);
+            flb_errno();
+            return NULL;
+        }
     } else {
         creds->session_token = NULL;
     }
@@ -163,7 +176,6 @@ struct aws_credentials_provider *new_environment_provider() {
 }
 
 /* EC2 IMDS Provider */
-
 aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provider) {
     aws_credentials *creds;
     int ret;
@@ -216,26 +228,71 @@ int refresh_fn_imds(struct aws_credentials_provider *provider) {
     return get_creds_imds(implementation);
 }
 
-// static struct aws_credentials_provider_imds {
-//     struct aws_credentials *credentials;
-//
-//     /* upstream connection to IMDS */
-//     struct flb_upstream *upstream;
-//
-//     /* IMDSv2 Token */
-//     flb_sds_t imds_v2_token;
-//     unsigned int imds_v2_token_len;
-//     time_t token_refresh;
-// };
-
 void destroy_fn_imds(struct aws_credentials_provider *provider) {
     struct aws_credentials_provider_imds *implementation = provider->implementation;
 
-    if (implementation->credentials) {
+    if (implementation) {
+        if (implementation->credentials) {
+            aws_credentials_destroy(implementation->credentials);
+        }
 
+        if (implementation->upstream) {
+            flb_upstream_destroy(implementation->upstream);
+        }
+
+        if (implementation->imds_v2_token) {
+            flb_sds_destroy(implementation->imds_v2_token);
+        }
+
+        flb_free(implementation);
+        provider->implementation = NULL;
     }
 
     return;
+}
+
+static struct aws_credentials_provider_vtable imds_provider_vtable = {
+    .get_credentials = get_credentials_fn_imds,
+    .refresh = refresh_fn_imds,
+    .destroy = destroy_fn_imds,
+};
+
+struct aws_credentials_provider *new_imds_provider() {
+    struct aws_credentials_provider_imds *implementation;
+    struct aws_credentials_provider *provider;
+
+    provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
+
+    if (!provider) {
+        flb_errno();
+        return NULL;
+    }
+
+    implementation = flb_calloc(1, sizeof(struct aws_credentials_provider_imds));
+
+    if (!implementation) {
+        flb_free(provider);
+        flb_errno();
+        return NULL;
+    }
+
+    provider->provider_vtable = &imds_provider_vtable;
+    provider->implementation = implementation;
+
+    implementation->upstream = flb_upstream_create(config,
+                                                   FLB_AWS_IMDS_V2_HOST,
+                                                   80,
+                                                   FLB_IO_TCP,
+                                                   NULL);
+    if (!implementation->upstream) {
+        aws_provider_destroy(provider);
+        flb_error("[aws_credentials] EC2 IMDS: connection initialization error");
+        return NULL;
+    }
+
+    provider->implementation = implementation;
+
+    return provider;
 }
 
 
@@ -446,40 +503,6 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
     return creds;
 }
 
-
-struct aws_credentials_provider *new_imds_provider() {
-    struct aws_credentials_provider_imds *implementation;
-    struct aws_credentials_provider *provider;
-
-    provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
-
-    if (!provider) {
-        flb_errno();
-        return NULL;
-    }
-
-    implementation = flb_calloc(1, sizeof(struct aws_credentials_provider_imds));
-
-    if (!implementation) {
-        flb_errno();
-        return NULL;
-    }
-
-    implementation->upstream = flb_upstream_create(config,
-                                                   FLB_AWS_IMDS_V2_HOST,
-                                                   80,
-                                                   FLB_IO_TCP,
-                                                   NULL);
-    if (!implementation->upstream) {
-        flb_error("[aws_credentials] connection initialization error");
-        return NULL;
-    }
-
-    provider->implementation = implementation;
-
-    return provider;
-}
-
 void aws_credentials_destroy(struct aws_credentials *creds)
 {
     if (creds) {
@@ -494,5 +517,14 @@ void aws_credentials_destroy(struct aws_credentials *creds)
         }
 
         flb_free(creds);
+    }
+}
+
+void aws_provider_destroy(struct aws_credentials_provider *provider))
+{
+    if (provider) {
+        provider->provider_vtable->destroy(provider->implementation);
+
+        flb_free(provider);
     }
 }
