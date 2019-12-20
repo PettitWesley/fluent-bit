@@ -53,7 +53,7 @@ static struct aws_credentials_provider_http {
     /* Host and Path to request credentials */
     char *host;
     char *path;
- };
+};
 
 /*
  * A provider that obtains credentials from EC2 IMDS.
@@ -68,7 +68,7 @@ static struct aws_credentials_provider_imds {
     flb_sds_t imds_v2_token;
     unsigned int imds_v2_token_len;
     time_t token_refresh;
- };
+};
 
 /*
  * The standard credential provider chain:
@@ -98,13 +98,13 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
 
     access_key = getenv(AWS_ACCESS_KEY_ID);
     if (!access_key) {
-        return NULL
+        return NULL;
     }
 
     secret_key = getenv(AWS_SECRET_ACCESS_KEY);
     if (!secret_key) {
         flb_free(access_key);
-        return NULL
+        return NULL;
     }
 
     creds = flb_malloc(sizeof(struct aws_credentials));
@@ -112,7 +112,7 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
         flb_free(access_key);
         flb_free(secret_key);
         flb_errno();
-        return NULL
+        return NULL;
     }
 
     creds->access_key_id = flb_sds_create(access_key);
@@ -147,7 +147,7 @@ static struct aws_credentials_provider_vtable environment_provider_vtable = {
 };
 
 struct aws_credentials_provider *new_environment_provider() {
-    struct aws_credentials_provider provider = flb_malloc(
+    struct aws_credentials_provider provider = flb_calloc(1,
                                                           sizeof(
                                                           struct aws_credentials_provider));
 
@@ -166,22 +166,44 @@ struct aws_credentials_provider *new_environment_provider() {
 
 aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provider) {
     aws_credentials *creds;
+    int ret;
     struct aws_credentials_provider_imds *implementation = provider->implementation;
 
     if (!implementation->credentials) {
-        /* todo: make a call to imds to get creds */
+        ret = get_creds_imds(implementation);
+        if (ret < 0) {
+            return NULL:
+        }
     }
 
     creds = flb_malloc(sizeof(struct aws_credentials));
     if (!creds) {
         flb_errno();
-        return NULL
+        return NULL;
     }
 
     creds->access_key_id = flb_sds_create(implementation->credentials->access_key_id);
+    if (!creds->access_key_id) {
+        flb_errno();
+        aws_credentials_destroy(creds);
+        return NULL;
+    }
+
     creds->secret_access_key = flb_sds_create(implementation->credentials->secret_access_key);
+    if (!creds->secret_access_key) {
+        flb_errno();
+        aws_credentials_destroy(creds);
+        return NULL;
+    }
+
     if (implementation->credentials->session_token) {
         creds->session_token = flb_sds_create(implementation->credentials->session_token);
+        if (!creds->session_token) {
+            flb_errno();
+            aws_credentials_destroy(creds);
+            return NULL;
+        }
+
     } else {
         creds->session_token = NULL;
     }
@@ -189,7 +211,35 @@ aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provid
     return creds;
 }
 
+int refresh_fn_imds(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_imds *implementation = provider->implementation;
+    return get_creds_imds(implementation);
+}
 
+// static struct aws_credentials_provider_imds {
+//     struct aws_credentials *credentials;
+//
+//     /* upstream connection to IMDS */
+//     struct flb_upstream *upstream;
+//
+//     /* IMDSv2 Token */
+//     flb_sds_t imds_v2_token;
+//     unsigned int imds_v2_token_len;
+//     time_t token_refresh;
+// };
+
+void destroy_fn_imds(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_imds *implementation = provider->implementation;
+
+    if (implementation->credentials) {
+
+    }
+
+    return;
+}
+
+
+/* Requests creds from IMDS and sets them on the provider */
 static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
 {
     int ret;
@@ -227,6 +277,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
     if (!cred_path) {
         flb_sds_destroy(instance_role);
         flb_errno();
+        return -1;
     }
 
     ret = snprintf(cred_path, cred_path_size, "%s%s", FLB_AWS_IMDS_V2_ROLE_PATH, instance_role);
@@ -234,13 +285,15 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
         flb_sds_destroy(instance_role);
         flb_free(cred_path);
         flb_errno();
+        return -1;
     }
 
-    // request creds
+    /* request creds */
+    ret = imds_credentials_request(implementation, cred_path);
 
     flb_sds_destroy(instance_role);
     flb_free(cred_path);
-    return 0;
+    return ret;
 
 }
 
@@ -260,15 +313,16 @@ static int imds_credentials_request(struct aws_credentials_provider_imds *implem
         return -1;
     }
 
-    /* process credentials data and set creds on the implementation */
     creds = process_http_credentials_response(credentials_response,
                                               credentials_response_len);
 
     if (creds == NULL) {
+        flb_sds_destroy(credentials_response);
         return -1;
     }
+    implementation->credentials = creds;
 
-
+    flb_sds_destroy(credentials_response);
     return 0;
 }
 
@@ -281,6 +335,9 @@ static int imds_credentials_request(struct aws_credentials_provider_imds *implem
  *   "Token": "SECURITY_TOKEN_STRING"
  * }
  * (some implementations (IMDS) have additional fields)
+ * TODO: Implement parsing of the expiration for performance improvement.
+ * (Client code must always force a new cred lookup if API responds with
+ * auth error, so proactively refreshing creds is a nicety).
  */
 static struct aws_credentials *process_http_credentials_response(flb_sds_t response,
                                                           unsigned int response_len)
@@ -315,7 +372,12 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
     /* return value is number of tokens parsed */
     tokens_size = ret;
 
-    creds = flb_calloc(sizeof(struct aws_credentials));
+    creds = flb_calloc(1, sizeof(struct aws_credentials));
+    if (!creds) {
+        flb_free(tokens);
+        flb_errno();
+        return NULL;
+    }
 
     /*
      * jsmn will create an array of tokens like:
@@ -337,18 +399,36 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
                 t = &tokens[i];
                 current_token = &response[t->start];
                 creds->access_key_id = flb_sds_create_len(current_token, t->size);
+                if (!creds->access_key_id) {
+                    flb_errno();
+                    aws_credentials_destroy(creds);
+                    flb_free(tokens);
+                    return NULL;
+                }
             }
             if (strcmp(current_token, AWS_HTTP_RESPONSE_SECRET_KEY) == 0) {
                 i++;
                 t = &tokens[i];
                 current_token = &response[t->start];
                 creds->secret_access_key = flb_sds_create_len(current_token, t->size);
+                if (!creds->secret_access_key) {
+                    flb_errno();
+                    aws_credentials_destroy(creds);
+                    flb_free(tokens);
+                    return NULL;
+                }
             }
             if (strcmp(current_token, AWS_HTTP_RESPONSE_TOKEN) == 0) {
                 i++;
                 t = &tokens[i];
                 current_token = &response[t->start];
                 creds->session_token = flb_sds_create_len(current_token, t->size);
+                if (!creds->session_token) {
+                    flb_errno();
+                    aws_credentials_destroy(creds);
+                    flb_free(tokens);
+                    return NULL;
+                }
             }
         }
 
@@ -359,7 +439,7 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
 
     if (creds->access_key_id == NULL || creds->secret_access_key == NULL ||
         creds->session_token == NULL) {
-        flb_free(creds);
+        aws_credentials_destroy(creds);
         return NULL:
     }
 
@@ -368,12 +448,51 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
 
 
 struct aws_credentials_provider *new_imds_provider() {
-    struct aws_credentials_provider provider = flb_malloc(
-                                                          sizeof(
-                                                          struct aws_credentials_provider));
+    struct aws_credentials_provider_imds *implementation;
+    struct aws_credentials_provider *provider;
+
+    provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
 
     if (!provider) {
         flb_errno();
         return NULL;
+    }
+
+    implementation = flb_calloc(1, sizeof(struct aws_credentials_provider_imds));
+
+    if (!implementation) {
+        flb_errno();
+        return NULL;
+    }
+
+    implementation->upstream = flb_upstream_create(config,
+                                                   FLB_AWS_IMDS_V2_HOST,
+                                                   80,
+                                                   FLB_IO_TCP,
+                                                   NULL);
+    if (!implementation->upstream) {
+        flb_error("[aws_credentials] connection initialization error");
+        return NULL;
+    }
+
+    provider->implementation = implementation;
+
+    return provider;
+}
+
+void aws_credentials_destroy(struct aws_credentials *creds)
+{
+    if (creds) {
+        if (creds->access_key_id) {
+            flb_sds_destroy(creds->access_key_id);
+        }
+        if (creds->secret_access_key) {
+            flb_sds_destroy(creds->secret_access_key);
+        }
+        if (creds->secret_access_key) {
+            flb_sds_destroy(creds->session_token);
+        }
+
+        flb_free(creds);
     }
 }

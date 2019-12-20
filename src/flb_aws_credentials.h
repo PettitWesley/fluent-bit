@@ -54,6 +54,11 @@ struct aws_credentials {
 void aws_credentials_destroy(struct aws_credentials *creds);
 
 /*
+ * Function to free memory used by an aws_credentials_provider structure
+ */
+void aws_provider_destroy(struct aws_credentials *creds);
+
+/*
  * Get credentials using the provider.
  * Client is in charge of freeing the returned credentials struct.
  * Returns NULL if credentials could not be obtained.
@@ -62,15 +67,15 @@ typedef aws_credentials*(aws_credentials_provider_get_credentials_fn)(struct aws
 
 /*
  * Force a refesh of credentials. This is needed for providers that cache
- * credentials. If the client receives a response from AWS indicating that
- * the credentials are expired, they can call this method.
+ * credentials. If the client code receives a response from AWS indicating that
+ * the credentials are expired or invalid, it can call this method and retry.
  */
 typedef int(aws_credentials_provider_refresh_fn)(struct aws_credentials_provider *provider);
 
 
 /*
- * Clean up the underlying provider implementation
- * Clients should call this and then free the aws_credentials_provider structure.
+ * Clean up the underlying provider implementation.
+ * Called by aws_provider_destroy.
  */
 typedef void(aws_credentials_provider_destroy_fn)(struct aws_credentials_provider *provider);
 
