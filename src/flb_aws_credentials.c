@@ -25,27 +25,17 @@
 
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
+#include <time.h>
 
-/*
- * A provider that wraps other providers and adds a cache.
- */
-static struct aws_credentials_provider_cached {
-    struct aws_credentials *credentials;
-    time_t next_refresh;
-    time_t ttl;
-
-    /* Underlying provider */
-    struct aws_credentials_provider *provider;
-};
 
 /*
  * A provider that obtains credentials from an http endpoint.
- * On ECS the ECS Agent vends credentials via a link local IP address.
+ * In ECS the ECS Agent vends credentials via a link local IP address.
  * Some customers build local HTTP services that provide the same functionality.
  */
 static struct aws_credentials_provider_http {
     struct aws_credentials *credentials;
-    time_t expiration;
+    time_t cred_refresh;
 
     /* upstream connection to host */
     struct flb_upstream *upstream;
@@ -60,6 +50,7 @@ static struct aws_credentials_provider_http {
  */
 static struct aws_credentials_provider_imds {
     struct aws_credentials *credentials;
+    time_t cred_refresh;
 
     /* upstream connection to IMDS */
     struct flb_upstream *upstream;
@@ -83,10 +74,10 @@ static struct aws_credentials_provider_imds {
  * Note: Client code should use this provider by default.
  */
 struct aws_credentials_provider_default_chain {
-    struct aws_credentials_provider *env_provider;
-    struct aws_credentials_provider *profile_provider;
-    struct aws_credentials_provider *ec2_provider;
-    struct aws_credentials_provider *ecs_provider;
+    // struct aws_credentials_provider *env_provider;
+    // struct aws_credentials_provider *profile_provider;
+    // struct aws_credentials_provider *ec2_provider;
+    // struct aws_credentials_provider *ecs_provider;
 };
 
 /* Environment Provider */
@@ -97,12 +88,12 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
     aws_credentials *creds;
 
     access_key = getenv(AWS_ACCESS_KEY_ID);
-    if (!access_key) {
+    if (!access_key || strlen(access_key) <= 0) {
         return NULL;
     }
 
     secret_key = getenv(AWS_SECRET_ACCESS_KEY);
-    if (!secret_key) {
+    if (!secret_key || strlen(secret_key) <= 0) {
         return NULL;
     }
 
@@ -127,7 +118,7 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
     }
 
     session_token = getenv(AWS_SESSION_TOKEN);
-    if (session_token) {
+    if (session_token && strlen(session_token) > 0) {
         creds->session_token = flb_sds_create(session_token);
         if (!creds->session_token) {
             aws_credentials_destroy(creds);
@@ -142,11 +133,26 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
 
 }
 
-/* Refresh is a no-op for the env provider */
+/*
+ * For the env provider, refresh simply checks if the environment
+ * variables are available.
+ */
 int refresh_fn_environment(struct aws_credentials_provider *provider) {
+    char *access_key;
+    char *secret_key;
+
+    access_key = getenv(AWS_ACCESS_KEY_ID);
+    if (!access_key || strlen(access_key) <= 0) {
+        return -1;
+    }
+
+    secret_key = getenv(AWS_SECRET_ACCESS_KEY);
+    if (!secret_key || strlen(secret_key) <= 0) {
+        return -1;
+    }
+
     return 0;
 }
-
 
 /* Destroy is a no-op for the env provider */
 void destroy_fn_environment(struct aws_credentials_provider *provider) {
@@ -181,7 +187,7 @@ aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provid
     int ret;
     struct aws_credentials_provider_imds *implementation = provider->implementation;
 
-    if (!implementation->credentials) {
+    if (!implementation->credentials || time(NULL) > implementation->cred_refresh) {
         ret = get_creds_imds(implementation);
         if (ret < 0) {
             return NULL:
@@ -360,6 +366,7 @@ static int imds_credentials_request(struct aws_credentials_provider_imds *implem
     flb_sds_t credentials_response;
     unsigned int credentials_response_len;
     struct aws_credentials *creds;
+    time_t expiration;
 
     ret = get_metadata(implementation->upstream, cred_path,
                        &credentials_response, &credentials_response_len,
@@ -371,16 +378,45 @@ static int imds_credentials_request(struct aws_credentials_provider_imds *implem
     }
 
     creds = process_http_credentials_response(credentials_response,
-                                              credentials_response_len);
+                                              credentials_response_len,
+                                              &expiration);
 
     if (creds == NULL) {
         flb_sds_destroy(credentials_response);
         return -1;
     }
     implementation->credentials = creds;
+    implementation->cred_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
 
     flb_sds_destroy(credentials_response);
     return 0;
+}
+
+static int http_credentials_request(struct aws_credentials_provider_http
+                                    *implementation)
+{
+    struct flb_http_client *client;
+    size_t b_sent;
+    int ret;
+    struct flb_upstream_conn *u_conn;
+
+    u_conn = flb_upstream_conn_get(implementation->upstream);
+    if (!u_conn) {
+        flb_error("[aws_credentials] HTTP Provider: connection initialization error");
+        return -1;
+    }
+
+    /* Compose HTTP request */
+    client = flb_http_client(u_conn, FLB_HTTP_GET,
+                             implementation->path,
+                             NULL, 0, implementation->host,
+                             80, NULL, 0);
+
+    if (!client) {
+        flb_error("[filter_aws] count not create http client");
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
 }
 
 /*
@@ -392,12 +428,13 @@ static int imds_credentials_request(struct aws_credentials_provider_imds *implem
  *   "Token": "SECURITY_TOKEN_STRING"
  * }
  * (some implementations (IMDS) have additional fields)
- * TODO: Implement parsing of the expiration for performance improvement.
- * (Client code must always force a new cred lookup if API responds with
- * auth error, so proactively refreshing creds is a nicety).
+ * Returns NULL if any part of parsing was unsuccessful.
  */
-static struct aws_credentials *process_http_credentials_response(flb_sds_t response,
-                                                          unsigned int response_len)
+static struct aws_credentials *process_http_credentials_response(flb_sds_t
+                                                                 response,
+                                                                 unsigned int
+                                                                 response_len,
+                                                                 time_t *expiration)
 {
     jsmntok_t *tokens;
     const jsmntok_t *t;
@@ -462,6 +499,7 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
                     flb_free(tokens);
                     return NULL;
                 }
+                continue;
             }
             if (strcmp(current_token, AWS_HTTP_RESPONSE_SECRET_KEY) == 0) {
                 i++;
@@ -474,6 +512,7 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
                     flb_free(tokens);
                     return NULL;
                 }
+                continue;
             }
             if (strcmp(current_token, AWS_HTTP_RESPONSE_TOKEN) == 0) {
                 i++;
@@ -481,6 +520,20 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
                 current_token = &response[t->start];
                 creds->session_token = flb_sds_create_len(current_token, t->size);
                 if (!creds->session_token) {
+                    flb_errno();
+                    aws_credentials_destroy(creds);
+                    flb_free(tokens);
+                    return NULL;
+                }
+                continue;
+            }
+            if (strcmp(current_token, AWS_HTTP_RESPONSE_EXPIRATION) == 0) {
+                i++;
+                t = &tokens[i];
+                current_token = &response[t->start];
+                response[t->end + 1] = '\0';
+                *expiration = parse_expiration(current_token);
+                if (*expiration == 0) {
                     flb_errno();
                     aws_credentials_destroy(creds);
                     flb_free(tokens);
@@ -501,6 +554,18 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t respo
     }
 
     return creds;
+}
+
+time_t parse_expiration(const char* timestamp)
+{
+    struct tm tm = {0};
+    time_t expiration;
+    if ( strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ", &tm) != NULL ) {
+      expiration = timegm(&tm);
+    } else {
+        flb_debug("[aws_credentials] Could not parse expiration: %s", timestamp);
+        return 0;
+    }
 }
 
 void aws_credentials_destroy(struct aws_credentials *creds)

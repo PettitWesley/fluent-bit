@@ -38,6 +38,7 @@
 #define AWS_HTTP_RESPONSE_ACCESS_KEY = "AccessKeyId"
 #define AWS_HTTP_RESPONSE_SECRET_KEY = "SecretAccessKey"
 #define AWS_HTTP_RESPONSE_TOKEN      = "Token"
+#define AWS_HTTP_RESPONSE_EXPIRATION = "Expiration"
 
 /*
  * A structure that wraps the sensitive data needed to sign an AWS request
@@ -66,9 +67,10 @@ void aws_provider_destroy(struct aws_credentials_provider *provider));
 typedef aws_credentials*(aws_credentials_provider_get_credentials_fn)(struct aws_credentials_provider *provider);
 
 /*
- * Force a refesh of credentials. This is needed for providers that cache
- * credentials. If the client code receives a response from AWS indicating that
- * the credentials are expired or invalid, it can call this method and retry.
+ * Force a refesh of cached credentials. If client code receives a response
+ * from AWS indicating that the credentials are expired or invalid,
+ * it can call this method and retry.
+ * Returns 0 if the refresh was successful.
  */
 typedef int(aws_credentials_provider_refresh_fn)(struct aws_credentials_provider *provider);
 
@@ -96,13 +98,6 @@ struct aws_credentials_provider {
     struct aws_credentials_provider_vtable *provider_vtable;
     void *implementation;
 };
-
-/*
- * A provider that wraps another provider and adds a cache.
- */
-struct aws_credentials_provider *new_cached_provider(struct
-                                                    aws_credentials_provider
-                                                    *provider, unsigned long ttl);
 
 /*
  * Standard Environment variables
