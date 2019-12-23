@@ -182,6 +182,7 @@ struct aws_credentials_provider *new_environment_provider() {
 }
 
 /* EC2 IMDS Provider */
+
 aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provider) {
     aws_credentials *creds;
     int ret;
@@ -296,8 +297,6 @@ struct aws_credentials_provider *new_imds_provider() {
         return NULL;
     }
 
-    provider->implementation = implementation;
-
     return provider;
 }
 
@@ -325,7 +324,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
     }
 
     /* Get the name of the instance role */
-    ret = get_metadata(implementation->upstream, FLB_AWS_IMDS_V2_ROLE_PATH,
+    ret = get_metadata(implementation->upstream, AWS_IMDS_V2_ROLE_PATH,
                        &instance_role, &instance_role_len,
                        implementation->imds_v2_token,
                        implementation->imds_v2_token_len);
@@ -335,7 +334,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
     }
 
     /* Construct path where we will find the credentials */
-    cred_path_size = sizeof(char) * (FLB_AWS_IMDS_V2_ROLE_PATH_LEN + instance_role_len) + 1;
+    cred_path_size = sizeof(char) * (AWS_IMDS_V2_ROLE_PATH_LEN + instance_role_len) + 1;
     cred_path = flb_malloc(cred_path_size);
     if (!cred_path) {
         flb_sds_destroy(instance_role);
@@ -343,7 +342,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
         return -1;
     }
 
-    ret = snprintf(cred_path, cred_path_size, "%s%s", FLB_AWS_IMDS_V2_ROLE_PATH, instance_role);
+    ret = snprintf(cred_path, cred_path_size, "%s%s", AWS_IMDS_V2_ROLE_PATH, instance_role);
     if (ret < 0) {
         flb_sds_destroy(instance_role);
         flb_free(cred_path);
@@ -360,11 +359,12 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
 
 }
 
-static int imds_credentials_request(struct aws_credentials_provider_imds *implementation, char *cred_path)
+static int imds_credentials_request(struct aws_credentials_provider_imds
+                                    *implementation, char *cred_path)
 {
     int ret;
     flb_sds_t credentials_response;
-    unsigned int credentials_response_len;
+    size_t credentials_response_len;
     struct aws_credentials *creds;
     time_t expiration;
 
@@ -392,6 +392,137 @@ static int imds_credentials_request(struct aws_credentials_provider_imds *implem
     return 0;
 }
 
+/*
+ * HTTP Credentials Provider - retrieve credentials from a local http server
+ * Used to implement the ECS Credentials provider.
+ * Equivalent to:
+ * https://github.com/aws/aws-sdk-go/tree/master/aws/credentials/endpointcreds
+ */
+
+aws_credentials *get_credentials_fn_http(struct aws_credentials_provider *provider) {
+    aws_credentials *creds;
+    int ret;
+    struct aws_credentials_provider_http *implementation = provider->implementation;
+
+    if (!implementation->credentials || time(NULL) > implementation->cred_refresh) {
+        ret = http_credentials_request(implementation);
+        if (ret < 0) {
+            return NULL:
+        }
+    }
+
+    creds = flb_malloc(sizeof(struct aws_credentials));
+    if (!creds) {
+        flb_errno();
+        return NULL;
+    }
+
+    creds->access_key_id = flb_sds_create(implementation->credentials->access_key_id);
+    if (!creds->access_key_id) {
+        flb_errno();
+        aws_credentials_destroy(creds);
+        return NULL;
+    }
+
+    creds->secret_access_key = flb_sds_create(implementation->credentials->secret_access_key);
+    if (!creds->secret_access_key) {
+        flb_errno();
+        aws_credentials_destroy(creds);
+        return NULL;
+    }
+
+    if (implementation->credentials->session_token) {
+        creds->session_token = flb_sds_create(implementation->credentials->session_token);
+        if (!creds->session_token) {
+            flb_errno();
+            aws_credentials_destroy(creds);
+            return NULL;
+        }
+
+    } else {
+        creds->session_token = NULL;
+    }
+
+    return creds;
+}
+
+int refresh_fn_http(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_http *implementation = provider->implementation;
+    return http_credentials_request(implementation);
+}
+
+void destroy_fn_http(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_http *implementation = provider->implementation;
+
+    if (implementation) {
+        if (implementation->credentials) {
+            aws_credentials_destroy(implementation->credentials);
+        }
+
+        if (implementation->upstream) {
+            flb_upstream_destroy(implementation->upstream);
+        }
+
+        if (implementation->host) {
+            flb_free(implementation->host);
+        }
+
+        if (implementation->path) {
+            flb_free(implementation->path);
+        }
+
+        flb_free(implementation);
+        provider->implementation = NULL;
+    }
+
+    return;
+}
+
+static struct aws_credentials_provider_vtable http_provider_vtable = {
+    .get_credentials = get_credentials_fn_http,
+    .refresh = refresh_fn_http,
+    .destroy = destroy_fn_http,
+};
+
+struct aws_credentials_provider *new_http_provider(char *host, char* path) {
+    struct aws_credentials_provider_http *implementation;
+    struct aws_credentials_provider *provider;
+
+    provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
+
+    if (!provider) {
+        flb_errno();
+        return NULL;
+    }
+
+    implementation = flb_calloc(1, sizeof(struct aws_credentials_provider_http));
+
+    if (!implementation) {
+        flb_free(provider);
+        flb_errno();
+        return NULL;
+    }
+
+    provider->provider_vtable = &http_provider_vtable;
+    provider->implementation = implementation;
+
+    implementation->host = host;
+    implementation->path = path;
+
+    implementation->upstream = flb_upstream_create(config,
+                                                   host,
+                                                   80,
+                                                   FLB_IO_TCP,
+                                                   NULL);
+    if (!implementation->upstream) {
+        aws_provider_destroy(provider);
+        flb_error("[aws_credentials] EC2 IMDS: connection initialization error");
+        return NULL;
+    }
+
+    return provider;
+}
+
 static int http_credentials_request(struct aws_credentials_provider_http
                                     *implementation)
 {
@@ -399,6 +530,10 @@ static int http_credentials_request(struct aws_credentials_provider_http
     size_t b_sent;
     int ret;
     struct flb_upstream_conn *u_conn;
+    flb_sds_t response;
+    size_t response_len;
+    time_t expiration;
+    struct aws_credentials *creds;
 
     u_conn = flb_upstream_conn_get(implementation->upstream);
     if (!u_conn) {
@@ -413,11 +548,78 @@ static int http_credentials_request(struct aws_credentials_provider_http
                              80, NULL, 0);
 
     if (!client) {
-        flb_error("[filter_aws] count not create http client");
+        flb_error("[aws_credentials] HTTP Provider: could not initialize request");
         flb_upstream_conn_release(u_conn);
         return -1;
     }
+
+    /* Perform request */
+    flb_debug("[aws_credentials] HTTP Provider: requesting credentials");
+    ret = flb_http_do(client, &b_sent);
+
+    if (ret != 0 || client->resp.status != 200) {
+        flb_error("[aws_credentials] credentials request http_do=%i, HTTP Status: %i",
+                  ret, client->resp.status);
+        flb_http_client_destroy(client);
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
+
+    response = flb_sds_create_len(client->resp.payload,
+                                  client->resp.payload_size);
+    if (!response) {
+        flb_errno();
+        flb_http_client_destroy(client);
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
+
+    flb_http_client_destroy(client);
+    flb_upstream_conn_release(u_conn);
+
+    response_len = client->resp.payload_size;
+
+    creds = process_http_credentials_response(response, response_len,
+                                              &expiration);
+
+    flb_sds_destroy(response);
+
+    if (!creds) {
+        return -1;
+    }
+
+    implementation->credentials = creds;
+    implementation->cred_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
+    return 0;
 }
+
+/*
+ * ECS Provider
+ * The ECS Provider is just a wrapper around the HTTP Provider
+ * with the ECS credentials endpoint.
+ */
+
+struct aws_credentials_provider *new_ecs_provider() {
+    char *host;
+    char *path;
+    char *path_var;
+
+    host = flb_malloc((ECS_CREDENTIALS_HOST_LEN + 1) * sizeof(char));
+    memcpy(host, ECS_CREDENTIALS_HOST, ECS_CREDENTIALS_HOST_LEN);
+    host[ECS_CREDENTIALS_HOST_LEN] = '\0';
+
+    path_var = getenv(ECS_CREDENTIALS_PATH_ENV_VAR)
+    if (path_var && strlen(path_var) > 0) {
+        path = flb_malloc((strlen(path_var) + 1) * sizeof(char));
+        path[strlen(path_var)] = '\0';
+
+        return new_http_provider(host, path);
+    } else {
+        return NULL;
+    }
+
+}
+
 
 /*
  * All HTTP credentials endpoints (IMDS, ECS, custom) follow the same spec:
@@ -432,7 +634,7 @@ static int http_credentials_request(struct aws_credentials_provider_http
  */
 static struct aws_credentials *process_http_credentials_response(flb_sds_t
                                                                  response,
-                                                                 unsigned int
+                                                                 size_t
                                                                  response_len,
                                                                  time_t *expiration)
 {

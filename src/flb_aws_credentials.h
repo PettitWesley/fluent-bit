@@ -31,14 +31,18 @@
 /* Refresh token if it will expire in 10 min or less */
 #define FLB_AWS_REFRESH_WINDOW         600
 
-#define FLB_AWS_IMDS_V2_ROLE_PATH      "/latest/meta-data/iam/security-credentials/"
-#define FLB_AWS_IMDS_V2_ROLE_PATH_LEN  43
+#define AWS_IMDS_V2_ROLE_PATH          "/latest/meta-data/iam/security-credentials/"
+#define AWS_IMDS_V2_ROLE_PATH_LEN      43
 
 /* HTTP Credentials Endpoints have a standard set of JSON Keys */
-#define AWS_HTTP_RESPONSE_ACCESS_KEY = "AccessKeyId"
-#define AWS_HTTP_RESPONSE_SECRET_KEY = "SecretAccessKey"
-#define AWS_HTTP_RESPONSE_TOKEN      = "Token"
-#define AWS_HTTP_RESPONSE_EXPIRATION = "Expiration"
+#define AWS_HTTP_RESPONSE_ACCESS_KEY   "AccessKeyId"
+#define AWS_HTTP_RESPONSE_SECRET_KEY   "SecretAccessKey"
+#define AWS_HTTP_RESPONSE_TOKEN        "Token"
+#define AWS_HTTP_RESPONSE_EXPIRATION   "Expiration"
+
+#define ECS_CREDENTIALS_HOST           "169.254.170.2"
+#define ECS_CREDENTIALS_HOST_LEN       13
+#define ECS_CREDENTIALS_PATH_ENV_VAR   "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
 
 /*
  * A structure that wraps the sensitive data needed to sign an AWS request
@@ -110,14 +114,18 @@ struct aws_credentials_provider *new_environment_provider();
 struct aws_credentials_provider *new_imds_provider();
 
 /*
- * New ECS provider
+ * New ECS provider.
+ * The ECS Provider is just a wrapper around the HTTP Provider
+ * with the ECS credentials endpoint.
  */
 struct aws_credentials_provider *new_ecs_provider();
 
 /*
  * New http provider
+ * Calling aws_provider_destroy on this provider frees the memory
+ * used by host and path.
  */
-struct aws_credentials_provider *new_http_provider();
+struct aws_credentials_provider *new_http_provider(char *host, char* path);
 
 /*
  * The standard credential provider chain:
