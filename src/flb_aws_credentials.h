@@ -101,6 +101,9 @@ struct aws_credentials_provider_vtable {
 struct aws_credentials_provider {
     struct aws_credentials_provider_vtable *provider_vtable;
     void *implementation;
+
+    /* Standard credentials chain is a list of providers */
+    struct mk_list _head;
 };
 
 /*

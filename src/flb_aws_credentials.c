@@ -74,14 +74,119 @@ static struct aws_credentials_provider_imds {
  * Note: Client code should use this provider by default.
  */
 struct aws_credentials_provider_default_chain {
-    // struct aws_credentials_provider *env_provider;
-    // struct aws_credentials_provider *profile_provider;
-    // struct aws_credentials_provider *ec2_provider;
-    // struct aws_credentials_provider *ecs_provider;
+    struct mk_list providers;
 };
 
+aws_credentials *get_credentials_fn_standard_chain(struct aws_credentials_provider *provider)
+{
+    struct aws_credentials_provider *sub_provider;
+    struct aws_credentials_provider_default_chain *implementation;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct aws_credentials *creds;
+
+    implementation = provider->implementation;
+
+    /* return credentials from the first provider that produces a valid set */
+    mk_list_foreach_safe(head, tmp, &implementation->providers) {
+        sub_provider = mk_list_entry(head,
+                                     struct aws_credentials_provider,
+                                     _head);
+        creds = sub_provider->provider_vtable->get_credentials();
+        if (creds) {
+            return creds;
+        }
+
+    }
+
+    return NULL;
+}
+
+int refresh_fn_standard_chain(struct aws_credentials_provider *provider)
+{
+    struct aws_credentials_provider *sub_provider;
+    struct aws_credentials_provider_default_chain *implementation;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    int ret;
+
+    implementation = provider->implementation;
+
+    /* return when a provider indicates it successfully refreshed */
+    mk_list_foreach_safe(head, tmp, &implementation->providers) {
+        sub_provider = mk_list_entry(head,
+                                     struct aws_credentials_provider,
+                                     _head);
+        ret = sub_provider->provider_vtable->refresh();
+        if (ret == 0) {
+            return 0;
+        }
+
+    }
+
+    return -1;
+}
+
+struct aws_credentials_provider *new_standard_chain_provider()
+{
+    struct aws_credentials_provider *sub_provider;
+    struct aws_credentials_provider *provider;
+    struct aws_credentials_provider_default_chain *implementation;
+
+    provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
+
+    if (!provider) {
+        flb_errno();
+        return NULL;
+    }
+
+    implementation = flb_calloc(1,
+                                sizeof(
+                                struct aws_credentials_provider_default_chain));
+
+    if (!implementation) {
+        flb_errno();
+        flb_free(provider);
+        return NULL;
+    }
+
+    provider->provider_vtable = &chain_provider_vtable;
+    provider->implementation = implementation;
+
+    /* Create chain of providers */
+    mk_list_init(&implementation->providers);
+
+    sub_provider = new_environment_provider();
+    if (!sub_provider) {
+        /* Env provider will only fail creation if a memory alloc failed */
+        aws_provider_destroy(provider);
+        return NULL;
+    }
+
+    mk_list_add(&sub_provider->_head, &implementation->providers);
+
+    sub_provider = new_imds_provider();
+    if (!sub_provider) {
+        /* IMDS will only fail creation if a memory alloc failed */
+        aws_provider_destroy(provider);
+        return NULL;
+    }
+
+    mk_list_add(&sub_provider->_head, &implementation->providers);
+
+    sub_provider = new_ecs_provider();
+    if (sub_provider) {
+        /* ECS Provider will fail creation if we are not running in ECS */
+        mk_list_add(&sub_provider->_head, &implementation->providers);
+    }
+
+    return provider;
+}
+
 /* Environment Provider */
-aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider *provider) {
+aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider
+                                                *provider)
+{
     char *access_key;
     char *secret_key;
     char *session_token;
@@ -137,7 +242,8 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider 
  * For the env provider, refresh simply checks if the environment
  * variables are available.
  */
-int refresh_fn_environment(struct aws_credentials_provider *provider) {
+int refresh_fn_environment(struct aws_credentials_provider *provider)
+{
     char *access_key;
     char *secret_key;
 
@@ -166,7 +272,7 @@ static struct aws_credentials_provider_vtable environment_provider_vtable = {
 };
 
 struct aws_credentials_provider *new_environment_provider() {
-    struct aws_credentials_provider provider = flb_calloc(1,
+    struct aws_credentials_provider *provider = flb_calloc(1,
                                                           sizeof(
                                                           struct aws_credentials_provider));
 
@@ -605,12 +711,22 @@ struct aws_credentials_provider *new_ecs_provider() {
     char *path_var;
 
     host = flb_malloc((ECS_CREDENTIALS_HOST_LEN + 1) * sizeof(char));
+    if (!host) {
+        flb_errno();
+        return NULL;
+    }
+
     memcpy(host, ECS_CREDENTIALS_HOST, ECS_CREDENTIALS_HOST_LEN);
     host[ECS_CREDENTIALS_HOST_LEN] = '\0';
 
     path_var = getenv(ECS_CREDENTIALS_PATH_ENV_VAR)
     if (path_var && strlen(path_var) > 0) {
         path = flb_malloc((strlen(path_var) + 1) * sizeof(char));
+        if (!path) {
+            flb_errno();
+            flb_free(host);
+            return NULL;
+        }
         path[strlen(path_var)] = '\0';
 
         return new_http_provider(host, path);
