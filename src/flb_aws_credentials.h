@@ -144,6 +144,23 @@ struct aws_credentials_provider *new_http_provider(char *host, char* path);
  */
 struct aws_credentials_provider *new_standard_chain_provider();
 
+/*
+ * STS Assume Role Provider.
+ */
+struct aws_credentials_provider *new_sts_assume_role_provider(struct
+                                                              aws_credentials_provider
+                                                              base_provider,
+                                                              char *external_id,
+                                                              char *role_arn,
+                                                              char *session_name);
+
+
+/*
+ * Helper functions
+ */
+
+time_t parse_expiration(const char* timestamp);
+
 
 #endif
 #endif /* FLB_HAVE_AWS */

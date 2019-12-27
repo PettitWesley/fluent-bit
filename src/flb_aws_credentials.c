@@ -127,6 +127,28 @@ int refresh_fn_standard_chain(struct aws_credentials_provider *provider)
     return -1;
 }
 
+void destroy_fn_standard_chain(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider *sub_provider;
+    struct aws_credentials_provider_default_chain *implementation;
+    struct mk_list *tmp;
+    struct mk_list *head;
+
+    implementation = provider->implementation;
+
+    mk_list_foreach_safe(head, tmp, &ctx->conditions) {
+        sub_provider = mk_list_entry(head, struct aws_credentials_provider,
+                                     _head);
+        mk_list_del(&sub_provider->_head);
+        aws_provider_destroy(sub_provider);
+    }
+}
+
+static struct aws_credentials_provider_vtable standard_chain_provider_vtable = {
+    .get_credentials = get_credentials_fn_standard_chain,
+    .refresh = refresh_fn_standard_chain,
+    .destroy = destroy_fn_standard_chain,
+};
+
 struct aws_credentials_provider *new_standard_chain_provider()
 {
     struct aws_credentials_provider *sub_provider;
@@ -150,7 +172,7 @@ struct aws_credentials_provider *new_standard_chain_provider()
         return NULL;
     }
 
-    provider->provider_vtable = &chain_provider_vtable;
+    provider->provider_vtable = &standard_chain_provider_vtable;
     provider->implementation = implementation;
 
     /* Create chain of providers */
@@ -167,7 +189,7 @@ struct aws_credentials_provider *new_standard_chain_provider()
 
     sub_provider = new_imds_provider();
     if (!sub_provider) {
-        /* IMDS will only fail creation if a memory alloc failed */
+        /* IMDS provider will only fail creation if a memory alloc failed */
         aws_provider_destroy(provider);
         return NULL;
     }
@@ -191,6 +213,8 @@ aws_credentials *get_credentials_fn_environment(struct aws_credentials_provider
     char *secret_key;
     char *session_token;
     aws_credentials *creds;
+
+    flb_debug("[aws_credentials] Requesting credentials from the env provider..");
 
     access_key = getenv(AWS_ACCESS_KEY_ID);
     if (!access_key || strlen(access_key) <= 0) {
@@ -247,6 +271,8 @@ int refresh_fn_environment(struct aws_credentials_provider *provider)
     char *access_key;
     char *secret_key;
 
+    flb_debug("[aws_credentials] Refresh called on the env provider");
+
     access_key = getenv(AWS_ACCESS_KEY_ID);
     if (!access_key || strlen(access_key) <= 0) {
         return -1;
@@ -294,6 +320,8 @@ aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provid
     int ret;
     struct aws_credentials_provider_imds *implementation = provider->implementation;
 
+    flb_debug("[aws_credentials] Requesting credentials from the EC2 provider..");
+
     if (!implementation->credentials || time(NULL) > implementation->cred_refresh) {
         ret = get_creds_imds(implementation);
         if (ret < 0) {
@@ -338,6 +366,7 @@ aws_credentials *get_credentials_fn_imds(struct aws_credentials_provider *provid
 
 int refresh_fn_imds(struct aws_credentials_provider *provider) {
     struct aws_credentials_provider_imds *implementation = provider->implementation;
+    flb_debug("[aws_credentials] Refresh called on the EC2 IMDS provider");
     return get_creds_imds(implementation);
 }
 
@@ -416,7 +445,10 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
     char *cred_path;
     size_t cred_path_size;
 
+    flb_debug("[aws_credentials] requesting credentials from EC2 IMDS");
+
     if (!implementation->imds_v2_token || (time(NULL) > implementation->token_refresh)) {
+        flb_debug("[aws_credentials] requesting a new IMDSv2 token");
         ret = get_ec2_token(implementation->upstream,
                             &implementation->imds_v2_token,
                             &implementation->imds_v2_token_len);
@@ -438,6 +470,9 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
     if (ret < 0) {
         return -1;
     }
+
+    flb_debug("[aws_credentials] Requesting credentials for instance role %s",
+              instance_role);
 
     /* Construct path where we will find the credentials */
     cred_path_size = sizeof(char) * (AWS_IMDS_V2_ROLE_PATH_LEN + instance_role_len) + 1;
@@ -510,6 +545,8 @@ aws_credentials *get_credentials_fn_http(struct aws_credentials_provider *provid
     int ret;
     struct aws_credentials_provider_http *implementation = provider->implementation;
 
+    flb_debug("[aws_credentials] Retrieving credentials from the HTTP provider..");
+
     if (!implementation->credentials || time(NULL) > implementation->cred_refresh) {
         ret = http_credentials_request(implementation);
         if (ret < 0) {
@@ -554,6 +591,7 @@ aws_credentials *get_credentials_fn_http(struct aws_credentials_provider *provid
 
 int refresh_fn_http(struct aws_credentials_provider *provider) {
     struct aws_credentials_provider_http *implementation = provider->implementation;
+    flb_debug("[aws_credentials] Refresh called on the http provider");
     return http_credentials_request(implementation);
 }
 
