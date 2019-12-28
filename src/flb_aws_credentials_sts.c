@@ -177,3 +177,40 @@ static int sts_assume_role_request(struct aws_credentials_provider_sts
     implementation->cred_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
     return 0;
 }
+
+/*
+ * The STS APIs return an XML response with credentials embedded
+ * The part of the document we care about looks like this:
+ * <Credentials>
+ *    <AccessKeyId>akid</AccessKeyId>
+ *    <SecretAccessKey>skid</SecretAccessKey>
+ *    <SessionToken>token</SessionToken>
+ *    <Expiration>2019-11-09T13:34:41Z</Expiration>
+ * </Credentials>
+ */
+static struct aws_credentials *process_sts_response(flb_sds_t response,
+                                                    size_t response_len,
+                                                    time_t *expiration)
+{
+
+}
+
+/* Returns the character position of the <Credentials> node */
+// static int find_credentials_node(flb_sds_t response, size_t response_len)
+// {
+//     int i;
+//     char *r = response;
+
+    // TODO: there should be a library function for finding a substring
+
+    // for (i = 12; i < response_len; i++) {
+    //     if (r[i - 12] == '<' && r[i - 11] == 'C' && r[i - 10] == 'r' &&
+    //         r[i - 9] == 'e' && r[i - 8] == 'd' && r[i - 7] == 'e' &&
+    //         r[i - 6] == 'n' && r[i - 5] == 't' && r[i - 4] == 'i' &&
+    //         r[i - 3] == 'a' && r[i - 2] == 'l' && r[i - 1] == 's' &&
+    //         r[i] == '>') {
+    //             return i;
+    //         }
+    //
+    // }
+// }
