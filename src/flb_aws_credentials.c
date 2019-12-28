@@ -422,7 +422,7 @@ struct aws_credentials_provider *new_imds_provider() {
     provider->implementation = implementation;
 
     implementation->upstream = flb_upstream_create(config,
-                                                   FLB_AWS_IMDS_V2_HOST,
+                                                   AWS_IMDS_V2_HOST,
                                                    80,
                                                    FLB_IO_TCP,
                                                    NULL);
@@ -457,7 +457,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
         }
 
         implementation->token_refresh = time(NULL)
-                                        + FLB_AWS_IMDS_V2_TOKEN_TTL
+                                        + AWS_IMDS_V2_TOKEN_TTL
                                         - FLB_AWS_REFRESH_WINDOW;
     }
 

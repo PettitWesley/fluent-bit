@@ -24,7 +24,7 @@
 
 #include <stdlib.h>
 
-static int get_ec2_token(struct flb_upstream *upstream, flb_sds_t *token, unsigned int *token_len)
+int get_ec2_token(struct flb_upstream *upstream, flb_sds_t *token, unsigned int *token_len)
 {
     struct flb_http_client *client;
     size_t b_sent;
@@ -39,8 +39,8 @@ static int get_ec2_token(struct flb_upstream *upstream, flb_sds_t *token, unsign
 
     /* Compose HTTP Client request */
     client = flb_http_client(u_conn, FLB_HTTP_PUT,
-                             FLB_AWS_IMDS_V2_TOKEN_PATH,
-                             NULL, 0, FLB_AWS_IMDS_V2_HOST,
+                             AWS_IMDS_V2_TOKEN_PATH,
+                             NULL, 0, AWS_IMDS_V2_HOST,
                              80, NULL, 0);
 
     if (!client) {
@@ -49,10 +49,10 @@ static int get_ec2_token(struct flb_upstream *upstream, flb_sds_t *token, unsign
         return -1;
     }
 
-    flb_http_add_header(client, FLB_AWS_IMDS_V2_TOKEN_TTL_HEADER,
-                        FLB_AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN,
-                        FLB_AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL,
-                        FLB_AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN);
+    flb_http_add_header(client, AWS_IMDS_V2_TOKEN_TTL_HEADER,
+                        AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN,
+                        AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL,
+                        AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN);
 
     /* Perform request */
     ret = flb_http_do(client, &b_sent);
@@ -85,7 +85,7 @@ static int get_ec2_token(struct flb_upstream *upstream, flb_sds_t *token, unsign
     return 0;
 }
 
-static int get_metadata(struct flb_upstream *upstream, char *metadata_path,
+int get_metadata(struct flb_upstream *upstream, char *metadata_path,
                         flb_sds_t *metadata, unsigned int *metadata_len,
                         flb_sds_t token, unsigned int token_len);
 {
@@ -147,4 +147,43 @@ static int get_metadata(struct flb_upstream *upstream, char *metadata_path,
     flb_http_client_destroy(client);
     flb_upstream_conn_release(u_conn);
     return 0;
+}
+
+/*
+ * https://service.region.amazonaws.com(.cn)
+ */
+char *endpoint_for(char* service, char* region)
+{
+    char *endpoint;
+    size_t len = AWS_SERVICE_ENDPOINT_BASE_LEN;
+    int is_cn = FLB_FALSE;
+
+
+    /* In the China regions, ".cn" is appended to the URL */
+    if (strcmp("cn-north-1", region) == 0) {
+        len += 3;
+        is_cn = FLB_TRUE;
+    }
+    if (strcmp("cn-northwest-1", region) == 0) {
+        len += 3;
+        is_cn = FLB_TRUE;
+    }
+
+    len += strlen(service);
+    len += strlen(region);
+
+    endpoint = flb_malloc(size(char) * (len + 1));
+    if (!endpoint) {
+        flb_errno();
+        return NULL;
+    }
+
+    snprintf(endpoint, len, AWS_SERVICE_ENDPOINT_FORMAT, service, region);
+
+    if (is_cn) {
+        strncat(endpoint, ".cn", 3);
+    }
+
+    return endpoint;
+
 }

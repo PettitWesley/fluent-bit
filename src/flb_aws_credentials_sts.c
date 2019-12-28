@@ -27,6 +27,10 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define STS_ASSUME_ROLE_URI_FORMAT    "/?Version=2011-06-15&Action=AssumeRole\
+&RoleSessionName=%s&RoleArn=%s"
+#define STS_ASSUME_ROLE_URI_BASE_LEN  64
+
 
 /*
  * A provider that uses credentials from the base provider to call STS
@@ -38,11 +42,12 @@ static struct aws_credentials_provider_sts {
     /* upstream connection to sts */
     struct flb_upstream *upstream;
 
-    /* sts:AssumeRole API arguments */
-    char *external_id;
     char *role_arn;
-    char *session_name;
+
+    char *uri;
+
     /* Fluent Bit uses regional STS endpoints; this is a best practice. */
+    char *endpoint;
     char *region;
 };
 
@@ -51,11 +56,40 @@ struct aws_credentials_provider *new_sts_assume_role_provider(struct
                                                               base_provider,
                                                               char *external_id,
                                                               char *role_arn,
-                                                              char *session_name);
+                                                              char *session_name,
+                                                              char *region);
 
-static char *sts_uri(struct aws_credentials_provider_sts *implementation)
+/*
+ * Constructs the STS request uri.
+ * external_id can be NULL.
+ */
+static char *sts_uri(char *role_arn, char *session_name, char *external_id)
 {
+    char *uri;
+    size_t len = STS_ASSUME_ROLE_URI_BASE_LEN;
 
+    if (external_id) {
+        len += 12; /* will add "&ExternalId=" */
+        len += strlen(external_id);
+    }
+
+    len += strlen(session_name);
+    len += strlen(role_arn);
+
+    uri = flb_malloc(size(char) * (len + 1));
+    if (!uri) {
+        flb_errno();
+        return NULL;
+    }
+
+    snprintf(uri, len, STS_ASSUME_ROLE_URI_FORMAT, session_name, role_arn);
+
+    if (implementation->external_id) {
+        strncat(uri, "&ExternalId=", 12);
+        strncat(uri, external_id, strlen(external_id));
+    }
+
+    return uri;
 }
 
 static int sts_assume_role_request(struct aws_credentials_provider_sts
@@ -78,22 +112,27 @@ static int sts_assume_role_request(struct aws_credentials_provider_sts
 
     /* Compose HTTP request */
     client = flb_http_client(u_conn, FLB_HTTP_GET,
-                             implementation->path,
-                             NULL, 0, implementation->host,
-                             80, NULL, 0);
+                             implementation->uri,
+                             NULL, 0,
+                             implementation->endpoint, 80,
+                             NULL, 0);
 
     if (!client) {
-        flb_error("[aws_credentials] HTTP Provider: could not initialize request");
+        flb_error("[aws_credentials] STS Provider: could not initialize request");
         flb_upstream_conn_release(u_conn);
         return -1;
     }
 
+    flb_signv4_do(client, FLB_TRUE, FLB_TRUE, time(NULL)
+                  implementation->region, "sts",
+                  implementation->base_provider);
+
     /* Perform request */
-    flb_debug("[aws_credentials] HTTP Provider: requesting credentials");
+    flb_debug("[aws_credentials] STS Provider: requesting credentials");
     ret = flb_http_do(client, &b_sent);
 
     if (ret != 0 || client->resp.status != 200) {
-        flb_error("[aws_credentials] credentials request http_do=%i, HTTP Status: %i",
+        flb_error("[aws_credentials] STS request http_do=%i, HTTP Status: %i",
                   ret, client->resp.status);
         flb_http_client_destroy(client);
         flb_upstream_conn_release(u_conn);
