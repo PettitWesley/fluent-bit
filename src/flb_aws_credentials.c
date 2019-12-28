@@ -187,6 +187,15 @@ struct aws_credentials_provider *new_standard_chain_provider()
 
     mk_list_add(&sub_provider->_head, &implementation->providers);
 
+    sub_provider = new_profile_provider();
+    if (!sub_provider) {
+        /* Profile provider will only fail creation if a memory alloc failed */
+        aws_provider_destroy(provider);
+        return NULL;
+    }
+
+    mk_list_add(&sub_provider->_head, &implementation->providers);
+
     sub_provider = new_imds_provider();
     if (!sub_provider) {
         /* IMDS provider will only fail creation if a memory alloc failed */

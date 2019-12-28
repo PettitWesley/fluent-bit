@@ -117,6 +117,11 @@ struct aws_credentials_provider *new_environment_provider();
 struct aws_credentials_provider *new_imds_provider();
 
 /*
+ * New AWS Profile provider, reads from the shared credentials file
+ */
+struct aws_credentials_provider *new_profile_provider();
+
+/*
  * New ECS provider.
  * The ECS Provider is just a wrapper around the HTTP Provider
  * with the ECS credentials endpoint.
