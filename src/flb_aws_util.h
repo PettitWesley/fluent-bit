@@ -37,33 +37,90 @@
 #define AWS_SERVICE_ENDPOINT_BASE_LEN          25
 
 /*
- * The AWS HTTP Client is a wrapper around the Fluent Bit http client.
+ * The AWS HTTP Client is a wrapper around the Fluent Bit's http library.
  * It handles tasks which are common to all AWS API requests (retries,
  * error processing, etc).
  * It is also easily mockable in unit tests.
  */
 
 
-typedef void(aws_credentials_provider_destroy_fn)(struct aws_credentials_provider *provider);
+typedef void(aws_http_client_request_fn)(struct aws_http_client *client,
+                                         int method, const char *uri,
+                                         const char *body, size_t body_len,
+                                         aws_http_header *dynamic_headers,
+                                         size_t headers_len);
+
+/* TODO: Eventually will need to add a way to call flb_http_buffer_size */
 
 /*
- * This structure is a virtual table that allows the client to get credentials.
- * And clean up all memory from the underlying implementation.
+ * Virtual table for aws http client behavior.
+ * This makes the client's functionality mockable in unit tests.
  */
-struct aws_credentials_provider_vtable {
-    aws_credentials_provider_get_credentials_fn *get_credentials;
-    aws_credentials_provider_refresh_fn *refresh;
-    aws_credentials_provider_destroy_fn *destroy;
+struct aws_http_client_vtable {
+    aws_http_client_request_fn *request;
 };
 
+struct aws_http_header {
+    char *key;
+    size_t key_len;
+    char *val;
+    size_t val_len;
+};
 
 struct aws_http_client {
     struct aws_http_client_vtable *client_vtable;
-    struct flb_http_client *client;
 
+    /* Name to identify this client: used in log messages and tests */
+    char *name;
+
+    /* Sigv4 */
     int has_auth;
     struct aws_credentials_provider *provider;
+    char *region;
+    char *service;
+
+    struct flb_upstream *upstream;
+
+    char *host;
+    int port;
+    const char *proxy;
+    int flags;
+
+    /*
+     * Additional headers which will be added to all requests.
+     * The AWS client will add auth headers, content length,
+     * and user agent.
+     */
+     struct aws_http_header *static_headers;
+     size_t static_headers_len;
+
+    /*
+     * Client from a successful request or the last failed retry.
+     * Caller code can use this to access the raw response.
+     * Caller code does not need to free this pointer.
+     */
+    struct flb_http_client *c;
+
+    /*
+     * The parsed AWS API error code returned by the last request.
+     * Caller code does not need to free this pointer.
+     */
+    flb_sds_t error_code;
 };
+
+typedef struct aws_http_client*(aws_http_client_create_fn)();
+
+/*
+ * HTTP Client Generator creates a new client structure and sets the vtable.
+ * Unit tests can implement a custom generator which returns a mock client.
+ * This structure is a virtual table.
+ */
+struct aws_http_client_generator {
+    aws_http_client_create_fn *new;
+};
+
+/* Get the generator */
+struct aws_http_client_generator *generator();
 
 /*
  * Get an IMDSv2 token

@@ -124,9 +124,15 @@ static int sts_assume_role_request(struct aws_credentials_provider_sts
         return -1;
     }
 
-    flb_signv4_do(client, FLB_TRUE, FLB_TRUE, time(NULL)
-                  implementation->region, "sts",
-                  implementation->base_provider);
+    signature = flb_signv4_do(client, FLB_TRUE, FLB_TRUE, time(NULL)
+                              implementation->region, "sts",
+                              implementation->base_provider);
+
+    if (!signature) {
+        flb_error("[aws_credentials] STS Provider: could not sign request");
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
 
     /* Perform request */
     flb_debug("[aws_credentials] STS Provider: requesting credentials");

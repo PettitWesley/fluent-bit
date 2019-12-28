@@ -68,7 +68,7 @@ void aws_provider_destroy(struct aws_credentials_provider *provider));
  * Client is in charge of freeing the returned credentials struct.
  * Returns NULL if credentials could not be obtained.
  */
-typedef aws_credentials*(aws_credentials_provider_get_credentials_fn)(struct aws_credentials_provider *provider);
+typedef struct aws_credentials*(aws_credentials_provider_get_credentials_fn)(struct aws_credentials_provider *provider);
 
 /*
  * Force a refesh of cached credentials. If client code receives a response
