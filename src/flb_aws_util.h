@@ -37,6 +37,35 @@
 #define AWS_SERVICE_ENDPOINT_BASE_LEN          25
 
 /*
+ * The AWS HTTP Client is a wrapper around the Fluent Bit http client.
+ * It handles tasks which are common to all AWS API requests (retries,
+ * error processing, etc).
+ * It is also easily mockable in unit tests.
+ */
+
+
+typedef void(aws_credentials_provider_destroy_fn)(struct aws_credentials_provider *provider);
+
+/*
+ * This structure is a virtual table that allows the client to get credentials.
+ * And clean up all memory from the underlying implementation.
+ */
+struct aws_credentials_provider_vtable {
+    aws_credentials_provider_get_credentials_fn *get_credentials;
+    aws_credentials_provider_refresh_fn *refresh;
+    aws_credentials_provider_destroy_fn *destroy;
+};
+
+
+struct aws_http_client {
+    struct aws_http_client_vtable *client_vtable;
+    struct flb_http_client *client;
+
+    int has_auth;
+    struct aws_credentials_provider *provider;
+};
+
+/*
  * Get an IMDSv2 token
  */
 int get_ec2_token(struct flb_upstream *upstream, flb_sds_t *token, unsigned int *token_len);

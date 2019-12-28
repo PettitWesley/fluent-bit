@@ -103,6 +103,7 @@ static int sts_assume_role_request(struct aws_credentials_provider_sts
     size_t response_len;
     time_t expiration;
     struct aws_credentials *creds;
+    flb_sds_t signature;
 
     u_conn = flb_upstream_conn_get(implementation->upstream);
     if (!u_conn) {
@@ -134,6 +135,10 @@ static int sts_assume_role_request(struct aws_credentials_provider_sts
     if (ret != 0 || client->resp.status != 200) {
         flb_error("[aws_credentials] STS request http_do=%i, HTTP Status: %i",
                   ret, client->resp.status);
+        if (client->resp.payload_size > 0) {
+                      flb_debug("[aws_credentials] Server response:\n%s",
+                                c->resp.payload);
+        }
         flb_http_client_destroy(client);
         flb_upstream_conn_release(u_conn);
         return -1;
