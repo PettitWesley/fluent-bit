@@ -188,13 +188,10 @@ struct aws_credentials_provider *new_standard_chain_provider()
     mk_list_add(&sub_provider->_head, &implementation->providers);
 
     sub_provider = new_profile_provider();
-    if (!sub_provider) {
-        /* Profile provider will only fail creation if a memory alloc failed */
-        aws_provider_destroy(provider);
-        return NULL;
+    if (sub_provider) {
+        /* Profile provider can fail if HOME env var is not set */;
+        mk_list_add(&sub_provider->_head, &implementation->providers);
     }
-
-    mk_list_add(&sub_provider->_head, &implementation->providers);
 
     sub_provider = new_imds_provider();
     if (!sub_provider) {
@@ -549,7 +546,8 @@ static int imds_credentials_request(struct aws_credentials_provider_imds
  * https://github.com/aws/aws-sdk-go/tree/master/aws/credentials/endpointcreds
  */
 
-aws_credentials *get_credentials_fn_http(struct aws_credentials_provider *provider) {
+aws_credentials *get_credentials_fn_http(struct aws_credentials_provider *provider)
+{
     aws_credentials *creds;
     int ret;
     struct aws_credentials_provider_http *implementation = provider->implementation;
@@ -565,30 +563,23 @@ aws_credentials *get_credentials_fn_http(struct aws_credentials_provider *provid
 
     creds = flb_malloc(sizeof(struct aws_credentials));
     if (!creds) {
-        flb_errno();
-        return NULL;
+        goto error;
     }
 
     creds->access_key_id = flb_sds_create(implementation->credentials->access_key_id);
     if (!creds->access_key_id) {
-        flb_errno();
-        aws_credentials_destroy(creds);
-        return NULL;
+        goto error;
     }
 
     creds->secret_access_key = flb_sds_create(implementation->credentials->secret_access_key);
     if (!creds->secret_access_key) {
-        flb_errno();
-        aws_credentials_destroy(creds);
-        return NULL;
+        goto error;
     }
 
     if (implementation->credentials->session_token) {
         creds->session_token = flb_sds_create(implementation->credentials->session_token);
         if (!creds->session_token) {
-            flb_errno();
-            aws_credentials_destroy(creds);
-            return NULL;
+            goto error;
         }
 
     } else {
@@ -596,6 +587,11 @@ aws_credentials *get_credentials_fn_http(struct aws_credentials_provider *provid
     }
 
     return creds;
+
+error:
+    flb_errno();
+    aws_credentials_destroy(creds);
+    return NULL;
 }
 
 int refresh_fn_http(struct aws_credentials_provider *provider) {
@@ -953,7 +949,9 @@ void aws_credentials_destroy(struct aws_credentials *creds)
 void aws_provider_destroy(struct aws_credentials_provider *provider))
 {
     if (provider) {
-        provider->provider_vtable->destroy(provider->implementation);
+        if (provider->implementation) {
+            provider->provider_vtable->destroy(provider->implementation);
+        }
 
         flb_free(provider);
     }

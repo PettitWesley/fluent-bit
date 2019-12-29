@@ -32,26 +32,193 @@
 #include <unistd.h>
 #include <ctype.h>
 
-#define ACCESS_KEY_PROPERTY_NAME    "aws_access_key_id"
-#define SECRET_KEY_PROPERTY_NAME    "aws_secret_access_key"
-#define SESSION_TOKEN_PROPERTY_NAME "aws_session_token"
+#define ACCESS_KEY_PROPERTY_NAME            "aws_access_key_id"
+#define SECRET_KEY_PROPERTY_NAME            "aws_secret_access_key"
+#define SESSION_TOKEN_PROPERTY_NAME         "aws_session_token"
+
+#define AWS_PROFILE                         "AWS_PROFILE"
+#define AWS_DEFAULT_PROFILE                 "AWS_DEFAULT_PROFILE"
 
 /*
  * A provider that reads from the shared credentials file.
- *
- * This provider is a bit rudimentary because we do not expect many Fluent Bit
- * users to use the credentials file (ECS, EC2, EKS providers are primary).
- * In the future support should be added for:
- *   - properties that extend over multiple lines (a continuation line starts
- *     with whitespace)
- *   - profiles that require using STS to assume an IAM role
  */
 static struct aws_credentials_provider_profile {
     struct aws_credentials *credentials;
 
-    char *profile;
-    char *path;
+    flb_sds_t *profile;
+    flb_sds_t *path;
 };
+
+aws_credentials *get_credentials_fn_profile(struct aws_credentials_provider
+                                         *provider)
+{
+    aws_credentials *creds;
+    int ret;
+    struct aws_credentials_provider_profile *implementation = provider->
+                                                              implementation;
+
+    flb_debug("[aws_credentials] Retrieving credentials for "
+              "AWS Profile %s", implementation->profile);
+
+    if (!implementation->credentials) {
+        ret = get_profile(implementation);
+        if (ret < 0) {
+            return NULL:
+        }
+    }
+
+    creds = flb_malloc(sizeof(struct aws_credentials));
+    if (!creds) {
+        goto error;
+    }
+
+    creds->access_key_id = flb_sds_create(implementation->credentials->access_key_id);
+    if (!creds->access_key_id) {
+        goto error;
+    }
+
+    creds->secret_access_key = flb_sds_create(implementation->credentials->secret_access_key);
+    if (!creds->secret_access_key) {
+        goto error;
+    }
+
+    if (implementation->credentials->session_token) {
+        creds->session_token = flb_sds_create(implementation->credentials->session_token);
+        if (!creds->session_token) {
+            goto error;
+        }
+
+    } else {
+        creds->session_token = NULL;
+    }
+
+    return creds;
+
+error:
+    flb_errno();
+    aws_credentials_destroy(creds);
+    return NULL;
+}
+
+int refresh_fn_profile(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_profile *implementation = provider->
+                                                              implementation;
+    flb_debug("[aws_credentials] Refresh called on the profile provider");
+    return get_profile(implementation);
+}
+
+void destroy_fn_profile(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_profile *implementation = provider->
+                                                              implementation;
+
+    if (implementation) {
+        if (implementation->credentials) {
+            aws_credentials_destroy(implementation->credentials);
+        }
+
+        if (implementation->profile) {
+            flb_sds_destroy(implementation->profile);
+        }
+
+        if (implementation->path) {
+            flb_sds_destroy(implementation->path);
+        }
+
+        flb_free(implementation);
+        provider->implementation = NULL;
+    }
+
+    return;
+}
+
+static struct aws_credentials_provider_vtable profile_provider_vtable = {
+    .get_credentials = get_credentials_fn_profile,
+    .refresh = refresh_fn_profile,
+    .destroy = destroy_fn_profile,
+};
+
+struct aws_credentials_provider *new_profile_provider()
+{
+    struct aws_credentials_provider *provider = NULL;
+    struct aws_credentials_provider_profile *implementation = NULL;
+    char *path;
+    char *profile;
+    char *home
+
+    provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
+
+    if (!provider) {
+        flb_errno();
+        return NULL;
+    }
+
+    implementation = flb_calloc(1,
+                                sizeof(
+                                struct aws_credentials_provider_profile));
+
+    if (!implementation) {
+        goto error;
+    }
+
+    provider->provider_vtable = &profile_provider_vtable;
+    provider->implementation = implementation;
+
+    /* find the shared credentials file */
+    path = getenv(AWS_SHARED_CREDENTIALS_FILE);
+    if (path && strlen(path) > 0) {
+        implementation->path = flb_sds_create(path);
+    } else {
+        /* default path: $HOME/.aws/credentials */
+        home = getenv("HOME");
+        if (!home || strlen(home) == 0) {
+            flb_warn("[aws_credentials] Failed to initialized profile provider: "
+            "$HOME not set and AWS_SHARED_CREDENTIALS_FILE not set.");
+            aws_provider_destroy(provider);
+            return NULL;
+        }
+
+        /* join file path */
+        implementation->path = flb_sds_create(home);
+        if (!implementation->path) {
+            goto error;
+        }
+        if (home[strlen(home) - 1] == '/') {
+            implementation->path = flb_sds_cat(implementation->path,
+                                               ".aws/credentials", 16);
+        } else {
+            implementation->path = flb_sds_cat(implementation->path,
+                                               "/.aws/credentials", 17);
+        }
+    }
+
+    if (!implementation->path) {
+        goto error;
+    }
+
+    /* AWS profile name */
+    profile = getenv(AWS_PROFILE);
+    if (profile && strlen(profile) > 0) {
+        goto set_profile;
+    }
+
+    profile = getenv(AWS_DEFAULT_PROFILE);
+    if (profile && strlen(profile) > 0) {
+        goto set_profile;
+    }
+
+    profile = "default";
+
+set_profile:
+    implementation->profile = flb_sds_create(profile);
+    if (!implementation->profile) {
+        goto error;
+    }
+
+error:
+    flb_errno();
+    aws_provider_destroy(provider);
+    return NULL;
+}
 
 static int file_to_buf(const char *path, char **out_buf, size_t *out_size)
 {
@@ -222,7 +389,7 @@ static int parse_file(char *buf, char *profile, struct aws_credentials *creds)
     return -1;
 }
 
-static struct aws_credentials *get_profile(aws_credentials_provider_profile
+static int get_profile(aws_credentials_provider_profile
                                            *implementation)
 {
     struct aws_credentials *creds;
@@ -233,25 +400,29 @@ static struct aws_credentials *get_profile(aws_credentials_provider_profile
     creds = flb_calloc(1, sizeof(struct aws_credentials));
     if (!creds) {
         flb_errno();
-        return NULL;
+        return -1;
     }
 
     ret = file_to_buf(implementation->path, &buf, &size);
     if (ret < 0) {
-        aws_credentials_destroy(creds);
-        return NULL;
+        flb_error("[aws_credentials] Could not read shared credentials file %s",
+                  implementation->path);
+        goto error;
     }
 
     ret = parse_file(buf, implementation->profile, creds);
     flb_free(buf);
 
     if (ret < 0) {
-        aws_credentials_destroy(creds);
         flb_error("[aws_credentials] Could not parse shared credentials file: "
                   "valid profile with name '%s' not found",
                   implementation->profile);
-        return NULL;
+        goto error;
     }
 
-    return creds;
+    implementation->credentials = creds;
+
+error:
+    aws_credentials_destroy(creds);
+    return -1;
 }
