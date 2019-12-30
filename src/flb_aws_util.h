@@ -36,6 +36,8 @@
 #define AWS_SERVICE_ENDPOINT_FORMAT            "https://%s.%s.amazonaws.com"
 #define AWS_SERVICE_ENDPOINT_BASE_LEN          25
 
+#define FLB_AWS_CREDENTIAL_REFRESH_LIMIT       300
+
 /*
  * The AWS HTTP Client is a wrapper around the Fluent Bit's http library.
  * It handles tasks which are common to all AWS API requests (retries,
@@ -44,11 +46,11 @@
  */
 
 
-typedef void(aws_http_client_request_fn)(struct aws_http_client *client,
-                                         int method, const char *uri,
-                                         const char *body, size_t body_len,
-                                         aws_http_header *dynamic_headers,
-                                         size_t headers_len);
+typedef int(aws_http_client_request_fn)(struct aws_http_client *aws_client,
+                                        int method, const char *uri,
+                                        const char *body, size_t body_len,
+                                        struct aws_http_header *dynamic_headers,
+                                        size_t dynamic_headers_len);
 
 /* TODO: Eventually will need to add a way to call flb_http_buffer_size */
 
@@ -83,7 +85,7 @@ struct aws_http_client {
 
     char *host;
     int port;
-    const char *proxy;
+    char *proxy;
     int flags;
 
     /*
@@ -102,11 +104,24 @@ struct aws_http_client {
     struct flb_http_client *c;
 
     /*
-     * The parsed AWS API error code returned by the last request.
+     * If an API responds with 400, we refresh creds and retry.
+     * For safety, credential refresh can only happen once per
+     * FLB_AWS_CREDENTIAL_REFRESH_LIMIT.
+     */
+    time_t refresh_limit;
+
+    /*
+     * The parsed AWS API error type returned by the last request.
      * Caller code does not need to free this pointer.
      */
-    flb_sds_t error_code;
+    flb_sds_t error_type;
 };
+
+/*
+ * Frees the aws_client and the internal flb_http_client.
+ * Caller code must free all other memory.
+ */
+void aws_client_destroy(struct aws_http_client *aws_client);
 
 typedef struct aws_http_client*(aws_http_client_create_fn)();
 
@@ -114,6 +129,7 @@ typedef struct aws_http_client*(aws_http_client_create_fn)();
  * HTTP Client Generator creates a new client structure and sets the vtable.
  * Unit tests can implement a custom generator which returns a mock client.
  * This structure is a virtual table.
+ * Client code should not free it.
  */
 struct aws_http_client_generator {
     aws_http_client_create_fn *new;

@@ -187,3 +187,237 @@ char *endpoint_for(char* service, char* region)
     return endpoint;
 
 }
+
+int aws_http_client_request(struct aws_http_client *aws_client,
+                            int method, const char *uri,
+                            const char *body, size_t body_len,
+                            struct aws_http_header *dynamic_headers,
+                            size_t headers_len)
+{
+    int ret;
+
+    //TODO: Need to think more about the retry strategy.
+
+    ret = request_do(aws_client, method, uri, body, body_len,
+                     dynamic_headers, dynamic_headers_len);
+
+    if (ret == 0 && aws_client->-c->resp.status == 200) {
+        return 0;
+    }
+
+    /*
+     * 400 or 403 could indicate an issue with credentials- so we force a
+     * refresh on the provider. For safety a refresh can be performed only once
+     * per FLB_AWS_CREDENTIAL_REFRESH_LIMIT.
+     */
+    if (aws_client->-c->resp.status == 400 ||
+        aws_client->-c->resp.status == 403) {
+        if (aws_client->has_auth && time(NULL) > aws_client->refresh_limit) {
+            aws_client->refresh_limit = time(NULL)
+                                        + FLB_AWS_CREDENTIAL_REFRESH_LIMIT;
+            aws_client->provider->provider_vtable->refresh();
+        }
+    }
+
+    /* perform a single retry */
+    return request_do(aws_client, method, uri, body, body_len,
+                      dynamic_headers, dynamic_headers_len);
+}
+
+static struct aws_http_client_vtable client_vtable = {
+    .request = aws_http_client_request,
+};
+
+struct aws_http_client *aws_http_client_create()
+{
+    aws_http_client *client = flb_calloc(1, sizeof(struct aws_http_client));
+    if (!client) {
+        flb_errno();
+        return NULL;
+    }
+    client->client_vtable = &client_vtable;
+    return client;
+}
+
+/* Generator that returns clients with the default vtable */
+
+static struct aws_http_client_generator default_generator = {
+    .new = aws_http_client_create,
+}
+
+struct aws_http_client_generator *generator()
+{
+    return &default_generator;
+}
+
+void aws_client_destroy(struct aws_http_client *aws_client)
+{
+    if (aws_client) {
+        if (aws_client->c) {
+            flb_http_client_destroy(aws_client->c);
+        }
+        flb_free(aws_client);
+    }
+}
+
+int request_do(struct aws_http_client *aws_client,
+                int method, const char *uri,
+                const char *body, size_t body_len,
+                struct aws_http_header *dynamic_headers,
+                size_t dynamic_headers_len)
+{
+    size_t b_sent;
+    int ret;
+    struct flb_upstream_conn *u_conn = NULL;
+    flb_sds_t signature = NULL;
+    int i;
+    struct aws_http_header *header;
+
+    u_conn = flb_upstream_conn_get(aws_client->upstream);
+    if (!u_conn) {
+        flb_error("[aws_client] connection initialization error");
+        return -1;
+    }
+
+    if (aws_client->c) {
+        /* free leftover client from previous request */
+        flb_http_client_destroy(aws_client->c);
+    }
+
+    /* Compose HTTP request */
+    aws_client->c = flb_http_client(u_conn, method, uri,
+                                    body, body_len,
+                                    aws_client->host, aws_client->host,
+                                    aws_client->proxy, aws_client->flags);
+
+    if (!aws_client->c) {
+        flb_error("[aws_client] could not initialize request");
+        goto error;
+    }
+
+    /* add headers */
+    for (i = 0; i < aws_client->static_headers_len; i++) {
+        header = aws_client->static_headers[i];
+        ret =  flb_http_add_header(aws_client->c,
+                                   header->key, header->key_len,
+                                   header->val, header->val_len);
+        if (ret < 0) {
+            flb_error("[aws_client] failed to add header to request");
+            goto error;
+        }
+    }
+
+    for (i = 0; i < aws_client->dynamic_headers_len; i++) {
+        header = aws_client->dynamic_headers[i];
+        ret =  flb_http_add_header(aws_client->c,
+                                   header->key, header->key_len,
+                                   header->val, header->val_len);
+        if (ret < 0) {
+            flb_error("[aws_client] failed to add header to request");
+            goto error;
+        }
+    }
+
+    if (aws_client->has_auth) {
+        signature = flb_signv4_do(aws_client->-c, FLB_TRUE, FLB_TRUE, time(NULL),
+                                  aws_client->region, aws_client->service,
+                                  aws_client->provider);
+    }
+
+    if (!signature) {
+        flb_error("[aws_client] could not sign request");
+        goto error;
+    }
+
+    /* Perform request */
+    ret = flb_http_do(aws_client->-c, &b_sent);
+
+    if (ret != 0 || aws_client->-c->resp.status != 200) {
+        flb_error("[aws_client] request error: http_do=%i, HTTP Status: %i",
+                  ret, aws_client->c->resp.status);
+        if (aws_client->c->resp.payload_size > 0) {
+            /* try to parse the error */
+            aws_client->error_type = parse_error(client->resp.payload,
+                                                 client->resp.payload_size);
+        }
+        goto error;
+    }
+
+    flb_upstream_conn_release(u_conn);
+    return 0;
+
+error:
+    if (u_conn) {
+        flb_upstream_conn_release(u_conn);
+    }
+    if (signature) {
+        flb_sds_destroy(signature);
+    }
+    return -1;
+}
+
+/* parses AWS API error responses and returns the value of the __type field */
+static flb_sds_t parse_error(char *response, size_t response_len) {
+    jsmntok_t *tokens;
+    const jsmntok_t *t;
+    char *current_token;
+    jsmn_parser parser;
+    int tokens_size = 10;
+    size_t size;
+    int ret;
+    int i = 0;
+    flb_sds_t error_type = NULL;
+
+    jsmn_init(&parser);
+
+    size = sizeof(jsmntok_t) * tokens_size;
+    tokens = flb_calloc(1, size);
+    if (!tokens) {
+        flb_errno();
+        return NULL;
+    }
+
+    ret = jsmn_parse(&parser, response, response_len,
+                     tokens, tokens_size);
+
+    if (ret == JSMN_ERROR_INVAL || ret == JSMN_ERROR_PART) {
+        flb_free(tokens);
+        return NULL;
+    }
+
+    /* return value is number of tokens parsed */
+    tokens_size = ret;
+
+    /*
+     * jsmn will create an array of tokens like:
+     * key, value, key, value
+     */
+    while (i < (tokens_size - 1)) {
+        t = &tokens[i];
+
+        if (t->start == -1 || t->end == -1 || (t->start == 0 && t->end == 0)) {
+            break;
+        }
+
+        if (t->type == JSMN_STRING) {
+            current_token = &response[t->start];
+
+            if (strncmp(current_token, "__type") == 0) {
+                i++;
+                t = &tokens[i];
+                current_token = &response[t->start];
+                error_type = flb_sds_create_len(current_token, t->size);
+                if (!error_type) {
+                    flb_errno();
+                    flb_free(tokens);
+                    return NULL;
+                }
+                break;
+            }
+        }
+
+        i++;
+    }
+
+    return error_type;
+}

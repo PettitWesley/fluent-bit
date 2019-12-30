@@ -813,7 +813,7 @@ static struct aws_credentials *process_http_credentials_response(flb_sds_t
     tokens = flb_calloc(1, size);
     if (!tokens) {
         flb_errno();
-        return -1;
+        return NULL;
     }
 
     ret = jsmn_parse(&parser, response, response_len,
