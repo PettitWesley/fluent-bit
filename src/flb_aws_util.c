@@ -344,6 +344,7 @@ int request_do(struct aws_http_client *aws_client,
     }
 
     flb_upstream_conn_release(u_conn);
+    flb_sds_destroy(signature);
     return 0;
 
 error:
