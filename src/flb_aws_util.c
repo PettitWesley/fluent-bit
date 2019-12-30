@@ -256,6 +256,15 @@ void aws_client_destroy(struct aws_http_client *aws_client)
         if (aws_client->c) {
             flb_http_client_destroy(aws_client->c);
         }
+        if (aws_client->error_type) {
+            flb_sds_destroy(aws_client->error_type);
+        }
+        if (aws_client->upstream) {
+            flb_upstream_destroy(upstream);
+        }
+        if (aws_client->static_headers) {
+            flb_free(static_headers);
+        }
         flb_free(aws_client);
     }
 }
@@ -273,15 +282,22 @@ int request_do(struct aws_http_client *aws_client,
     int i;
     struct aws_http_header *header;
 
-    u_conn = flb_upstream_conn_get(aws_client->upstream);
-    if (!u_conn) {
-        flb_error("[aws_client] connection initialization error");
-        return -1;
+    if (aws_client->error_type) {
+        /* clear last error */
+        flb_sds_destroy(aws_client->error_type);
+        aws_client->error_type = NULL;
     }
 
     if (aws_client->c) {
         /* free leftover client from previous request */
         flb_http_client_destroy(aws_client->c);
+        aws_client->c = NULL;
+    }
+
+    u_conn = flb_upstream_conn_get(aws_client->upstream);
+    if (!u_conn) {
+        flb_error("[aws_client] connection initialization error");
+        return -1;
     }
 
     /* Compose HTTP request */

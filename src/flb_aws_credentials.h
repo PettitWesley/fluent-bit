@@ -114,7 +114,7 @@ struct aws_credentials_provider *new_environment_provider();
 /*
  * New EC2 IMDS provider
  */
-struct aws_credentials_provider *new_imds_provider();
+struct aws_credentials_provider *new_imds_provider(struct flb_config *config);
 
 /*
  * New AWS Profile provider, reads from the shared credentials file
@@ -126,14 +126,15 @@ struct aws_credentials_provider *new_profile_provider();
  * The ECS Provider is just a wrapper around the HTTP Provider
  * with the ECS credentials endpoint.
  */
-struct aws_credentials_provider *new_ecs_provider();
+struct aws_credentials_provider *new_ecs_provider(struct flb_config *config);
 
 /*
  * New http provider
  * Calling aws_provider_destroy on this provider frees the memory
  * used by host and path.
  */
-struct aws_credentials_provider *new_http_provider(char *host, char* path);
+struct aws_credentials_provider *new_http_provider(struct flb_config *config,
+                                                   char *host, char* path);
 
 /*
  * The standard credential provider chain:
@@ -152,12 +153,19 @@ struct aws_credentials_provider *new_standard_chain_provider();
 /*
  * STS Assume Role Provider.
  */
-struct aws_credentials_provider *new_sts_assume_role_provider(struct
+struct aws_credentials_provider *new_sts_assume_role_provider(struct flb_config
+                                                              *config,
+                                                              struct flb_tls *tls,
+                                                              struct
                                                               aws_credentials_provider
                                                               base_provider,
                                                               char *external_id,
                                                               char *role_arn,
-                                                              char *session_name);
+                                                              char *session_name,
+                                                              char *region,
+                                                              char *proxy,
+                                                              aws_http_client_generator
+                                                              *generator);
 
 
 /*

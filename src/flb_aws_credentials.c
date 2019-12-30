@@ -405,7 +405,8 @@ static struct aws_credentials_provider_vtable imds_provider_vtable = {
     .destroy = destroy_fn_imds,
 };
 
-struct aws_credentials_provider *new_imds_provider() {
+struct aws_credentials_provider *new_imds_provider(struct flb_config *config)
+{
     struct aws_credentials_provider_imds *implementation;
     struct aws_credentials_provider *provider;
 
@@ -633,7 +634,9 @@ static struct aws_credentials_provider_vtable http_provider_vtable = {
     .destroy = destroy_fn_http,
 };
 
-struct aws_credentials_provider *new_http_provider(char *host, char* path) {
+struct aws_credentials_provider *new_http_provider(struct flb_config *config,
+                                                   char *host, char* path)
+{
     struct aws_credentials_provider_http *implementation;
     struct aws_credentials_provider *provider;
 
@@ -748,7 +751,7 @@ static int http_credentials_request(struct aws_credentials_provider_http
  * with the ECS credentials endpoint.
  */
 
-struct aws_credentials_provider *new_ecs_provider() {
+struct aws_credentials_provider *new_ecs_provider(struct flb_config *config) {
     char *host;
     char *path;
     char *path_var;
@@ -772,7 +775,7 @@ struct aws_credentials_provider *new_ecs_provider() {
         }
         path[strlen(path_var)] = '\0';
 
-        return new_http_provider(host, path);
+        return new_http_provider(config, host, path);
     } else {
         return NULL;
     }

@@ -51,143 +51,208 @@
 static struct aws_credentials_provider_sts {
     struct aws_credentials_provider *base_provider;
 
-    /* upstream connection to sts */
-    struct flb_upstream *upstream;
+    struct aws_credentials creds;
+    time_t next_refresh;
 
-    char *role_arn;
-
-    char *uri;
+    struct aws_http_client *sts_client;
 
     /* Fluent Bit uses regional STS endpoints; this is a best practice. */
     char *endpoint;
-    char *region;
+
+    char *uri;
 };
 
-struct aws_credentials_provider *new_sts_assume_role_provider(struct
+struct aws_credentials_provider *new_sts_assume_role_provider(struct flb_config
+                                                              *config,
+                                                              struct flb_tls *tls,
+                                                              struct
                                                               aws_credentials_provider
                                                               base_provider,
                                                               char *external_id,
                                                               char *role_arn,
                                                               char *session_name,
-                                                              char *region);
-
-/*
- * Constructs the STS request uri.
- * external_id can be NULL.
- */
-static char *sts_uri(char *role_arn, char *session_name, char *external_id)
+                                                              char *region,
+                                                              char *proxy,
+                                                              aws_http_client_generator
+                                                              *generator)
 {
-    char *uri;
-    size_t len = STS_ASSUME_ROLE_URI_BASE_LEN;
+    struct aws_credentials_provider_sts *implementation;
+    struct aws_credentials_provider *provider;
+    struct flb_upstream *upstream;
 
-    if (external_id) {
-        len += 12; /* will add "&ExternalId=" */
-        len += strlen(external_id);
-    }
+    provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
 
-    len += strlen(session_name);
-    len += strlen(role_arn);
-
-    uri = flb_malloc(size(char) * (len + 1));
-    if (!uri) {
+    if (!provider) {
         flb_errno();
         return NULL;
     }
 
-    snprintf(uri, len, STS_ASSUME_ROLE_URI_FORMAT, session_name, role_arn);
+    implementation = flb_calloc(1, sizeof(struct aws_credentials_provider_sts));
 
-    if (implementation->external_id) {
-        strncat(uri, "&ExternalId=", 12);
-        strncat(uri, external_id, strlen(external_id));
+    if (!implementation) {
+        goto error;
     }
 
-    return uri;
+    provider->provider_vtable = &sts_provider_vtable;
+    provider->implementation = implementation;
+
+    implementation->uri = sts_uri(role_arn, session_name, external_id);
+    if (!implementation->uri) {
+        goto error;
+    }
+
+    implementation->endpoint = endpoint_for("sts", region);
+    if (!implementation->endpoint) {
+        goto error;
+    }
+
+    implementation->base_provider = base_provider;
+    implementation->sts_client = generator->new();
+    if (!implementation->sts_client) {
+        goto error;
+    }
+    implementation->sts_client->name = "sts_client";
+    implementation->sts_client->has_auth = FLB_TRUE;
+    implementation->sts_client->provider = base_provider;
+    implementation->sts_client->region = region;
+    implementation->sts_client->service = "sts";
+    implementation->sts_client->port = 80
+    implementation->sts_client->flags = 0;
+    implementation->sts_client->proxy = proxy;
+
+    upstream = flb_upstream_create(config, implementation->endpoint, 80,
+                                   FLB_IO_TLS, tls);
+
+    implementation->sts_client->upstream = upstream;
+    implementation->endpoint->host = implementation->endpoint;
+
+error:
+    flb_errno();
+    aws_provider_destroy(provider);
+    return NULL;
 }
+
+
+aws_credentials *get_credentials_fn_sts(struct aws_credentials_provider *provider) {
+    aws_credentials *creds;
+    int ret;
+    struct aws_credentials_provider_sts *implementation = provider->implementation;
+
+    flb_debug("[aws_credentials] Requesting credentials from the STS provider..");
+
+    if (!implementation->credentials || time(NULL) > implementation->next_refresh) {
+        ret = sts_assume_role_request(implementation);
+        if (ret < 0) {
+            return NULL:
+        }
+    }
+
+    creds = flb_malloc(sizeof(struct aws_credentials));
+    if (!creds) {
+        goto error;
+    }
+
+    creds->access_key_id = flb_sds_create(implementation->creds->access_key_id);
+    if (!creds->access_key_id) {
+        goto error;
+    }
+
+    creds->secret_access_key = flb_sds_create(implementation->creds->secret_access_key);
+    if (!creds->secret_access_key) {
+        goto error;
+    }
+
+    if (implementation->credentials->session_token) {
+        creds->session_token = flb_sds_create(implementation->creds->session_token);
+        if (!creds->session_token) {
+            goto error;
+        }
+
+    } else {
+        creds->session_token = NULL;
+    }
+
+    return creds;
+
+error:
+    flb_errno();
+    aws_credentials_destroy(creds);
+    return NULL;
+}
+
+int refresh_fn_sts(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_sts *implementation = provider->implementation;
+    flb_debug("[aws_credentials] Refresh called on the STS provider");
+    return sts_assume_role_request(implementation);;
+}
+
+void destroy_fn_sts(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_sts *implementation = provider->implementation;
+    if (implementation) {
+        if (implementation->credentials) {
+            aws_credentials_destroy(implementation->credentials);
+        }
+
+        if (implementation->sts_client) {
+            aws_client_destroy(implementation->sts_client);
+        }
+
+        if (implementation->uri) {
+            flb_free(implementation->uri);
+        }
+
+        if (implementation->endpoint) {
+            flb_free(implementation->endpoint);
+        }
+
+        flb_free(implementation);
+        provider->implementation = NULL;
+    }
+
+    return;
+}
+
+static struct aws_credentials_provider_vtable sts_provider_vtable = {
+    .get_credentials = get_credentials_fn_sts,
+    .refresh = refresh_fn_sts,
+    .destroy = destroy_fn_sts,
+};
 
 static int sts_assume_role_request(struct aws_credentials_provider_sts
                                    *implementation)
 {
-    struct flb_http_client *client;
-    size_t b_sent;
     int ret;
-    struct flb_upstream_conn *u_conn;
-    flb_sds_t response;
-    size_t response_len;
     time_t expiration;
-    struct aws_credentials *creds;
-    flb_sds_t signature;
+    struct aws_http_client sts_client = implementation->sts_client;
 
-    u_conn = flb_upstream_conn_get(implementation->upstream);
-    if (!u_conn) {
-        flb_error("[aws_credentials] STS Provider: connection initialization error");
-        return -1;
-    }
+    ret = sts_client->client_vtable->request(sts_client, FLB_HTTP_GET,
+                                             implementation->uri, NULL, 0,
+                                             NULL, 0);
 
-    /* Compose HTTP request */
-    client = flb_http_client(u_conn, FLB_HTTP_GET,
-                             implementation->uri,
-                             NULL, 0,
-                             implementation->endpoint, 80,
-                             NULL, 0);
-
-    if (!client) {
-        flb_error("[aws_credentials] STS Provider: could not initialize request");
-        flb_upstream_conn_release(u_conn);
-        return -1;
-    }
-
-    signature = flb_signv4_do(client, FLB_TRUE, FLB_TRUE, time(NULL)
-                              implementation->region, "sts",
-                              implementation->base_provider);
-
-    if (!signature) {
-        flb_error("[aws_credentials] STS Provider: could not sign request");
-        flb_upstream_conn_release(u_conn);
-        return -1;
-    }
-
-    /* Perform request */
-    flb_debug("[aws_credentials] STS Provider: requesting credentials");
-    ret = flb_http_do(client, &b_sent);
-
-    if (ret != 0 || client->resp.status != 200) {
-        flb_error("[aws_credentials] STS request http_do=%i, HTTP Status: %i",
-                  ret, client->resp.status);
-        if (client->resp.payload_size > 0) {
-                      flb_debug("[aws_credentials] Server response:\n%s",
-                                c->resp.payload);
+    if (ret == 0 && sts_client->c->resp.status == 200) {
+        implementation->creds = process_sts_response(sts_client->c->resp.payload,
+                                                     &expiration);
+        if (!implementation->creds) {
+            flb_error("[aws_credentials] Failed to parse response from STS");
+            return -1;
         }
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
-        return -1;
+        implementation->next_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
+        return 0;
     }
 
-    response = flb_sds_create_len(client->resp.payload,
-                                  client->resp.payload_size);
-    if (!response) {
-        flb_errno();
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
-        return -1;
+    if (sts_client->error_type) {
+        flb_error("[aws_credentials] STS API responded with %s",
+                  sts_client->error_type);
     }
 
-    flb_http_client_destroy(client);
-    flb_upstream_conn_release(u_conn);
-
-    response_len = client->resp.payload_size;
-
-    creds = process_http_credentials_response(response, response_len,
-                                              &expiration);
-
-    flb_sds_destroy(response);
-
-    if (!creds) {
-        return -1;
+    if (sts_client->c && sts_client->c->resp.payload_size > 0) {
+        flb_debug("[aws_credentials] STS raw response: \n%s",
+                  sts_client->c->resp.payload);
     }
 
-    implementation->credentials = creds;
-    implementation->cred_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
-    return 0;
+    flb_error("[aws_credentials] STS assume role request failed");
+    return -1;
+
 }
 
 /*
@@ -200,7 +265,7 @@ static int sts_assume_role_request(struct aws_credentials_provider_sts
  *    <Expiration>2019-11-09T13:34:41Z</Expiration>
  * </Credentials>
  */
-static struct aws_credentials *process_sts_response(flb_sds_t response,
+static struct aws_credentials *process_sts_response(char *response,
                                                     time_t *expiration)
 {
     struct aws_credentials *creds;
@@ -258,6 +323,39 @@ error:
         flb_sds_destroy(tmp);
     }
     return NULL;
+}
+
+/*
+ * Constructs the STS request uri.
+ * external_id can be NULL.
+ */
+static char *sts_uri(char *role_arn, char *session_name, char *external_id)
+{
+    char *uri;
+    size_t len = STS_ASSUME_ROLE_URI_BASE_LEN;
+
+    if (external_id) {
+        len += 12; /* will add "&ExternalId=" */
+        len += strlen(external_id);
+    }
+
+    len += strlen(session_name);
+    len += strlen(role_arn);
+
+    uri = flb_malloc(size(char) * (len + 1));
+    if (!uri) {
+        flb_errno();
+        return NULL;
+    }
+
+    snprintf(uri, len, STS_ASSUME_ROLE_URI_FORMAT, session_name, role_arn);
+
+    if (implementation->external_id) {
+        strncat(uri, "&ExternalId=", 12);
+        strncat(uri, external_id, strlen(external_id));
+    }
+
+    return uri;
 }
 
 static flb_sds_t get_node(char *cred_node, char* node_name, int node_len)
