@@ -26,10 +26,22 @@
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 #define STS_ASSUME_ROLE_URI_FORMAT    "/?Version=2011-06-15&Action=AssumeRole\
 &RoleSessionName=%s&RoleArn=%s"
 #define STS_ASSUME_ROLE_URI_BASE_LEN  64
+
+#define CREDENTIALS_NODE              "<Credentials>"
+#define CREDENTIALS_NODE_LEN          13
+#define ACCESS_KEY_NODE               "<AccessKeyId>"
+#define ACCESS_KEY_NODE_LEN           13
+#define SECRET_KEY_NODE               "<SecretAccessKey>"
+#define SECRET_KEY_NODE_LEN           17
+#define SESSION_TOKEN_NODE            "<SessionToken>"
+#define SESSION_TOKEN_NODE_LEN        14
+#define EXPIRATION_NODE               "<Expiration>"
+#define EXPIRATION_NODE_LEN           12
 
 
 /*
@@ -179,7 +191,7 @@ static int sts_assume_role_request(struct aws_credentials_provider_sts
 }
 
 /*
- * The STS APIs return an XML response with credentials embedded
+ * The STS APIs return an XML document with credentials.
  * The part of the document we care about looks like this:
  * <Credentials>
  *    <AccessKeyId>akid</AccessKeyId>
@@ -189,28 +201,91 @@ static int sts_assume_role_request(struct aws_credentials_provider_sts
  * </Credentials>
  */
 static struct aws_credentials *process_sts_response(flb_sds_t response,
-                                                    size_t response_len,
                                                     time_t *expiration)
 {
+    struct aws_credentials *creds;
+    char *cred_node;
+    flb_sds_t tmp = NULL;
 
+    cred_node = strstr(response, CREDENTIALS_NODE);
+    if (!cred_node) {
+        flb_error("[aws_credentials] Could not find '%s' node in sts response",
+                  CREDENTIALS_NODE);
+        return NULL;
+    }
+    cred_node += CREDENTIALS_NODE_LEN;
+
+    creds = flb_malloc(sizeof(struct aws_credentials));
+    if (!creds) {
+        flb_errno();
+        return NULL;
+    }
+
+    creds->access_key_id = get_node(cred_node, ACCESS_KEY_NODE,
+                                    ACCESS_KEY_NODE_LEN);
+    if (!creds->access_key_id) {
+        goto error;
+    }
+
+    creds->secret_access_key = get_node(cred_node, SECRET_KEY_NODE,
+                                        SECRET_KEY_NODE_LEN);
+    if (!creds->secret_access_key) {
+        goto error;
+    }
+
+    creds->session_token = get_node(cred_node, SESSION_TOKEN_NODE,
+                                    SESSION_TOKEN_NODE_LEN);
+    if (!creds->session_token) {
+        goto error;
+    }
+
+    tmp = get_node(cred_node, EXPIRATION_NODE, EXPIRATION_NODE_LEN);
+    if (!tmp) {
+        goto error;
+    }
+    *expiration = parse_expiration(tmp);
+    if (*expiration == 0) {
+        flb_error("[aws_credentials] Could not parse expiration in sts response");
+        goto error;
+    }
+
+    flb_sds_destroy(tmp);
+    return creds;
+
+error:
+    aws_credentials_destroy(creds);
+    if (tmp) {
+        flb_sds_destroy(tmp);
+    }
+    return NULL;
 }
 
-/* Returns the character position of the <Credentials> node */
-// static int find_credentials_node(flb_sds_t response, size_t response_len)
-// {
-//     int i;
-//     char *r = response;
+static flb_sds_t get_node(char *cred_node, char* node_name, int node_len)
+{
+    char *node;
+    char *end;
+    flb_sds_t val;
 
-    // TODO: there should be a library function for finding a substring
+    node = strstr(cred_node, node_name);
+    if (!node) {
+        flb_error("[aws_credentials] Could not find '%s' node in sts response",
+                  node_name);
+        return NULL;
+    }
+    node += node_len;
+    end = strchr(node, '<');
+    if (!end) {
+        flb_error("[aws_credentials] Could not find end of '%s' node in sts response",
+                  node_name);
+        return NULL;
+    }
+    *end = '\0';
 
-    // for (i = 12; i < response_len; i++) {
-    //     if (r[i - 12] == '<' && r[i - 11] == 'C' && r[i - 10] == 'r' &&
-    //         r[i - 9] == 'e' && r[i - 8] == 'd' && r[i - 7] == 'e' &&
-    //         r[i - 6] == 'n' && r[i - 5] == 't' && r[i - 4] == 'i' &&
-    //         r[i - 3] == 'a' && r[i - 2] == 'l' && r[i - 1] == 's' &&
-    //         r[i] == '>') {
-    //             return i;
-    //         }
-    //
-    // }
-// }
+    val = flb_sds_create(node);
+    if (!val) {
+        flb_errno();
+        return NULL;
+    }
+
+    return val;
+}
