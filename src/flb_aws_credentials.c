@@ -52,11 +52,11 @@ static struct aws_credentials_provider_imds {
     time_t cred_refresh;
 
     /* upstream connection to IMDS */
-    struct flb_upstream *upstream;
+    struct aws_http_client *client;
 
     /* IMDSv2 Token */
     flb_sds_t imds_v2_token;
-    unsigned int imds_v2_token_len;
+    size_t imds_v2_token_len;
     time_t token_refresh;
 };
 
@@ -423,6 +423,7 @@ struct aws_credentials_provider *new_imds_provider(struct flb_config *config,
 {
     struct aws_credentials_provider_imds *implementation;
     struct aws_credentials_provider *provider;
+    struct flb_upstream *upstream;
 
     provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
 
@@ -442,16 +443,30 @@ struct aws_credentials_provider *new_imds_provider(struct flb_config *config,
     provider->provider_vtable = &imds_provider_vtable;
     provider->implementation = implementation;
 
-    implementation->upstream = flb_upstream_create(config,
-                                                   AWS_IMDS_V2_HOST,
-                                                   80,
-                                                   FLB_IO_TCP,
-                                                   NULL);
-    if (!implementation->upstream) {
+    upstream = flb_upstream_create(config, AWS_IMDS_V2_HOST, 80,
+                                   FLB_IO_TCP, NULL);
+    if (!upstream) {
         aws_provider_destroy(provider);
         flb_error("[aws_credentials] EC2 IMDS: connection initialization error");
         return NULL;
     }
+
+    implementation->client = generator->new();
+    if (!implementation->client) {
+        aws_provider_destroy(provider);
+        flb_upstream_destroy(upstream);
+        flb_error("[aws_credentials] EC2 IMDS: client creation error");
+        return NULL;
+    }
+    implementation->client->name = "ec2_imds_provider_client";
+    implementation->client->has_auth = FLB_FALSE;
+    implementation->client->provider = NULL;
+    implementation->client->region = NULL;
+    implementation->client->service = NULL;
+    implementation->client->port = 80
+    implementation->client->flags = 0;
+    implementation->client->proxy = NULL;
+    implementation->client->upstream = upstream;
 
     return provider;
 }
@@ -462,7 +477,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
 {
     int ret;
     flb_sds_t instance_role;
-    unsigned int instance_role_len;
+    size_t instance_role_len;
     char *cred_path;
     size_t cred_path_size;
 
@@ -470,7 +485,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
 
     if (!implementation->imds_v2_token || (time(NULL) > implementation->token_refresh)) {
         flb_debug("[aws_credentials] requesting a new IMDSv2 token");
-        ret = get_ec2_token(implementation->upstream,
+        ret = get_ec2_token(implementation->client,
                             &implementation->imds_v2_token,
                             &implementation->imds_v2_token_len);
         if (ret < 0) {
@@ -483,7 +498,7 @@ static int get_creds_imds(struct aws_credentials_provider_imds *implementation)
     }
 
     /* Get the name of the instance role */
-    ret = get_metadata(implementation->upstream, AWS_IMDS_V2_ROLE_PATH,
+    ret = get_metadata(implementation->client, AWS_IMDS_V2_ROLE_PATH,
                        &instance_role, &instance_role_len,
                        implementation->imds_v2_token,
                        implementation->imds_v2_token_len);
@@ -530,7 +545,7 @@ static int imds_credentials_request(struct aws_credentials_provider_imds
     struct aws_credentials *creds;
     time_t expiration;
 
-    ret = get_metadata(implementation->upstream, cred_path,
+    ret = get_metadata(implementation->client, cred_path,
                        &credentials_response, &credentials_response_len,
                        implementation->imds_v2_token,
                        implementation->imds_v2_token_len);
@@ -623,8 +638,8 @@ void destroy_fn_http(struct aws_credentials_provider *provider) {
             aws_credentials_destroy(implementation->credentials);
         }
 
-        if (implementation->upstream) {
-            flb_upstream_destroy(implementation->upstream);
+        if (implementation->client) {
+            aws_client_destroy(implementation->client);
         }
 
         if (implementation->host) {
@@ -655,6 +670,7 @@ struct aws_credentials_provider *new_http_provider(struct flb_config *config,
 {
     struct aws_credentials_provider_http *implementation;
     struct aws_credentials_provider *provider;
+    struct flb_upstream *upstream;
 
     provider = flb_calloc(1, sizeof(struct aws_credentials_provider));
 
@@ -677,16 +693,31 @@ struct aws_credentials_provider *new_http_provider(struct flb_config *config,
     implementation->host = host;
     implementation->path = path;
 
-    implementation->upstream = flb_upstream_create(config,
-                                                   host,
-                                                   80,
-                                                   FLB_IO_TCP,
-                                                   NULL);
-    if (!implementation->upstream) {
+    upstream = flb_upstream_create(config, host, 80, FLB_IO_TCP, NULL);
+
+    if (!upstream) {
         aws_provider_destroy(provider);
-        flb_error("[aws_credentials] EC2 IMDS: connection initialization error");
+        flb_error("[aws_credentials] HTTP Provider: connection initialization "
+                  "error");
         return NULL;
     }
+
+    implementation->client = generator->new();
+    if (!implementation->client) {
+        aws_provider_destroy(provider);
+        flb_upstream_destroy(upstream);
+        flb_error("[aws_credentials] HTTP Provider: client creation error");
+        return NULL;
+    }
+    implementation->client->name = "http_provider_client";
+    implementation->client->has_auth = FLB_FALSE;
+    implementation->client->provider = NULL;
+    implementation->client->region = NULL;
+    implementation->client->service = NULL;
+    implementation->client->port = 80
+    implementation->client->flags = 0;
+    implementation->client->proxy = NULL;
+    implementation->client->upstream = upstream;
 
     return provider;
 }
@@ -694,58 +725,28 @@ struct aws_credentials_provider *new_http_provider(struct flb_config *config,
 static int http_credentials_request(struct aws_credentials_provider_http
                                     *implementation)
 {
-    struct flb_http_client *client;
-    size_t b_sent;
-    int ret;
-    struct flb_upstream_conn *u_conn;
     flb_sds_t response;
     size_t response_len;
     time_t expiration;
     struct aws_credentials *creds;
+    struct aws_http_client client = implementation->client;
 
-    u_conn = flb_upstream_conn_get(implementation->upstream);
-    if (!u_conn) {
-        flb_error("[aws_credentials] HTTP Provider: connection initialization error");
-        return -1;
-    }
-
-    /* Compose HTTP request */
-    client = flb_http_client(u_conn, FLB_HTTP_GET,
-                             implementation->path,
-                             NULL, 0, implementation->host,
-                             80, NULL, 0);
-
-    if (!client) {
-        flb_error("[aws_credentials] HTTP Provider: could not initialize request");
-        flb_upstream_conn_release(u_conn);
-        return -1;
-    }
-
-    /* Perform request */
-    flb_debug("[aws_credentials] HTTP Provider: requesting credentials");
-    ret = flb_http_do(client, &b_sent);
+    ret = client->client_vtable->request(client, FLB_HTTP_GET,
+                                         implementation->path, NULL, 0,
+                                         NULL, 0);
 
     if (ret != 0 || client->resp.status != 200) {
-        flb_error("[aws_credentials] credentials request http_do=%i, HTTP Status: %i",
-                  ret, client->resp.status);
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
 
-    response = flb_sds_create_len(client->resp.payload,
-                                  client->resp.payload_size);
+    response = flb_sds_create_len(client->c->resp.payload,
+                                  client->c->resp.payload_size);
     if (!response) {
         flb_errno();
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
 
-    flb_http_client_destroy(client);
-    flb_upstream_conn_release(u_conn);
-
-    response_len = client->resp.payload_size;
+    response_len = client->c->resp.payload_size;
 
     creds = process_http_credentials_response(response, response_len,
                                               &expiration);

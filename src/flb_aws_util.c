@@ -24,128 +24,80 @@
 
 #include <stdlib.h>
 
-int get_ec2_token(struct flb_upstream *upstream, flb_sds_t *token, unsigned int *token_len)
+static struct aws_http_header token_ttl_header = {
+    .key = AWS_IMDS_V2_TOKEN_TTL_HEADER.
+    .key_len = AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN,
+    .val = AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL,
+    .val_len = AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN,
+};
+
+int get_ec2_token(struct aws_http_client client, flb_sds_t *token,
+                  size_t *token_len)
 {
-    struct flb_http_client *client;
-    size_t b_sent;
     int ret;
-    struct flb_upstream_conn *u_conn;
+    flb_sds_t imds_token;
 
-    u_conn = flb_upstream_conn_get(upstream);
-    if (!u_conn) {
-        flb_error("[filter_aws] connection initialization error");
-        return -1;
-    }
+    ret = client->client_vtable->request(client, FLB_HTTP_PUT,
+                                         AWS_IMDS_V2_TOKEN_PATH, NULL, 0,
+                                         &token_ttl_header, 1);
 
-    /* Compose HTTP Client request */
-    client = flb_http_client(u_conn, FLB_HTTP_PUT,
-                             AWS_IMDS_V2_TOKEN_PATH,
-                             NULL, 0, AWS_IMDS_V2_HOST,
-                             80, NULL, 0);
-
-    if (!client) {
-        flb_error("[filter_aws] count not create http client");
-        flb_upstream_conn_release(u_conn);
-        return -1;
-    }
-
-    flb_http_add_header(client, AWS_IMDS_V2_TOKEN_TTL_HEADER,
-                        AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN,
-                        AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL,
-                        AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN);
-
-    /* Perform request */
-    ret = flb_http_do(client, &b_sent);
-    flb_debug("[filter_aws] IMDSv2 token request http_do=%i, HTTP Status: %i",
-              ret, client->resp.status);
-
-    if (ret != 0 || client->resp.status != 200) {
-        if (client->resp.payload_size > 0) {
-            flb_debug("[filter_aws] IMDSv2 token response\n%s",
+    if (ret != 0 || client->c->resp.status != 200) {
+        if (client->c->resp.payload_size > 0) {
+            flb_debug("[ecs_imds] IMDSv2 token response\n%s",
                       client->resp.payload);
         }
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
 
-    *token = flb_sds_create_len(client->resp.payload,
-                                client->resp.payload_size);
+    imds_token = flb_sds_create_len(client->c->resp.payload,
+                                client->c->resp.payload_size);
 
-    if (!token) {
+    if (!imds_token) {
         flb_errno();
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
-    *token_len->imds_v2_token_len = client->resp.payload_size;
+    *token = imds_token;
+    *token_len = client->resp.payload_size;
 
-    flb_http_client_destroy(client);
-    flb_upstream_conn_release(u_conn);
     return 0;
 }
 
-int get_metadata(struct flb_upstream *upstream, char *metadata_path,
-                        flb_sds_t *metadata, unsigned int *metadata_len,
-                        flb_sds_t token, unsigned int token_len);
+int get_metadata(struct aws_http_client client, char *metadata_path,
+                 flb_sds_t *metadata, size_t *metadata_len,
+                 flb_sds_t token, size_t token_len);
 {
-    struct flb_http_client *client;
-    size_t b_sent;
     int ret;
-    struct flb_upstream_conn *u_conn;
+    flb_sds_t ec2_metadata;
 
-    u_conn = flb_upstream_conn_get(upstream);
-    if (!u_conn) {
-        flb_error("[filter_aws] connection initialization error");
-        return -1;
-    }
+    struct aws_http_header token_ttl_header = {
+        .key = AWS_IMDS_V2_TOKEN_HEADER,
+        .key_len = AWS_IMDS_V2_TOKEN_HEADER_LEN,
+        .val = token,
+        .val_len = token_len,
+    };
 
-    /* Compose HTTP Client request */
-    client = flb_http_client(u_conn,
-                             FLB_HTTP_GET, metadata_path,
-                             NULL, 0,
-                             FLB_FILTER_AWS_IMDS_V2_HOST, 80,
-                             NULL, 0);
+    ret = client->client_vtable->request(client, FLB_HTTP_GET,
+                                         metadata_path, NULL, 0,
+                                         &token_ttl_header, 1);
 
-    if (!client) {
-        flb_error("[filter_aws] count not create http client");
-        flb_upstream_conn_release(u_conn);
-        return -1;
-    }
-
-    flb_http_add_header(client, FLB_FILTER_AWS_IMDS_V2_TOKEN_HEADER,
-                        FLB_FILTER_AWS_IMDS_V2_TOKEN_HEADER_LEN,
-                        token,
-                        token_len);
-
-    /* Perform request */
-    ret = flb_http_do(client, &b_sent);
-    flb_debug("[filter_aws] IMDSv2 metadata request http_do=%i, HTTP Status: %i",
-              ret, client->resp.status);
-
-    if (ret != 0 || client->resp.status != 200) {
-        if (client->resp.payload_size > 0) {
-            flb_debug("[filter_aws] IMDSv2 metadata request\n%s",
+    if (ret != 0 || client->c->resp.status != 200) {
+        if (client->c->resp.payload_size > 0) {
+            flb_debug("[ecs_imds] IMDSv2 metadata response\n%s",
                       client->resp.payload);
         }
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
 
-    *metadata = flb_sds_create_len(client->resp.payload,
-                                   client->resp.payload_size);
+    ec2_metadata = flb_sds_create_len(client->c->resp.payload,
+                                      client->c->resp.payload_size);
 
-    if (!metadata) {
+    if (!ec2_metadata) {
         flb_errno();
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
         return -1;
     }
+    *metadata = ec2_metadata;
     *metadata_len = client->resp.payload_size;
 
-    flb_http_client_destroy(client);
-    flb_upstream_conn_release(u_conn);
     return 0;
 }
 
@@ -338,11 +290,10 @@ int request_do(struct aws_http_client *aws_client,
         signature = flb_signv4_do(aws_client->-c, FLB_TRUE, FLB_TRUE, time(NULL),
                                   aws_client->region, aws_client->service,
                                   aws_client->provider);
-    }
-
-    if (!signature) {
-        flb_error("[aws_client] could not sign request");
-        goto error;
+        if (!signature) {
+            flb_error("[aws_client] could not sign request");
+            goto error;
+        }
     }
 
     /* Perform request */

@@ -220,6 +220,10 @@ struct aws_credentials_provider *new_sts_assume_role_provider(struct flb_config
 
     upstream = flb_upstream_create(config, implementation->endpoint, 80,
                                    FLB_IO_TLS, tls);
+    if (!upstream) {
+        flb_error("[aws_credentials] Connection initialization error");
+        goto error;
+    }
 
     implementation->sts_client->upstream = upstream;
     implementation->endpoint->host = implementation->endpoint;
