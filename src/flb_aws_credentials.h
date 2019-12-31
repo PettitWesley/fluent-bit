@@ -114,7 +114,9 @@ struct aws_credentials_provider *new_environment_provider();
 /*
  * New EC2 IMDS provider
  */
-struct aws_credentials_provider *new_imds_provider(struct flb_config *config);
+struct aws_credentials_provider *new_imds_provider(struct flb_config *config,
+                                                   struct aws_http_client_generator
+                                                   *generator);
 
 /*
  * New AWS Profile provider, reads from the shared credentials file
@@ -126,7 +128,9 @@ struct aws_credentials_provider *new_profile_provider();
  * The ECS Provider is just a wrapper around the HTTP Provider
  * with the ECS credentials endpoint.
  */
-struct aws_credentials_provider *new_ecs_provider(struct flb_config *config);
+struct aws_credentials_provider *new_ecs_provider(struct flb_config *config,
+                                                  struct aws_http_client_generator
+                                                  *generator);
 
 /*
  * New http provider
@@ -134,21 +138,30 @@ struct aws_credentials_provider *new_ecs_provider(struct flb_config *config);
  * used by host and path.
  */
 struct aws_credentials_provider *new_http_provider(struct flb_config *config,
-                                                   char *host, char* path);
+                                                   char *host, char* path,
+                                                   struct aws_http_client_generator
+                                                   *generator);
 
 /*
  * The standard credential provider chain:
  * 1. Environment variables
  * 2. Shared credentials file (AWS Profile)
- * 3. EC2 IMDS
- * 4. ECS HTTP credentials endpoint
+ * 3. EKS OIDC
+ * 4. EC2 IMDS
+ * 5. ECS HTTP credentials endpoint
  *
  * This provider will evaluate each provider in order, returning the result
  * from the first provider that returns valid credentials.
  *
  * Note: Client code should use this provider by default.
  */
-struct aws_credentials_provider *new_standard_chain_provider();
+struct aws_credentials_provider *new_standard_chain_provider(struct flb_config
+                                                             *config,
+                                                             struct flb_tls *tls,
+                                                             char *region,
+                                                             char *proxy,
+                                                             aws_http_client_generator
+                                                             *generator);
 
 /*
  * STS Assume Role Provider.

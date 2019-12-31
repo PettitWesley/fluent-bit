@@ -37,8 +37,7 @@ static struct aws_credentials_provider_http {
     struct aws_credentials *credentials;
     time_t cred_refresh;
 
-    /* upstream connection to host */
-    struct flb_upstream *upstream;
+    struct aws_http_client *client;
 
     /* Host and Path to request credentials */
     char *host;
@@ -65,8 +64,9 @@ static struct aws_credentials_provider_imds {
  * The standard credential provider chain:
  * 1. Environment variables
  * 2. Shared credentials file (AWS Profile)
- * 3. EC2 IMDS
- * 4. ECS HTTP credentials endpoint
+ * 3. EKS OIDC
+ * 4. EC2 IMDS
+ * 5. ECS HTTP credentials endpoint
  *
  * This provider will evaluate each provider in order, returning the result
  * from the first provider that returns valid credentials.
@@ -149,7 +149,13 @@ static struct aws_credentials_provider_vtable standard_chain_provider_vtable = {
     .destroy = destroy_fn_standard_chain,
 };
 
-struct aws_credentials_provider *new_standard_chain_provider()
+struct aws_credentials_provider *new_standard_chain_provider(struct flb_config
+                                                             *config,
+                                                             struct flb_tls *tls,
+                                                             char *region,
+                                                             char *proxy,
+                                                             aws_http_client_generator
+                                                             *generator)
 {
     struct aws_credentials_provider *sub_provider;
     struct aws_credentials_provider *provider;
@@ -193,7 +199,13 @@ struct aws_credentials_provider *new_standard_chain_provider()
         mk_list_add(&sub_provider->_head, &implementation->providers);
     }
 
-    sub_provider = new_imds_provider();
+    sub_provider = *new_eks_provider(config, tls, region, proxy, generator);
+    if (sub_provider) {
+        /* EKS provider can fail if we are not running in k8s */;
+        mk_list_add(&sub_provider->_head, &implementation->providers);
+    }
+
+    sub_provider = new_imds_provider(config, generator);
     if (!sub_provider) {
         /* IMDS provider will only fail creation if a memory alloc failed */
         aws_provider_destroy(provider);
@@ -202,7 +214,7 @@ struct aws_credentials_provider *new_standard_chain_provider()
 
     mk_list_add(&sub_provider->_head, &implementation->providers);
 
-    sub_provider = new_ecs_provider();
+    sub_provider = new_ecs_provider(config, generator);
     if (sub_provider) {
         /* ECS Provider will fail creation if we are not running in ECS */
         mk_list_add(&sub_provider->_head, &implementation->providers);
@@ -405,7 +417,9 @@ static struct aws_credentials_provider_vtable imds_provider_vtable = {
     .destroy = destroy_fn_imds,
 };
 
-struct aws_credentials_provider *new_imds_provider(struct flb_config *config)
+struct aws_credentials_provider *new_imds_provider(struct flb_config *config,
+                                                   struct aws_http_client_generator
+                                                   *generator)
 {
     struct aws_credentials_provider_imds *implementation;
     struct aws_credentials_provider *provider;
@@ -635,7 +649,9 @@ static struct aws_credentials_provider_vtable http_provider_vtable = {
 };
 
 struct aws_credentials_provider *new_http_provider(struct flb_config *config,
-                                                   char *host, char* path)
+                                                   char *host, char* path,
+                                                   struct aws_http_client_generator
+                                                   *generator)
 {
     struct aws_credentials_provider_http *implementation;
     struct aws_credentials_provider *provider;
@@ -751,7 +767,10 @@ static int http_credentials_request(struct aws_credentials_provider_http
  * with the ECS credentials endpoint.
  */
 
-struct aws_credentials_provider *new_ecs_provider(struct flb_config *config) {
+struct aws_credentials_provider *new_ecs_provider(struct flb_config *config,
+                                                  struct aws_http_client_generator
+                                                  *generator)
+{
     char *host;
     char *path;
     char *path_var;
@@ -773,10 +792,13 @@ struct aws_credentials_provider *new_ecs_provider(struct flb_config *config) {
             flb_free(host);
             return NULL;
         }
+        memcpy(path, path_var, strlen(path_var));
         path[strlen(path_var)] = '\0';
 
-        return new_http_provider(config, host, path);
+        return new_http_provider(config, host, path, generator);
     } else {
+        flb_debug("[aws_credentials] Not initializing ECS Provider because"
+                  " %s is not set", ECS_CREDENTIALS_PATH_ENV_VAR);
         return NULL;
     }
 
