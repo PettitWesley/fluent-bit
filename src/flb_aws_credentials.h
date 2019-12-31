@@ -167,12 +167,29 @@ struct aws_credentials_provider *new_sts_assume_role_provider(struct flb_config
                                                               aws_http_client_generator
                                                               *generator);
 
+/*
+ * A provider that uses OIDC tokens provided by kubernetes to obtain
+ * AWS credentials.
+ *
+ * The AWS SDKs have defined a spec for an OIDC provider that obtains tokens
+ * from environment variables or the shared config file.
+ * This provider only contains the functionality needed for EKS- obtaining the
+ * location of the OIDC token from an environment variable.
+ */
+struct aws_credentials_provider *new_eks_provider(struct flb_config *config,
+                                                  struct flb_tls *tls,
+                                                  char *region, char *proxy,
+                                                  aws_http_client_generator
+                                                  *generator);
+
 
 /*
  * Helper functions
  */
 
 time_t parse_expiration(const char* timestamp);
+
+int file_to_buf(const char *path, char **out_buf, size_t *out_size);
 
 
 #endif

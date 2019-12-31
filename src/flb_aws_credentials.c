@@ -959,3 +959,46 @@ void aws_provider_destroy(struct aws_credentials_provider *provider))
         flb_free(provider);
     }
 }
+
+int file_to_buf(const char *path, char **out_buf, size_t *out_size)
+{
+    int ret;
+    long bytes;
+    char *buf;
+    FILE *fp;
+    struct stat st;
+
+    ret = stat(path, &st);
+    if (ret == -1) {
+        return -1;
+    }
+
+    fp = fopen(path, "r");
+    if (!fp) {
+        return -1;
+    }
+
+    buf = flb_malloc(st.st_size + sizeof(char));
+    if (!buf) {
+        flb_errno();
+        fclose(fp);
+        return -1;
+    }
+
+    bytes = fread(buf, st.st_size, 1, fp);
+    if (bytes != 1) {
+        flb_errno();
+        flb_free(buf);
+        fclose(fp);
+        return -1;
+    }
+
+    /* fread does not add null byte */
+    buf[st.st_size] = '\0';
+
+    fclose(fp);
+    *out_buf = buf;
+    *out_size = st.st_size;
+
+    return 0;
+}
