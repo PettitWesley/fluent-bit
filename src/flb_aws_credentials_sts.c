@@ -122,9 +122,9 @@ error:
 int refresh_fn_sts(struct aws_credentials_provider *provider) {
     struct aws_credentials_provider_sts *implementation = provider->implementation;
     flb_debug("[aws_credentials] Refresh called on the STS provider");
-    ret = sts_assume_role_request(implementation->sts_client,
-                                  &implementation->creds, implementation->uri,
-                                  &implementation->next_refresh);
+    return sts_assume_role_request(implementation->sts_client,
+                                   &implementation->creds, implementation->uri,
+                                   &implementation->next_refresh);
 }
 
 void destroy_fn_sts(struct aws_credentials_provider *provider) {
@@ -258,6 +258,59 @@ static struct aws_credentials_provider_eks {
     char *token_file;
 };
 
+aws_credentials *get_credentials_fn_eks(struct aws_credentials_provider *provider) {
+    aws_credentials *creds;
+    int ret;
+    struct aws_credentials_provider_eks *implementation = provider->implementation;
+
+    flb_debug("[aws_credentials] Requesting credentials from the STS provider..");
+
+    if (!implementation->credentials || time(NULL) > implementation->next_refresh) {
+        ret = assume_with_web_identity(implementation);
+        if (ret < 0) {
+            return NULL:
+        }
+    }
+
+    creds = flb_malloc(sizeof(struct aws_credentials));
+    if (!creds) {
+        goto error;
+    }
+
+    creds->access_key_id = flb_sds_create(implementation->creds->access_key_id);
+    if (!creds->access_key_id) {
+        goto error;
+    }
+
+    creds->secret_access_key = flb_sds_create(implementation->creds->secret_access_key);
+    if (!creds->secret_access_key) {
+        goto error;
+    }
+
+    if (implementation->credentials->session_token) {
+        creds->session_token = flb_sds_create(implementation->creds->session_token);
+        if (!creds->session_token) {
+            goto error;
+        }
+
+    } else {
+        creds->session_token = NULL;
+    }
+
+    return creds;
+
+error:
+    flb_errno();
+    aws_credentials_destroy(creds);
+    return NULL;
+}
+
+int refresh_fn_eks(struct aws_credentials_provider *provider) {
+    struct aws_credentials_provider_eks *implementation = provider->implementation;
+    flb_debug("[aws_credentials] Refresh called on the STS provider");
+    return assume_with_web_identity(implementation);
+}
+
 void destroy_fn_eks(struct aws_credentials_provider *provider) {
     struct aws_credentials_provider_eks *implementation = provider->
                                                           implementation;
@@ -284,6 +337,12 @@ void destroy_fn_eks(struct aws_credentials_provider *provider) {
 
     return;
 }
+
+static struct aws_credentials_provider_vtable eks_provider_vtable = {
+    .get_credentials = get_credentials_fn_eks,
+    .refresh = refresh_fn_eks,
+    .destroy = destroy_fn_eks,
+};
 
 struct aws_credentials_provider *new_eks_provider(struct flb_config *config,
                                                   struct flb_tls *tls,
