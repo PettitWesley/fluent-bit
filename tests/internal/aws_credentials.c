@@ -4,13 +4,17 @@
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_mem.h>
 #include <fluent-bit/flb_info.h>
+#include <fluent-bit/flb_http_client.h>
+
+#include <monkey/mk_core.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "flb_tests_internal.h"
 
 #define ACCESS_KEY "akid"
 #define SECRET_KEY "skid"
 #define TOKEN      "token"
-
 
 static void unsetenv_credentials()
 {
