@@ -147,9 +147,6 @@ void aws_client_destroy(struct aws_http_client *aws_client)
         if (aws_client->upstream) {
             flb_upstream_destroy(aws_client->upstream);
         }
-        if (aws_client->static_headers) {
-            flb_free(aws_client->static_headers);
-        }
         flb_free(aws_client);
     }
 }

@@ -108,8 +108,10 @@ struct aws_http_client {
 };
 
 /*
- * Frees the aws_client and the internal flb_http_client.
- * Caller code must free all other memory.
+ * Frees the aws_client, the internal flb_http_client, error_code,
+ * and flb_upstream.
+ * Caller code must free any other memory.
+ * (Why? - Because all other memory may be static.)
  */
 void aws_client_destroy(struct aws_http_client *aws_client);
 
