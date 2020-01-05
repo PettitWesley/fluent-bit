@@ -24,7 +24,8 @@
 #define ROLE_ARN_ENV_VAR              "AWS_ROLE_ARN"
 #define SESSION_NAME_ENV_VAR          "AWS_ROLE_SESSION_NAME"
 
-#define WEB_TOKEN_FILE "/data/aws_credentials/web_identity_token_file.txt"
+#define WEB_TOKEN_FILE FLB_TESTS_DATA_PATH "/data/aws_credentials/\
+web_identity_token_file.txt"
 
 #define STS_RESPONSE_EKS  "<AssumeRoleWithWebIdentityResponse \
 xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">\n\
@@ -335,18 +336,6 @@ static void test_eks_provider() {
     struct aws_credentials_provider *provider;
     struct aws_credentials *creds;
     int ret;
-    char path[4096];
-
-    /* construct token file path */
-    if (getcwd(path, sizeof(path)) == NULL) {
-        flb_errno();
-        return;
-    }
-
-    if (strcat(path, WEB_TOKEN_FILE) == NULL) {
-        flb_errno();
-        return;
-    }
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -365,7 +354,7 @@ static void test_eks_provider() {
         flb_errno();
         return;
     }
-    ret = setenv(TOKEN_FILE_ENV_VAR, path, 1);
+    ret = setenv(TOKEN_FILE_ENV_VAR, WEB_TOKEN_FILE, 1);
     if (ret < 0) {
         flb_errno();
         return;
@@ -410,18 +399,6 @@ static void test_eks_provider_random_session_name() {
     struct aws_credentials_provider *provider;
     struct aws_credentials *creds;
     int ret;
-    char path[4096];
-
-    /* construct token file path */
-    if (getcwd(path, sizeof(path)) == NULL) {
-        flb_errno();
-        return;
-    }
-
-    if (strcat(path, WEB_TOKEN_FILE) == NULL) {
-        flb_errno();
-        return;
-    }
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -437,7 +414,7 @@ static void test_eks_provider_random_session_name() {
         flb_errno();
         return;
     }
-    ret = setenv(TOKEN_FILE_ENV_VAR, path, 1);
+    ret = setenv(TOKEN_FILE_ENV_VAR, WEB_TOKEN_FILE, 1);
     if (ret < 0) {
         flb_errno();
         return;
@@ -482,18 +459,6 @@ static void test_eks_provider_api_error() {
     struct aws_credentials_provider *provider;
     struct aws_credentials *creds;
     int ret;
-    char path[4096];
-
-    /* construct token file path */
-    if (getcwd(path, sizeof(path)) == NULL) {
-        flb_errno();
-        return;
-    }
-
-    if (strcat(path, WEB_TOKEN_FILE) == NULL) {
-        flb_errno();
-        return;
-    }
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -508,7 +473,7 @@ static void test_eks_provider_api_error() {
         flb_errno();
         return;
     }
-    ret = setenv(TOKEN_FILE_ENV_VAR, path, 1);
+    ret = setenv(TOKEN_FILE_ENV_VAR, WEB_TOKEN_FILE, 1);
     if (ret < 0) {
         flb_errno();
         return;
