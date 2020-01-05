@@ -181,6 +181,14 @@ struct aws_credentials_provider *new_ecs_provider(struct flb_config *config,
                                                   *generator);
 
 /*
+ * New EC2 IMDS provider
+ */
+struct aws_credentials_provider *new_ec2_provider(struct flb_config *config,
+                                                  struct
+                                                  aws_http_client_generator
+                                                  *generator);
+
+/*
  * Helper functions
  */
 
@@ -193,6 +201,10 @@ struct aws_credentials *process_sts_response(char *response,
 char *sts_uri(char *action, char *role_arn, char *session_name,
               char *external_id, char *identity_token);
 char *random_session_name();
+
+struct aws_credentials *process_http_credentials_response(char *response,
+                                                          size_t response_len,
+                                                          time_t *expiration)
 
 
 #endif

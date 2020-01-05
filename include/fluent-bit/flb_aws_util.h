@@ -135,5 +135,18 @@ char *endpoint_for(char* service, char* region);
 
 flb_sds_t parse_error(char *response, size_t response_len);
 
+/*
+ * Get an IMDSv2 token
+ */
+int get_ec2_token(struct aws_http_client client, flb_sds_t *token,
+                  size_t *token_len);
+
+/*
+ * Get data from an IMDSv2 path
+ */
+int get_metadata(struct aws_http_client client, char *metadata_path,
+                 flb_sds_t *metadata, size_t *metadata_len,
+                 flb_sds_t token, size_t token_len);
+
 #endif
 #endif /* FLB_HAVE_AWS */
