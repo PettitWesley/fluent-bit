@@ -204,7 +204,7 @@ char *random_session_name();
 
 struct aws_credentials *process_http_credentials_response(char *response,
                                                           size_t response_len,
-                                                          time_t *expiration)
+                                                          time_t *expiration);
 
 
 #endif

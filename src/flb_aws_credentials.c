@@ -424,17 +424,17 @@ struct aws_credentials *process_http_credentials_response(char *response,
                                                           size_t response_len,
                                                           time_t *expiration)
 {
-    jsmntok_t *tokens;
-    const jsmntok_t *t;
-    char *current_token;
+    jsmntok_t *tokens = NULL;
+    const jsmntok_t *t = NULL;
+    char *current_token = NULL;
     jsmn_parser parser;
     int tokens_size = 50;
     size_t size;
     int ret;
-    struct aws_credentials *creds;
+    struct aws_credentials *creds = NULL;
     int i = 0;
     int len;
-    flb_sds_t tmp;
+    flb_sds_t tmp = NULL;
 
     /*
      * Remove/reset existing value of expiration.

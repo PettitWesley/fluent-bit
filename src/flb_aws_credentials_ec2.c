@@ -29,19 +29,53 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#define AWS_IMDS_V2_ROLE_PATH      "/latest/meta-data/iam/security-credentials/"
+#define AWS_IMDS_V2_ROLE_PATH_LEN  43
+
+struct aws_credentials_provider_ec2;
+static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation);
+static int ec2_credentials_request(struct aws_credentials_provider_ec2
+                                   *implementation, char *cred_path);
+
 /* EC2 IMDS Provider */
 
-aws_credentials *get_credentials_fn_ec2(struct aws_credentials_provider *provider) {
-    aws_credentials *creds;
+/*
+ * A provider that obtains credentials from EC2 IMDS.
+ */
+struct aws_credentials_provider_ec2 {
+    struct aws_credentials *creds;
+    time_t next_refresh;
+
+    /* upstream connection to IMDS */
+    struct aws_http_client *client;
+
+    /* IMDSv2 Token */
+    flb_sds_t imds_v2_token;
+    size_t imds_v2_token_len;
+    time_t token_refresh;
+};
+
+struct aws_credentials *get_credentials_fn_ec2(struct aws_credentials_provider
+                                               *provider)
+{
+    struct aws_credentials *creds;
     int ret;
-    struct aws_credentials_provider_ec2 *implementation = provider->implementation;
+    int refresh = FLB_FALSE;
+    struct aws_credentials_provider_ec2 *implementation = provider->
+                                                          implementation;
 
-    flb_debug("[aws_credentials] Requesting credentials from the EC2 provider..");
+    flb_debug("[aws_credentials] Requesting credentials from the "
+              "EC2 provider..");
 
-    if (!implementation->creds || time(NULL) > implementation->cred_refresh) {
+    /* a negative next_refresh means that auto-refresh is disabled */
+    if (implementation->next_refresh > 0
+        && time(NULL) > implementation->next_refresh) {
+        refresh = FLB_TRUE;
+    }
+    if (!implementation->creds || refresh == FLB_TRUE) {
         ret = get_creds_ec2(implementation);
         if (ret < 0) {
-            return NULL:
+            return NULL;
         }
     }
 
@@ -58,7 +92,8 @@ aws_credentials *get_credentials_fn_ec2(struct aws_credentials_provider *provide
         return NULL;
     }
 
-    creds->secret_access_key = flb_sds_create(implementation->creds->secret_access_key);
+    creds->secret_access_key = flb_sds_create(implementation->creds->
+                                              secret_access_key);
     if (!creds->secret_access_key) {
         flb_errno();
         aws_credentials_destroy(creds);
@@ -66,7 +101,8 @@ aws_credentials *get_credentials_fn_ec2(struct aws_credentials_provider *provide
     }
 
     if (implementation->creds->session_token) {
-        creds->session_token = flb_sds_create(implementation->creds->session_token);
+        creds->session_token = flb_sds_create(implementation->creds->
+                                              session_token);
         if (!creds->session_token) {
             flb_errno();
             aws_credentials_destroy(creds);
@@ -81,21 +117,23 @@ aws_credentials *get_credentials_fn_ec2(struct aws_credentials_provider *provide
 }
 
 int refresh_fn_ec2(struct aws_credentials_provider *provider) {
-    struct aws_credentials_provider_ec2 *implementation = provider->implementation;
+    struct aws_credentials_provider_ec2 *implementation = provider->
+                                                          implementation;
     flb_debug("[aws_credentials] Refresh called on the EC2 IMDS provider");
     return get_creds_ec2(implementation);
 }
 
 void destroy_fn_ec2(struct aws_credentials_provider *provider) {
-    struct aws_credentials_provider_ec2 *implementation = provider->implementation;
+    struct aws_credentials_provider_ec2 *implementation = provider->
+                                                          implementation;
 
     if (implementation) {
         if (implementation->creds) {
             aws_credentials_destroy(implementation->creds);
         }
 
-        if (implementation->upstream) {
-            flb_upstream_destroy(implementation->upstream);
+        if (implementation->client) {
+            aws_client_destroy(implementation->client);
         }
 
         if (implementation->imds_v2_token) {
@@ -116,9 +154,9 @@ static struct aws_credentials_provider_vtable ec2_provider_vtable = {
 };
 
 struct aws_credentials_provider *new_ec2_provider(struct flb_config *config,
-                                                   struct
-                                                   aws_http_client_generator
-                                                   *generator)
+                                                  struct
+                                                  aws_http_client_generator
+                                                  *generator)
 {
     struct aws_credentials_provider_ec2 *implementation;
     struct aws_credentials_provider *provider;
@@ -139,14 +177,15 @@ struct aws_credentials_provider *new_ec2_provider(struct flb_config *config,
         return NULL;
     }
 
-    provider->provider_vtable = &imds_provider_vtable;
+    provider->provider_vtable = &ec2_provider_vtable;
     provider->implementation = implementation;
 
     upstream = flb_upstream_create(config, AWS_IMDS_V2_HOST, 80,
                                    FLB_IO_TCP, NULL);
     if (!upstream) {
         aws_provider_destroy(provider);
-        flb_error("[aws_credentials] EC2 IMDS: connection initialization error");
+        flb_error("[aws_credentials] EC2 IMDS: connection initialization "
+                  "error");
         return NULL;
     }
 
@@ -162,7 +201,7 @@ struct aws_credentials_provider *new_ec2_provider(struct flb_config *config,
     implementation->client->provider = NULL;
     implementation->client->region = NULL;
     implementation->client->service = NULL;
-    implementation->client->port = 80
+    implementation->client->port = 80;
     implementation->client->flags = 0;
     implementation->client->proxy = NULL;
     implementation->client->upstream = upstream;
@@ -181,7 +220,8 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
 
     flb_debug("[aws_credentials] requesting credentials from EC2 IMDS");
 
-    if (!implementation->imds_v2_token || (time(NULL) > implementation->token_refresh)) {
+    if (!implementation->imds_v2_token ||
+        (time(NULL) > implementation->token_refresh)) {
         flb_debug("[aws_credentials] requesting a new IMDSv2 token");
         ret = get_ec2_token(implementation->client,
                             &implementation->imds_v2_token,
@@ -209,7 +249,8 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
               instance_role);
 
     /* Construct path where we will find the credentials */
-    cred_path_size = sizeof(char) * (AWS_IMDS_V2_ROLE_PATH_LEN + instance_role_len) + 1;
+    cred_path_size = sizeof(char) * (AWS_IMDS_V2_ROLE_PATH_LEN +
+                                     instance_role_len) + 1;
     cred_path = flb_malloc(cred_path_size);
     if (!cred_path) {
         flb_sds_destroy(instance_role);
@@ -217,7 +258,8 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
         return -1;
     }
 
-    ret = snprintf(cred_path, cred_path_size, "%s%s", AWS_IMDS_V2_ROLE_PATH, instance_role);
+    ret = snprintf(cred_path, cred_path_size, "%s%s", AWS_IMDS_V2_ROLE_PATH,
+                   instance_role);
     if (ret < 0) {
         flb_sds_destroy(instance_role);
         flb_free(cred_path);
@@ -261,7 +303,7 @@ static int ec2_credentials_request(struct aws_credentials_provider_ec2
         return -1;
     }
     implementation->creds = creds;
-    implementation->cred_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
+    implementation->next_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
 
     flb_sds_destroy(credentials_response);
     return 0;

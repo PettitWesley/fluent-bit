@@ -332,13 +332,13 @@ flb_sds_t parse_error(char *response, size_t response_len) {
 
 
 static struct aws_http_header token_ttl_header = {
-    .key = AWS_IMDS_V2_TOKEN_TTL_HEADER.
+    .key = AWS_IMDS_V2_TOKEN_TTL_HEADER,
     .key_len = AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN,
     .val = AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL,
     .val_len = AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN,
 };
 
-int get_ec2_token(struct aws_http_client client, flb_sds_t *token,
+int get_ec2_token(struct aws_http_client *client, flb_sds_t *token,
                   size_t *token_len)
 {
     int ret;
@@ -351,27 +351,27 @@ int get_ec2_token(struct aws_http_client client, flb_sds_t *token,
     if (ret != 0 || client->c->resp.status != 200) {
         if (client->c->resp.payload_size > 0) {
             flb_debug("[ecs_imds] IMDSv2 token response\n%s",
-                      client->resp.payload);
+                      client->c->resp.payload);
         }
         return -1;
     }
 
     imds_token = flb_sds_create_len(client->c->resp.payload,
-                                client->c->resp.payload_size);
+                                    client->c->resp.payload_size);
 
     if (!imds_token) {
         flb_errno();
         return -1;
     }
     *token = imds_token;
-    *token_len = client->resp.payload_size;
+    *token_len = client->c->resp.payload_size;
 
     return 0;
 }
 
-int get_metadata(struct aws_http_client client, char *metadata_path,
+int get_metadata(struct aws_http_client *client, char *metadata_path,
                  flb_sds_t *metadata, size_t *metadata_len,
-                 flb_sds_t token, size_t token_len);
+                 flb_sds_t token, size_t token_len)
 {
     int ret;
     flb_sds_t ec2_metadata;
@@ -390,7 +390,7 @@ int get_metadata(struct aws_http_client client, char *metadata_path,
     if (ret != 0 || client->c->resp.status != 200) {
         if (client->c->resp.payload_size > 0) {
             flb_debug("[ecs_imds] IMDSv2 metadata response\n%s",
-                      client->resp.payload);
+                      client->c->resp.payload);
         }
         return -1;
     }
@@ -403,7 +403,7 @@ int get_metadata(struct aws_http_client client, char *metadata_path,
         return -1;
     }
     *metadata = ec2_metadata;
-    *metadata_len = client->resp.payload_size;
+    *metadata_len = client->c->resp.payload_size;
 
     return 0;
 }
