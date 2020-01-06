@@ -133,6 +133,8 @@ static flb_sds_t msgpack_to_json_sds(const msgpack_object *obj)
             break;
         }
     }
+
+    return out_buf;
 }
 
 static void playground(const void *data, size_t bytes)
@@ -167,7 +169,7 @@ static void playground(const void *data, size_t bytes)
             continue;
         }
 
-        record = msgpack_to_json_sds(&obj);
+        record = msgpack_to_json_sds(obj);
         flb_info("[wip] record: %s", record);
 
     }
