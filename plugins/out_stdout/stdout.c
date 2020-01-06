@@ -31,6 +31,7 @@
 
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_aws_credentials.h>
+#include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_mem.h>
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_http_client.h>
@@ -38,166 +39,7 @@
 #include <monkey/mk_core.h>
 #include <string.h>
 #include <unistd.h>
-
-#define ACCESS_KEY_HTTP "http_akid"
-#define SECRET_KEY_HTTP "http_skid"
-#define TOKEN_HTTP      "http_token"
-
-#define HTTP_CREDENTIALS_RESPONSE "{\n\
-    \"AccessKeyId\": \"http_akid\",\n\
-    \"Expiration\": \"2014-10-24T23:00:23Z\",\n\
-    \"RoleArn\": \"TASK_ROLE_ARN\",\n\
-    \"SecretAccessKey\": \"http_skid\",\n\
-    \"Token\": \"http_token\"\n\
-}"
-
-int request_happy_case(struct aws_http_client *aws_client,
-                      int method, const char *uri)
-{
-    flb_debug("[test-check] %d", method == FLB_HTTP_GET);
-
-    /* create an http client so that we can set the response */
-    aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
-    if (!aws_client->c) {
-        flb_errno();
-        return -1;
-    }
-    mk_list_init(&aws_client->c->headers);
-
-    aws_client->c->resp.status = 200;
-    aws_client->c->resp.payload = HTTP_CREDENTIALS_RESPONSE;
-    aws_client->c->resp.payload_size = strlen(HTTP_CREDENTIALS_RESPONSE);
-    aws_client->error_type = NULL;
-
-    return 0;
-}
-
-int request_error_case(struct aws_http_client *aws_client,
-                       int method, const char *uri)
-{
-    flb_debug("[test-check] %d", method == FLB_HTTP_GET);
-
-    /* create an http client so that we can set the response */
-    aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
-    if (!aws_client->c) {
-        flb_errno();
-        return -1;
-    }
-    mk_list_init(&aws_client->c->headers);
-
-    aws_client->c->resp.status = 400;
-    aws_client->c->resp.payload = NULL;
-    aws_client->c->resp.payload_size = 0;
-    aws_client->error_type = NULL;
-
-    return 0;
-}
-
-/* test/mock version of the aws_http_client request function */
-int test_http_client_request(struct aws_http_client *aws_client,
-                             int method, const char *uri,
-                             const char *body, size_t body_len,
-                             struct aws_http_header *dynamic_headers,
-                             size_t dynamic_headers_len)
-{
-    /*
-     * route to the correct test case fn using the uri
-     */
-    if (strstr(uri, "happy-case") != NULL) {
-        return request_happy_case(aws_client, method, uri);
-    } else if (strstr(uri, "error-case") != NULL) {
-        return request_error_case(aws_client, method, uri);
-    }
-
-    /* uri should match one of the above conditions */
-    flb_errno();
-    return -1;
-
-}
-
-/* Test/mock aws_http_client */
-static struct aws_http_client_vtable test_vtable = {
-    .request = test_http_client_request,
-};
-
-struct aws_http_client *test_http_client_create()
-{
-    struct aws_http_client *client = flb_calloc(1,
-                                                sizeof(struct aws_http_client));
-    if (!client) {
-        flb_errno();
-        return NULL;
-    }
-    client->client_vtable = &test_vtable;
-    return client;
-}
-
-/* Generator that returns clients with the test vtable */
-static struct aws_http_client_generator test_generator = {
-    .new = test_http_client_create,
-};
-
-struct aws_http_client_generator *generator_in_test()
-{
-    return &test_generator;
-}
-
-/* http and ecs providers */
-static void test_http_provider()
-{
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
-    int ret;
-    struct flb_config *config;
-    flb_sds_t host;
-    flb_sds_t path;
-
-    config = flb_malloc(sizeof(struct flb_config));
-    if (!config) {
-        flb_errno();
-        return;
-    }
-
-    host = flb_sds_create("127.0.0.1");
-    path = flb_sds_create("/happy-case");
-
-    provider = new_http_provider(config, host, path,
-                                 generator_in_test());
-
-    if (!provider) {
-        flb_errno();
-        return;
-    }
-
-    /* repeated calls to get credentials should return the same set */
-    creds = provider->provider_vtable->get_credentials(provider);
-    if (!creds) {
-        flb_errno();
-        return;
-    }
-    flb_debug("[test-check] %d", strcmp(ACCESS_KEY_HTTP, creds->access_key_id) == 0);
-    flb_debug("[test-check] %d", strcmp(SECRET_KEY_HTTP, creds->secret_access_key) == 0);
-    flb_debug("[test-check] %d", strcmp(TOKEN_HTTP, creds->session_token) == 0);
-
-    aws_credentials_destroy(creds);
-
-    creds = provider->provider_vtable->get_credentials(provider);
-    if (!creds) {
-        flb_errno();
-        return;
-    }
-    flb_debug("[test-check] %d", strcmp(ACCESS_KEY_HTTP, creds->access_key_id) == 0);
-    flb_debug("[test-check] %d", strcmp(SECRET_KEY_HTTP, creds->secret_access_key) == 0);
-    flb_debug("[test-check] %d", strcmp(TOKEN_HTTP, creds->session_token) == 0);
-
-    aws_credentials_destroy(creds);
-
-    /* refresh should return 0 (success) */
-    ret = provider->provider_vtable->refresh(provider);
-    flb_debug("[test-check] %d", ret == 0);
-
-    aws_provider_destroy(provider);
-}
+#include <stdio.h>
 
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
@@ -234,6 +76,12 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    ctx->provider = new_ec2_provider(config, generator());
+    if (!ctx->provider) {
+        flb_errno();
+        flb_error("Failed to initialize provider");
+    }
+
     /* Date format for JSON output */
     ctx->json_date_format = FLB_PACK_JSON_DATE_DOUBLE;
     tmp = flb_output_get_property("json_date_format", ins);
@@ -254,6 +102,79 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     return 0;
 }
 
+static flb_sds_t msgpack_to_json_sds(const msgpack_object *obj)
+{
+    int ret;
+    flb_sds_t out_buf;
+    flb_sds_t tmp_buf;
+    size_t out_size = 256;
+    size_t new_size = 0;
+
+    out_buf = flb_sds_create_size(out_size);
+    if (!out_buf) {
+        flb_errno();
+        return NULL;
+    }
+
+    while (1) {
+        ret = flb_msgpack_to_json(out_buf, out_size, obj);
+        if (ret <= 0) {
+            new_size = out_size * 2;
+            tmp_buf = flb_sds_increase(out_buf, new_size - out_size);
+            if (tmp_buf) {
+                out_buf = tmp_buf;
+                out_size = new_size;
+            } else {
+                flb_errno();
+                flb_sds_destroy(out_buf);
+                return NULL;
+            }
+        } else {
+            break;
+        }
+    }
+}
+
+static void playground(const void *data, size_t bytes)
+{
+    size_t off = 0;
+    int i = 0;
+    int ret;
+    int total_records;
+    struct flb_time tm;
+    msgpack_unpacked result;
+    msgpack_object  *obj;
+
+    flb_sds_t record;
+
+    /* Iterate over each item */
+    msgpack_unpacked_init(&result);
+    while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
+        /*
+         * Each record is a msgpack array [timestamp, map] of the
+         * timestamp and record map.
+         */
+
+        if (result.data.type != MSGPACK_OBJECT_ARRAY) {
+            continue;
+        }
+
+        /* unpack the array of [timestamp, map] */
+        flb_time_pop_from_msgpack(&tm, &result, &obj);
+
+        /* obj should now be the record map */
+        if (obj->type != MSGPACK_OBJECT_MAP) {
+            continue;
+        }
+
+        record = msgpack_to_json_sds(&obj);
+        flb_info("[wip] record: %s", record);
+
+    }
+
+    msgpack_unpacked_destroy(&result);
+}
+
 static void cb_stdout_flush(const void *data, size_t bytes,
                             const char *tag, int tag_len,
                             struct flb_input_instance *i_ins,
@@ -270,7 +191,24 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_time tmp;
     msgpack_object *p;
 
-    test_http_provider();
+    // struct aws_credentials *creds;
+    //
+    // creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
+    // if (!creds) {
+    //     flb_info("[result] No creds");
+    // } else {
+    //     flb_info("[result] Creds!!");
+    //     flb_info("[creds] access: %s", creds->access_key_id);
+    //     flb_info("[creds] secret: %s", creds->secret_access_key);
+    //     flb_info("[creds] token len: %d", flb_sds_len(creds->session_token));
+    //     flb_info("[creds] token: %s", creds->session_token);
+    //     // for (int i=0; i < flb_sds_len(creds->session_token); i++) {
+    //     //     printf("%c", creds->session_token[i]);
+    //     // }
+    //     // printf("\n");
+    // }
+
+
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
