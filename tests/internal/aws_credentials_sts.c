@@ -104,7 +104,7 @@ int request_eks_test1(struct flb_aws_client *aws_client,
 }
 
 int request_eks_flb_sts_session_name(struct flb_aws_client *aws_client,
-                                    int method, const char *uri)
+                                     int method, const char *uri)
 {
     TEST_CHECK(method == FLB_HTTP_GET);
     TEST_CHECK(strstr(uri, "Action=AssumeRoleWithWebIdentity") != NULL);

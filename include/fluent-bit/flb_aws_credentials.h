@@ -106,28 +106,28 @@ void flb_aws_provider_destroy(struct flb_aws_provider *provider);
  * location of the OIDC token from an environment variable.
  */
 struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
-                                                  struct flb_tls *tls,
-                                                  char *region, char *proxy,
-                                                  struct
-                                                  flb_aws_client_generator
-                                                  *generator);
+                                                 struct flb_tls *tls,
+                                                 char *region, char *proxy,
+                                                 struct
+                                                 flb_aws_client_generator
+                                                 *generator);
 
 
 /*
  * STS Assume Role Provider.
  */
 struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
-                                                  struct flb_tls *tls,
-                                                  struct flb_aws_provider
-                                                  *base_provider,
-                                                  char *external_id,
-                                                  char *role_arn,
-                                                  char *session_name,
-                                                  char *region,
-                                                  char *proxy,
-                                                  struct
-                                                  flb_aws_client_generator
-                                                  *generator);
+                                                 struct flb_tls *tls,
+                                                 struct flb_aws_provider
+                                                 *base_provider,
+                                                 char *external_id,
+                                                 char *role_arn,
+                                                 char *session_name,
+                                                 char *region,
+                                                 char *proxy,
+                                                 struct
+                                                 flb_aws_client_generator
+                                                 *generator);
 
 /*
  * Standard environment variables
@@ -143,7 +143,7 @@ time_t flb_aws_cred_expiration(const char* timestamp);
 int flb_read_file(const char *path, char **out_buf, size_t *out_size);
 
 struct flb_aws_credentials *flb_parse_sts_resp(char *response,
-                                             time_t *expiration);
+                                               time_t *expiration);
 char *flb_sts_uri(char *action, char *role_arn, char *session_name,
                   char *external_id, char *identity_token);
 char *flb_sts_session_name();

@@ -39,8 +39,8 @@
 
 /* Environment Provider */
 struct flb_aws_credentials *get_credentials_fn_environment(struct
-                                                       flb_aws_provider
-                                                       *provider)
+                                                           flb_aws_provider
+                                                           *provider)
 {
     char *access_key;
     char *secret_key;

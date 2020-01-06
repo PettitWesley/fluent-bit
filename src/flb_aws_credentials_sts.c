@@ -56,7 +56,8 @@ void bytes_to_string(unsigned char *data, char *buf, size_t len);
 static int assume_with_web_identity(struct flb_aws_provider_eks
                                     *implementation);
 static int sts_assume_role_request(struct flb_aws_client *sts_client,
-                                   struct flb_aws_credentials **creds, char *uri,
+                                   struct flb_aws_credentials **creds,
+                                   char *uri,
                                    time_t *next_refresh);
 static flb_sds_t get_node(char *cred_node, char* node_name, int node_len);
 
@@ -80,7 +81,7 @@ struct flb_aws_provider_sts {
 };
 
 struct flb_aws_credentials *get_credentials_fn_sts(struct flb_aws_provider
-                                               *provider)
+                                                   *provider)
 {
     struct flb_aws_credentials *creds;
     int ret;
@@ -185,17 +186,17 @@ static struct flb_aws_provider_vtable sts_provider_vtable = {
 };
 
 struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
-                                                  struct flb_tls *tls,
-                                                  struct flb_aws_provider
-                                                  *base_provider,
-                                                  char *external_id,
-                                                  char *role_arn,
-                                                  char *session_name,
-                                                  char *region,
-                                                  char *proxy,
-                                                  struct
-                                                  flb_aws_client_generator
-                                                  *generator)
+                                                 struct flb_tls *tls,
+                                                 struct flb_aws_provider
+                                                 *base_provider,
+                                                 char *external_id,
+                                                 char *role_arn,
+                                                 char *session_name,
+                                                 char *region,
+                                                 char *proxy,
+                                                 struct
+                                                 flb_aws_client_generator
+                                                 *generator)
 {
     struct flb_aws_provider_sts *implementation;
     struct flb_aws_provider *provider;
@@ -292,13 +293,12 @@ struct flb_aws_provider_eks {
 
 
 struct flb_aws_credentials *get_credentials_fn_eks(struct flb_aws_provider
-                                               *provider)
+                                                   *provider)
 {
     struct flb_aws_credentials *creds;
     int ret;
     int refresh = FLB_FALSE;
-    struct flb_aws_provider_eks *implementation = provider->
-                                                          implementation;
+    struct flb_aws_provider_eks *implementation = provider->implementation;
 
     flb_debug("[aws_credentials] Requesting credentials from the "
               "EKS provider..");
@@ -391,11 +391,11 @@ static struct flb_aws_provider_vtable eks_provider_vtable = {
 };
 
 struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
-                                                  struct flb_tls *tls,
-                                                  char *region, char *proxy,
-                                                  struct
-                                                  flb_aws_client_generator
-                                                  *generator)
+                                                 struct flb_tls *tls,
+                                                 char *region, char *proxy,
+                                                 struct
+                                                 flb_aws_client_generator
+                                                 *generator)
 {
     struct flb_aws_provider_eks *implementation = NULL;
     struct flb_aws_provider *provider = NULL;
@@ -567,7 +567,8 @@ static int assume_with_web_identity(struct flb_aws_provider_eks
     size_t web_token_size;
     char *uri;
 
-    ret = flb_read_file(implementation->token_file, &web_token, &web_token_size);
+    ret = flb_read_file(implementation->token_file, &web_token,
+                        &web_token_size);
     if (ret < 0) {
         flb_error("[aws_credentials] Could not read web identify token file");
         return -1;
@@ -589,7 +590,8 @@ static int assume_with_web_identity(struct flb_aws_provider_eks
 }
 
 static int sts_assume_role_request(struct flb_aws_client *sts_client,
-                                   struct flb_aws_credentials **creds, char *uri,
+                                   struct flb_aws_credentials **creds,
+                                   char *uri,
                                    time_t *next_refresh)
 {
     int ret;

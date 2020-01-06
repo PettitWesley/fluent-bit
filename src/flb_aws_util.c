@@ -28,10 +28,10 @@
 #include <stdlib.h>
 
 int request_do(struct flb_aws_client *aws_client,
-                int method, const char *uri,
-                const char *body, size_t body_len,
-                struct flb_aws_header *dynamic_headers,
-                size_t dynamic_headers_len);
+               int method, const char *uri,
+               const char *body, size_t body_len,
+               struct flb_aws_header *dynamic_headers,
+               size_t dynamic_headers_len);
 
 /*
  * https://service.region.amazonaws.com(.cn)
