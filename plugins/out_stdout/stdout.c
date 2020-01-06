@@ -191,6 +191,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_time tmp;
     msgpack_object *p;
 
+    playground(data, bytes);
+
     // struct aws_credentials *creds;
     //
     // creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
