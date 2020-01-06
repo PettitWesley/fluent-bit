@@ -20,6 +20,11 @@
 #define STS_SECRET_KEY "sts_skid"
 #define STS_TOKEN      "sts_token"
 
+/* standard environment variables */
+#define AWS_ACCESS_KEY_ID              "AWS_ACCESS_KEY_ID"
+#define AWS_SECRET_ACCESS_KEY          "AWS_SECRET_ACCESS_KEY"
+#define AWS_SESSION_TOKEN              "AWS_SESSION_TOKEN"
+
 #define TOKEN_FILE_ENV_VAR            "AWS_WEB_IDENTITY_TOKEN_FILE"
 #define ROLE_ARN_ENV_VAR              "AWS_ROLE_ARN"
 #define SESSION_NAME_ENV_VAR          "AWS_ROLE_SESSION_NAME"
@@ -72,7 +77,7 @@ xmlns=\"https://sts.amazonaws.com/doc/\n\
 </AssumeRoleResponse>"
 
 /* Each test case has its own request function */
-int request_eks_test1(struct aws_http_client *aws_client,
+int request_eks_test1(struct flb_aws_client *aws_client,
                       int method, const char *uri)
 {
     TEST_CHECK(method == FLB_HTTP_GET);
@@ -98,13 +103,13 @@ int request_eks_test1(struct aws_http_client *aws_client,
     return 0;
 }
 
-int request_eks_random_session_name(struct aws_http_client *aws_client,
+int request_eks_flb_sts_session_name(struct flb_aws_client *aws_client,
                                     int method, const char *uri)
 {
     TEST_CHECK(method == FLB_HTTP_GET);
     TEST_CHECK(strstr(uri, "Action=AssumeRoleWithWebIdentity") != NULL);
-    TEST_CHECK(strstr(uri, "RoleArn=arn:aws:iam::123456789012:role/test")
-               != NULL);
+    TEST_CHECK(strstr(uri, "RoleArn=arn:aws:iam::123456789012:role/"
+                           "randomsession") != NULL);
     TEST_CHECK(strstr(uri, "WebIdentityToken=this-is-a-fake-jwt") != NULL);
     /* this test case has a random session name */
     TEST_CHECK(strstr(uri, "RoleSessionName=") != NULL);
@@ -127,7 +132,7 @@ int request_eks_random_session_name(struct aws_http_client *aws_client,
     return 0;
 }
 
-int request_eks_api_error(struct aws_http_client *aws_client,
+int request_eks_api_error(struct flb_aws_client *aws_client,
                           int method, const char *uri)
 {
     TEST_CHECK(method == FLB_HTTP_GET);
@@ -156,7 +161,7 @@ int request_eks_api_error(struct aws_http_client *aws_client,
     return -1;
 }
 
-int request_sts_test1(struct aws_http_client *aws_client,
+int request_sts_test1(struct flb_aws_client *aws_client,
                       int method, const char *uri)
 {
     TEST_CHECK(method == FLB_HTTP_GET);
@@ -182,7 +187,7 @@ int request_sts_test1(struct aws_http_client *aws_client,
     return 0;
 }
 
-int request_sts_api_error(struct aws_http_client *aws_client,
+int request_sts_api_error(struct flb_aws_client *aws_client,
                           int method, const char *uri)
 {
     TEST_CHECK(method == FLB_HTTP_GET);
@@ -208,11 +213,11 @@ int request_sts_api_error(struct aws_http_client *aws_client,
     return 0;
 }
 
-/* test/mock version of the aws_http_client request function */
-int test_http_client_request(struct aws_http_client *aws_client,
+/* test/mock version of the flb_aws_client request function */
+int test_http_client_request(struct flb_aws_client *aws_client,
                              int method, const char *uri,
                              const char *body, size_t body_len,
-                             struct aws_http_header *dynamic_headers,
+                             struct flb_aws_header *dynamic_headers,
                              size_t dynamic_headers_len)
 {
     if (strcmp(aws_client->name, "sts_client_eks_provider") == 0) {
@@ -223,7 +228,7 @@ int test_http_client_request(struct aws_http_client *aws_client,
         if (strstr(uri, "test1") != NULL) {
             return request_eks_test1(aws_client, method, uri);
         } else if (strstr(uri, "randomsession") != NULL) {
-            return request_eks_random_session_name(aws_client, method, uri);
+            return request_eks_flb_sts_session_name(aws_client, method, uri);
         } else if (strstr(uri, "apierror") != NULL) {
             return request_eks_api_error(aws_client, method, uri);
         }
@@ -249,15 +254,15 @@ int test_http_client_request(struct aws_http_client *aws_client,
 
 }
 
-/* Test/mock aws_http_client */
-static struct aws_http_client_vtable test_vtable = {
+/* Test/mock flb_aws_client */
+static struct flb_aws_client_vtable test_vtable = {
     .request = test_http_client_request,
 };
 
-struct aws_http_client *test_http_client_create()
+struct flb_aws_client *test_http_client_create()
 {
-    struct aws_http_client *client = flb_calloc(1,
-                                                sizeof(struct aws_http_client));
+    struct flb_aws_client *client = flb_calloc(1,
+                                                sizeof(struct flb_aws_client));
     if (!client) {
         flb_errno();
         return NULL;
@@ -267,11 +272,11 @@ struct aws_http_client *test_http_client_create()
 }
 
 /* Generator that returns clients with the test vtable */
-static struct aws_http_client_generator test_generator = {
-    .new = test_http_client_create,
+static struct flb_aws_client_generator test_generator = {
+    .create = test_http_client_create,
 };
 
-struct aws_http_client_generator *generator_in_test()
+struct flb_aws_client_generator *generator_in_test()
 {
     return &test_generator;
 }
@@ -297,9 +302,9 @@ static void unsetenv_eks()
     }
 }
 
-static void test_random_session_name()
+static void test_flb_sts_session_name()
 {
-    char *session_name = random_session_name();
+    char *session_name = flb_sts_session_name();
 
     TEST_CHECK(strlen(session_name) == 32);
 }
@@ -308,7 +313,7 @@ static void test_sts_uri()
 {
     char *uri;
 
-    uri = sts_uri("AssumeRole", "myrole", "mysession",
+    uri = flb_sts_uri("AssumeRole", "myrole", "mysession",
                   "myexternalid", NULL);
     TEST_CHECK(strcmp(uri, "/?Version=2011-06-15&Action=AssumeRole"
                       "&RoleSessionName=mysession&RoleArn=myrole"
@@ -318,23 +323,23 @@ static void test_sts_uri()
 
 static void test_process_sts_response()
 {
-    struct aws_credentials *creds;
+    struct flb_aws_credentials *creds;
     time_t expiration;
 
-    creds = process_sts_response(STS_RESPONSE_EKS, &expiration);
+    creds = flb_parse_sts_resp(STS_RESPONSE_EKS, &expiration);
 
     TEST_CHECK(strcmp(EKS_ACCESS_KEY, creds->access_key_id) == 0);
     TEST_CHECK(strcmp(EKS_SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(EKS_TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
 }
 
 static void test_eks_provider() {
     struct flb_config *config;
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
     int ret;
 
     config = flb_malloc(sizeof(struct flb_config));
@@ -360,7 +365,7 @@ static void test_eks_provider() {
         return;
     }
 
-    provider = new_eks_provider(config, NULL, "us-west-2", NULL,
+    provider = flb_eks_provider_create(config, NULL, "us-west-2", NULL,
                                 generator_in_test());
 
     /* repeated calls to get credentials should return the same set */
@@ -373,7 +378,7 @@ static void test_eks_provider() {
     TEST_CHECK(strcmp(EKS_SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(EKS_TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     creds = provider->provider_vtable->get_credentials(provider);
     if (!creds) {
@@ -384,20 +389,20 @@ static void test_eks_provider() {
     TEST_CHECK(strcmp(EKS_SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(EKS_TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     /* refresh should return 0 (success) */
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret == 0);
 
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(provider);
     unsetenv_eks();
 }
 
 static void test_eks_provider_random_session_name() {
     struct flb_config *config;
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
     int ret;
 
     config = flb_malloc(sizeof(struct flb_config));
@@ -420,7 +425,7 @@ static void test_eks_provider_random_session_name() {
         return;
     }
 
-    provider = new_eks_provider(config, NULL, "us-west-2", NULL,
+    provider = flb_eks_provider_create(config, NULL, "us-west-2", NULL,
                                 generator_in_test());
 
     /* repeated calls to get credentials should return the same set */
@@ -433,7 +438,7 @@ static void test_eks_provider_random_session_name() {
     TEST_CHECK(strcmp(EKS_SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(EKS_TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     creds = provider->provider_vtable->get_credentials(provider);
     if (!creds) {
@@ -444,20 +449,20 @@ static void test_eks_provider_random_session_name() {
     TEST_CHECK(strcmp(EKS_SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(EKS_TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     /* refresh should return 0 (success) */
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret == 0);
 
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(provider);
     unsetenv_eks();
 }
 
 static void test_eks_provider_api_error() {
     struct flb_config *config;
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
     int ret;
 
     config = flb_malloc(sizeof(struct flb_config));
@@ -479,7 +484,7 @@ static void test_eks_provider_api_error() {
         return;
     }
 
-    provider = new_eks_provider(config, NULL, "us-west-2", NULL,
+    provider = flb_eks_provider_create(config, NULL, "us-west-2", NULL,
                                 generator_in_test());
 
     /* API will return an error - creds will be NULL */
@@ -493,15 +498,15 @@ static void test_eks_provider_api_error() {
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret < 0);
 
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(provider);
     unsetenv_eks();
 }
 
 static void test_sts_provider() {
     struct flb_config *config;
-    struct aws_credentials_provider *provider;
-    struct aws_credentials_provider *base_provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_provider *base_provider;
+    struct flb_aws_credentials *creds;
     int ret;
 
     config = flb_malloc(sizeof(struct flb_config));
@@ -528,13 +533,13 @@ static void test_sts_provider() {
         return;
     }
 
-    base_provider = new_environment_provider();
+    base_provider = flb_aws_env_provider_create();
     if (!base_provider) {
         flb_errno();
         return;
     }
 
-    provider = new_sts_provider(config, NULL, base_provider, "external_id",
+    provider = flb_sts_provider_create(config, NULL, base_provider, "external_id",
                                 "arn:aws:iam::123456789012:role/test1",
                                 "session_name", "cn-north-1", NULL,
                                 generator_in_test());
@@ -553,7 +558,7 @@ static void test_sts_provider() {
     TEST_CHECK(strcmp(STS_SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(STS_TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     creds = provider->provider_vtable->get_credentials(provider);
     if (!creds) {
@@ -564,21 +569,21 @@ static void test_sts_provider() {
     TEST_CHECK(strcmp(STS_SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(STS_TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     /* refresh should return 0 (success) */
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret == 0);
 
-    aws_provider_destroy(base_provider);
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(base_provider);
+    flb_aws_provider_destroy(provider);
 }
 
 static void test_sts_provider_api_error() {
     struct flb_config *config;
-    struct aws_credentials_provider *provider;
-    struct aws_credentials_provider *base_provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_provider *base_provider;
+    struct flb_aws_credentials *creds;
     int ret;
 
     config = flb_malloc(sizeof(struct flb_config));
@@ -605,13 +610,13 @@ static void test_sts_provider_api_error() {
         return;
     }
 
-    base_provider = new_environment_provider();
+    base_provider = flb_aws_env_provider_create();
     if (!base_provider) {
         flb_errno();
         return;
     }
 
-    provider = new_sts_provider(config, NULL, base_provider, "external_id",
+    provider = flb_sts_provider_create(config, NULL, base_provider, "external_id",
                                 "arn:aws:iam::123456789012:role/apierror",
                                 "session_name", "cn-north-1", NULL,
                                 generator_in_test());
@@ -631,12 +636,12 @@ static void test_sts_provider_api_error() {
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret < 0);
 
-    aws_provider_destroy(base_provider);
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(base_provider);
+    flb_aws_provider_destroy(provider);
 }
 
 TEST_LIST = {
-    { "test_random_session_name" , test_random_session_name},
+    { "test_flb_sts_session_name" , test_flb_sts_session_name},
     { "test_sts_uri" , test_sts_uri},
     { "process_sts_response" , test_process_sts_response},
     { "eks_credential_provider" , test_eks_provider},

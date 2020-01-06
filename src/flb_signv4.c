@@ -941,7 +941,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
                         int amz_date_header,
                         time_t t_now,
                         char *region, char *service,
-                        struct aws_credentials_provider *provider)
+                        struct flb_aws_provider *provider)
 {
     char amzdate[32];
     char datestamp[32];
@@ -951,7 +951,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
     flb_sds_t signature;
     flb_sds_t signed_headers;
     flb_sds_t auth_header;
-    struct aws_credentials *creds;
+    struct flb_aws_credentials *creds;
 
     creds = provider->provider_vtable->get_credentials(provider);
     if (!creds) {
@@ -962,14 +962,14 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
     gmt = flb_malloc(sizeof(struct tm));
     if (!gmt) {
         flb_errno();
-        aws_credentials_destroy(creds);
+        flb_aws_credentials_destroy(creds);
         return NULL;
     }
 
     if (!gmtime_r(&t_now, gmt)) {
         flb_error("[signv4] error converting given unix timestamp");
         flb_free(gmt);
-        aws_credentials_destroy(creds);
+        flb_aws_credentials_destroy(creds);
         return NULL;
     }
 
@@ -981,7 +981,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
     signed_headers = flb_sds_create_size(256);
     if (!signed_headers) {
         flb_error("[signedv4] cannot allocate buffer for auth signed headers");
-        aws_credentials_destroy(creds);
+        flb_aws_credentials_destroy(creds);
         return NULL;
     }
 
@@ -991,7 +991,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
     if (!cr) {
         flb_error("[signv4] failed canonical request");
         flb_sds_destroy(signed_headers);
-        aws_credentials_destroy(creds);
+        flb_aws_credentials_destroy(creds);
         return NULL;
     }
 
@@ -1002,7 +1002,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         flb_error("[signv4] failed string to sign");
         flb_sds_destroy(cr);
         flb_sds_destroy(signed_headers);
-        aws_credentials_destroy(creds);
+        flb_aws_credentials_destroy(creds);
         return NULL;
     }
     flb_sds_destroy(cr);
@@ -1014,7 +1014,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         flb_error("[signv4] failed calculate_string");
         flb_sds_destroy(signed_headers);
         flb_sds_destroy(string_to_sign);
-        aws_credentials_destroy(creds);
+        flb_aws_credentials_destroy(creds);
         return NULL;
     }
     flb_sds_destroy(string_to_sign);
@@ -1026,7 +1026,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
                                                signed_headers, signature);
     flb_sds_destroy(signed_headers);
     flb_sds_destroy(signature);
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     if (!auth_header) {
         flb_error("[signv4] error creating authorization header");

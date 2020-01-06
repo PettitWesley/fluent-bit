@@ -6,7 +6,7 @@
 
 #include "flb_tests_internal.h"
 
-static void test_parse_error()
+static void test_flb_aws_error()
 {
     flb_sds_t error_type;
     char *api_response =  "{\"__type\":\"IncompleteSignatureException\","
@@ -15,31 +15,31 @@ static void test_parse_error()
                           "service/term, got '<Credential>'\"}";
     char *garbage = "garbage"; /* something that can't be parsed */
 
-    error_type = parse_error(api_response, strlen(api_response));
+    error_type = flb_aws_error(api_response, strlen(api_response));
 
     TEST_CHECK(strcmp("IncompleteSignatureException", error_type) == 0);
 
     flb_sds_destroy(error_type);
 
-    error_type = parse_error(garbage, strlen(garbage));
+    error_type = flb_aws_error(garbage, strlen(garbage));
 
     TEST_CHECK(error_type == NULL);
 
     flb_sds_destroy(error_type);
 }
 
-static void test_endpoint_for()
+static void test_flb_aws_endpoint()
 {
     char *endpoint;
 
-    endpoint = endpoint_for("cloudwatch", "ap-south-1");
+    endpoint = flb_aws_endpoint("cloudwatch", "ap-south-1");
 
     TEST_CHECK(strcmp("https://cloudwatch.ap-south-1.amazonaws.com",
                       endpoint) == 0);
     flb_free(endpoint);
 
     /* China regions have a different TLD */
-    endpoint = endpoint_for("cloudwatch", "cn-north-1");
+    endpoint = flb_aws_endpoint("cloudwatch", "cn-north-1");
 
     TEST_CHECK(strcmp("https://cloudwatch.cn-north-1.amazonaws.com.cn",
                       endpoint) == 0);
@@ -48,7 +48,7 @@ static void test_endpoint_for()
 }
 
 TEST_LIST = {
-    { "parse_api_error" , test_parse_error},
-    { "endpoint_for" , test_endpoint_for},
+    { "parse_api_error" , test_flb_aws_error},
+    { "flb_aws_endpoint" , test_flb_aws_endpoint},
     { 0 }
 };

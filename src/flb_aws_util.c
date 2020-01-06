@@ -27,16 +27,16 @@
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
 
-int request_do(struct aws_http_client *aws_client,
+int request_do(struct flb_aws_client *aws_client,
                 int method, const char *uri,
                 const char *body, size_t body_len,
-                struct aws_http_header *dynamic_headers,
+                struct flb_aws_header *dynamic_headers,
                 size_t dynamic_headers_len);
 
 /*
  * https://service.region.amazonaws.com(.cn)
  */
-char *endpoint_for(char* service, char* region)
+char *flb_aws_endpoint(char* service, char* region)
 {
     char *endpoint;
     size_t len = AWS_SERVICE_ENDPOINT_BASE_LEN;
@@ -72,10 +72,10 @@ char *endpoint_for(char* service, char* region)
 
 }
 
-int aws_http_client_request(struct aws_http_client *aws_client,
+int flb_aws_client_request(struct flb_aws_client *aws_client,
                             int method, const char *uri,
                             const char *body, size_t body_len,
-                            struct aws_http_header *dynamic_headers,
+                            struct flb_aws_header *dynamic_headers,
                             size_t dynamic_headers_len)
 {
     int ret;
@@ -108,14 +108,14 @@ int aws_http_client_request(struct aws_http_client *aws_client,
                       dynamic_headers, dynamic_headers_len);
 }
 
-static struct aws_http_client_vtable client_vtable = {
-    .request = aws_http_client_request,
+static struct flb_aws_client_vtable client_vtable = {
+    .request = flb_aws_client_request,
 };
 
-struct aws_http_client *aws_http_client_create()
+struct flb_aws_client *flb_aws_client_create()
 {
-    struct aws_http_client *client = flb_calloc(1,
-                                                sizeof(struct aws_http_client));
+    struct flb_aws_client *client = flb_calloc(1,
+                                                sizeof(struct flb_aws_client));
     if (!client) {
         flb_errno();
         return NULL;
@@ -126,16 +126,16 @@ struct aws_http_client *aws_http_client_create()
 
 /* Generator that returns clients with the default vtable */
 
-static struct aws_http_client_generator default_generator = {
-    .new = aws_http_client_create,
+static struct flb_aws_client_generator default_generator = {
+    .create = flb_aws_client_create,
 };
 
-struct aws_http_client_generator *generator()
+struct flb_aws_client_generator *flb_aws_client_generator()
 {
     return &default_generator;
 }
 
-void aws_client_destroy(struct aws_http_client *aws_client)
+void flb_aws_client_destroy(struct flb_aws_client *aws_client)
 {
     if (aws_client) {
         if (aws_client->c) {
@@ -151,10 +151,10 @@ void aws_client_destroy(struct aws_http_client *aws_client)
     }
 }
 
-int request_do(struct aws_http_client *aws_client,
+int request_do(struct flb_aws_client *aws_client,
                 int method, const char *uri,
                 const char *body, size_t body_len,
-                struct aws_http_header *dynamic_headers,
+                struct flb_aws_header *dynamic_headers,
                 size_t dynamic_headers_len)
 {
     size_t b_sent;
@@ -162,7 +162,7 @@ int request_do(struct aws_http_client *aws_client,
     struct flb_upstream_conn *u_conn = NULL;
     flb_sds_t signature = NULL;
     int i;
-    struct aws_http_header header;
+    struct flb_aws_header header;
 
     if (aws_client->error_type) {
         /* clear last error */
@@ -234,7 +234,7 @@ int request_do(struct aws_http_client *aws_client,
                   ret, aws_client->c->resp.status);
         if (aws_client->c->resp.payload_size > 0) {
             /* try to parse the error */
-            aws_client->error_type = parse_error(aws_client->c->resp.payload,
+            aws_client->error_type = flb_aws_error(aws_client->c->resp.payload,
                                                  aws_client->c->
                                                  resp.payload_size);
         }
@@ -256,7 +256,7 @@ error:
 }
 
 /* parses AWS API error responses and returns the value of the __type field */
-flb_sds_t parse_error(char *response, size_t response_len) {
+flb_sds_t flb_aws_error(char *response, size_t response_len) {
     jsmntok_t *tokens;
     const jsmntok_t *t;
     char *current_token;

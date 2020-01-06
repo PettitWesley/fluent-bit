@@ -22,7 +22,7 @@
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_aws_credentials.h>
 
-#ifdef FLB_HAVE_AWS
+#ifdef FLB_HAVE_SIGNV4
 
 #ifndef FLB_SIGNV4_H
 #define FLB_SIGNV4_H
@@ -34,7 +34,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
                         int amz_date,
                         time_t t_now,
                         char *region, char *service,
-                        struct aws_credentials_provider *provider);
+                        struct flb_aws_provider *provider);
 
 #endif
-#endif /* FLB_HAVE_AWS */
+#endif /* FLB_HAVE_SIGNV4 */

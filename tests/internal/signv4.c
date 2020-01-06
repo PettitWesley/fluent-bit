@@ -52,6 +52,11 @@
 /* Test suite entry point */
 #define AWS_SUITE   FLB_TESTS_DATA_PATH "data/signv4/aws-sig-v4-test-suite/"
 
+/* Credentials Environment Variables */
+#define AWS_ACCESS_KEY_ID              "AWS_ACCESS_KEY_ID"
+#define AWS_SECRET_ACCESS_KEY          "AWS_SECRET_ACCESS_KEY"
+#define AWS_SESSION_TOKEN              "AWS_SESSION_TOKEN"
+
 struct request {
     int method_i;
     flb_sds_t method;
@@ -530,7 +535,7 @@ static void aws_test_suite()
     struct mk_list *tests;
     struct flb_config *config;
     struct aws_test *awt;
-    struct aws_credentials_provider *provider;
+    struct flb_aws_provider *provider;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -564,7 +569,7 @@ static void aws_test_suite()
         flb_errno();
         return;
     }
-    provider = new_environment_provider();
+    provider = flb_aws_env_provider_create();
     if (!provider) {
         flb_errno();
         return;

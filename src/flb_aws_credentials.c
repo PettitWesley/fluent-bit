@@ -32,15 +32,20 @@
 #define TEN_MINUTES    600
 #define TWELVE_HOURS   43200
 
+/* Credentials Environment Variables */
+#define AWS_ACCESS_KEY_ID              "AWS_ACCESS_KEY_ID"
+#define AWS_SECRET_ACCESS_KEY          "AWS_SECRET_ACCESS_KEY"
+#define AWS_SESSION_TOKEN              "AWS_SESSION_TOKEN"
+
 /* Environment Provider */
-struct aws_credentials *get_credentials_fn_environment(struct
-                                                       aws_credentials_provider
+struct flb_aws_credentials *get_credentials_fn_environment(struct
+                                                       flb_aws_provider
                                                        *provider)
 {
     char *access_key;
     char *secret_key;
     char *session_token;
-    struct aws_credentials *creds;
+    struct flb_aws_credentials *creds;
 
     flb_debug("[aws_credentials] Requesting credentials from the "
               "env provider..");
@@ -55,7 +60,7 @@ struct aws_credentials *get_credentials_fn_environment(struct
         return NULL;
     }
 
-    creds = flb_malloc(sizeof(struct aws_credentials));
+    creds = flb_malloc(sizeof(struct flb_aws_credentials));
     if (!creds) {
         flb_errno();
         return NULL;
@@ -63,14 +68,14 @@ struct aws_credentials *get_credentials_fn_environment(struct
 
     creds->access_key_id = flb_sds_create(access_key);
     if (!creds->access_key_id) {
-        aws_credentials_destroy(creds);
+        flb_aws_credentials_destroy(creds);
         flb_errno();
         return NULL;
     }
 
     creds->secret_access_key = flb_sds_create(secret_key);
     if (!creds->secret_access_key) {
-        aws_credentials_destroy(creds);
+        flb_aws_credentials_destroy(creds);
         flb_errno();
         return NULL;
     }
@@ -79,7 +84,7 @@ struct aws_credentials *get_credentials_fn_environment(struct
     if (session_token && strlen(session_token) > 0) {
         creds->session_token = flb_sds_create(session_token);
         if (!creds->session_token) {
-            aws_credentials_destroy(creds);
+            flb_aws_credentials_destroy(creds);
             flb_errno();
             return NULL;
         }
@@ -95,7 +100,7 @@ struct aws_credentials *get_credentials_fn_environment(struct
  * For the env provider, refresh simply checks if the environment
  * variables are available.
  */
-int refresh_fn_environment(struct aws_credentials_provider *provider)
+int refresh_fn_environment(struct flb_aws_provider *provider)
 {
     char *access_key;
     char *secret_key;
@@ -116,20 +121,20 @@ int refresh_fn_environment(struct aws_credentials_provider *provider)
 }
 
 /* Destroy is a no-op for the env provider */
-void destroy_fn_environment(struct aws_credentials_provider *provider) {
+void destroy_fn_environment(struct flb_aws_provider *provider) {
     return;
 }
 
-static struct aws_credentials_provider_vtable environment_provider_vtable = {
+static struct flb_aws_provider_vtable environment_provider_vtable = {
     .get_credentials = get_credentials_fn_environment,
     .refresh = refresh_fn_environment,
     .destroy = destroy_fn_environment,
 };
 
-struct aws_credentials_provider *new_environment_provider() {
-    struct aws_credentials_provider *provider = flb_calloc(1,
+struct flb_aws_provider *flb_aws_env_provider_create() {
+    struct flb_aws_provider *provider = flb_calloc(1,
                                                           sizeof(
-                                                          struct aws_credentials_provider));
+                                                          struct flb_aws_provider));
 
     if (!provider) {
         flb_errno();
@@ -143,7 +148,7 @@ struct aws_credentials_provider *new_environment_provider() {
 }
 
 
-void aws_credentials_destroy(struct aws_credentials *creds)
+void flb_aws_credentials_destroy(struct flb_aws_credentials *creds)
 {
     if (creds) {
         if (creds->access_key_id) {
@@ -160,7 +165,7 @@ void aws_credentials_destroy(struct aws_credentials *creds)
     }
 }
 
-void aws_provider_destroy(struct aws_credentials_provider *provider)
+void flb_aws_provider_destroy(struct flb_aws_provider *provider)
 {
     if (provider) {
         if (provider->implementation) {
@@ -194,7 +199,7 @@ time_t timestamp_to_epoch(const char *timestamp)
     return seconds;
 }
 
-time_t credential_expiration(const char *timestamp)
+time_t flb_aws_cred_expiration(const char *timestamp)
 {
     time_t now;
     time_t expiration = timestamp_to_epoch(timestamp);
@@ -206,7 +211,7 @@ time_t credential_expiration(const char *timestamp)
      * Sanity check - expiration should be ~10 minutes to 12 hours in the future
      * < 10 minutes is problematic because the provider auto-refreshes if creds
      * expire in 5 minutes. Disabling auto-refresh reduces requests for creds.
-     * (The aws_http_client will still force a refresh of creds and then retry
+     * (The flb_aws_client will still force a refresh of creds and then retry
      * if it receives an auth error).
      * (> 12 hours is impossible with the current APIs and would likely indicate
      *  a bug in how this code processes timestamps.)
@@ -226,7 +231,7 @@ time_t credential_expiration(const char *timestamp)
      return expiration;
 }
 
-int file_to_buf(const char *path, char **out_buf, size_t *out_size)
+int flb_read_file(const char *path, char **out_buf, size_t *out_size)
 {
     int ret;
     long bytes;

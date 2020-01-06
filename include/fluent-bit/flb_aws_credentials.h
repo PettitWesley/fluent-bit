@@ -30,30 +30,25 @@
 /* Refresh if creds they will expire in 5 min or less */
 #define FLB_AWS_REFRESH_WINDOW         300
 
-/* Credentials Environment Variables */
-#define AWS_ACCESS_KEY_ID              "AWS_ACCESS_KEY_ID"
-#define AWS_SECRET_ACCESS_KEY          "AWS_SECRET_ACCESS_KEY"
-#define AWS_SESSION_TOKEN              "AWS_SESSION_TOKEN"
-
 /*
  * A structure that wraps the sensitive data needed to sign an AWS request
  */
-struct aws_credentials {
+struct flb_aws_credentials {
     flb_sds_t access_key_id;
     flb_sds_t secret_access_key;
     flb_sds_t session_token;
 };
 
 /* defined below but declared here for the function declarations */
-struct aws_credentials_provider;
+struct flb_aws_provider;
 
 /*
  * Get credentials using the provider.
  * Client is in charge of freeing the returned credentials struct.
  * Returns NULL if credentials could not be obtained.
  */
-typedef struct aws_credentials*(aws_credentials_provider_get_credentials_fn)
-                               (struct aws_credentials_provider *provider);
+typedef struct flb_aws_credentials*(flb_aws_provider_get_credentials_fn)
+                                   (struct flb_aws_provider *provider);
 
 /*
  * Force a refesh of cached credentials. If client code receives a response
@@ -61,33 +56,30 @@ typedef struct aws_credentials*(aws_credentials_provider_get_credentials_fn)
  * it can call this method and retry.
  * Returns 0 if the refresh was successful.
  */
-typedef int(aws_credentials_provider_refresh_fn)(struct aws_credentials_provider
-                                                 *provider);
+typedef int(flb_aws_provider_refresh_fn)(struct flb_aws_provider *provider);
 
 
 /*
  * Clean up the underlying provider implementation.
- * Called by aws_provider_destroy.
+ * Called by flb_aws_provider_destroy.
  */
-typedef void(aws_credentials_provider_destroy_fn)(struct
-                                                  aws_credentials_provider
-                                                  *provider);
+typedef void(flb_flb_aws_provider_destroy_fn)(struct flb_aws_provider *provider);
 
 /*
  * This structure is a virtual table that allows the client to get credentials.
  * And clean up all memory from the underlying implementation.
  */
-struct aws_credentials_provider_vtable {
-    aws_credentials_provider_get_credentials_fn *get_credentials;
-    aws_credentials_provider_refresh_fn *refresh;
-    aws_credentials_provider_destroy_fn *destroy;
+struct flb_aws_provider_vtable {
+    flb_aws_provider_get_credentials_fn *get_credentials;
+    flb_aws_provider_refresh_fn *refresh;
+    flb_flb_aws_provider_destroy_fn *destroy;
 };
 
 /*
  * A generic structure to represent all providers.
  */
-struct aws_credentials_provider {
-    struct aws_credentials_provider_vtable *provider_vtable;
+struct flb_aws_provider {
+    struct flb_aws_provider_vtable *provider_vtable;
     void *implementation;
 
     /* Standard credentials chain is a list of providers */
@@ -97,12 +89,12 @@ struct aws_credentials_provider {
 /*
  * Function to free memory used by an aws_credentials structure
  */
-void aws_credentials_destroy(struct aws_credentials *creds);
+void flb_aws_credentials_destroy(struct flb_aws_credentials *creds);
 
 /*
- * Function to free memory used by an aws_credentials_provider structure
+ * Function to free memory used by an flb_aws_provider structure
  */
-void aws_provider_destroy(struct aws_credentials_provider *provider);
+void flb_aws_provider_destroy(struct flb_aws_provider *provider);
 
 /*
  * A provider that uses OIDC tokens provided by kubernetes to obtain
@@ -113,21 +105,20 @@ void aws_provider_destroy(struct aws_credentials_provider *provider);
  * This provider only contains the functionality needed for EKS- obtaining the
  * location of the OIDC token from an environment variable.
  */
-struct aws_credentials_provider *new_eks_provider(struct flb_config *config,
+struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
                                                   struct flb_tls *tls,
                                                   char *region, char *proxy,
                                                   struct
-                                                  aws_http_client_generator
+                                                  flb_aws_client_generator
                                                   *generator);
 
 
 /*
  * STS Assume Role Provider.
  */
-struct aws_credentials_provider *new_sts_provider(struct flb_config *config,
+struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
                                                   struct flb_tls *tls,
-                                                  struct
-                                                  aws_credentials_provider
+                                                  struct flb_aws_provider
                                                   *base_provider,
                                                   char *external_id,
                                                   char *role_arn,
@@ -135,27 +126,27 @@ struct aws_credentials_provider *new_sts_provider(struct flb_config *config,
                                                   char *region,
                                                   char *proxy,
                                                   struct
-                                                  aws_http_client_generator
+                                                  flb_aws_client_generator
                                                   *generator);
 
 /*
  * Standard environment variables
  */
-struct aws_credentials_provider *new_environment_provider();
+struct flb_aws_provider *flb_aws_env_provider_create();
 
 /*
  * Helper functions
  */
 
-time_t credential_expiration(const char* timestamp);
+time_t flb_aws_cred_expiration(const char* timestamp);
 
-int file_to_buf(const char *path, char **out_buf, size_t *out_size);
+int flb_read_file(const char *path, char **out_buf, size_t *out_size);
 
-struct aws_credentials *process_sts_response(char *response,
+struct flb_aws_credentials *flb_parse_sts_resp(char *response,
                                              time_t *expiration);
-char *sts_uri(char *action, char *role_arn, char *session_name,
-              char *external_id, char *identity_token);
-char *random_session_name();
+char *flb_sts_uri(char *action, char *role_arn, char *session_name,
+                  char *external_id, char *identity_token);
+char *flb_sts_session_name();
 
 
 #endif

@@ -11,6 +11,11 @@
 #define SECRET_KEY "skid"
 #define TOKEN      "token"
 
+/* Credentials Environment Variables */
+#define AWS_ACCESS_KEY_ID              "AWS_ACCESS_KEY_ID"
+#define AWS_SECRET_ACCESS_KEY          "AWS_SECRET_ACCESS_KEY"
+#define AWS_SESSION_TOKEN              "AWS_SESSION_TOKEN"
+
 
 static void unsetenv_credentials()
 {
@@ -36,8 +41,8 @@ static void unsetenv_credentials()
 /* test for the env provider */
 static void test_environment_provider()
 {
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
     int ret;
 
     /* set environment */
@@ -57,7 +62,7 @@ static void test_environment_provider()
         return;
     }
 
-    provider = new_environment_provider();
+    provider = flb_aws_env_provider_create();
     if (!provider) {
         flb_errno();
         return;
@@ -73,7 +78,7 @@ static void test_environment_provider()
     TEST_CHECK(strcmp(SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     creds = provider->provider_vtable->get_credentials(provider);
     if (!creds) {
@@ -84,7 +89,7 @@ static void test_environment_provider()
     TEST_CHECK(strcmp(SECRET_KEY, creds->secret_access_key) == 0);
     TEST_CHECK(strcmp(TOKEN, creds->session_token) == 0);
 
-    aws_credentials_destroy(creds);
+    flb_aws_credentials_destroy(creds);
 
     /* refresh should return 0 (success) */
     ret = provider->provider_vtable->refresh(provider);
@@ -92,20 +97,20 @@ static void test_environment_provider()
 
     unsetenv_credentials();
 
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(provider);
 }
 
 /* test the env provider when no cred env vars are set */
 static void test_environment_provider_unset()
 {
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
     int ret;
 
     unsetenv_credentials();
 
 
-    provider = new_environment_provider();
+    provider = flb_aws_env_provider_create();
     if (!provider) {
         flb_errno();
         return;
@@ -113,24 +118,16 @@ static void test_environment_provider_unset()
 
     /* repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
-    if (!creds) {
-        flb_errno();
-        return;
-    }
     TEST_CHECK(creds == NULL);
 
     creds = provider->provider_vtable->get_credentials(provider);
-    if (!creds) {
-        flb_errno();
-        return;
-    }
     TEST_CHECK(creds == NULL);
 
     /* refresh should return -1 (failure) */
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret < 0);
 
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(provider);
 }
 
 static void test_credential_expiration()
@@ -140,14 +137,11 @@ static void test_credential_expiration()
     time_t exp_expected = time(NULL) + 3600;
     char time_stamp[50];
     time_t exp_actual;
-    if (gmtime_r(&exp_expected, &tm) == NULL) {
-        printf("gmtime didn't work");
-    }
-    if (strftime(time_stamp, 50, "%Y-%m-%dT%H:%M:%SZ", &tm) == 0) {
-        printf("strftime didn't work");
-    }
+    TEST_CHECK(gmtime_r(&exp_expected, &tm) != NULL);
 
-    exp_actual = credential_expiration(time_stamp);
+    TEST_CHECK(strftime(time_stamp, 50, "%Y-%m-%dT%H:%M:%SZ", &tm) > 0);
+
+    exp_actual = flb_aws_cred_expiration(time_stamp);
 
     TEST_CHECK(exp_actual == exp_expected);
 }
