@@ -102,13 +102,17 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     return 0;
 }
 
-static flb_sds_t msgpack_to_json_sds(const msgpack_object *obj)
+/*
+ * Returns an SDS string with the JSON representation of obj
+ * 'estimate' is used to initialize the SDS buffer
+ */
+flb_sds_t msgpack_to_json_sds(const msgpack_object *obj, size_t estimate)
 {
     int ret;
     flb_sds_t out_buf;
     flb_sds_t tmp_buf;
-    size_t out_size = 256;
-    size_t new_size = 0;
+    //TODO: is there a way to find or better guess the size?
+    size_t out_size = estimate * 1.5;
 
     out_buf = flb_sds_create_size(out_size);
     if (!out_buf) {
@@ -119,13 +123,13 @@ static flb_sds_t msgpack_to_json_sds(const msgpack_object *obj)
     while (1) {
         ret = flb_msgpack_to_json(out_buf, out_size, obj);
         if (ret <= 0) {
-            new_size = out_size * 2;
             tmp_buf = flb_sds_increase(out_buf, new_size - out_size);
             if (tmp_buf) {
                 out_buf = tmp_buf;
-                out_size = new_size;
+                out_size = out_size + 256;
             } else {
                 flb_errno();
+                flb_error("[aws_pack] Buffer memory alloc failed, skipping record");
                 flb_sds_destroy(out_buf);
                 return NULL;
             }
@@ -137,20 +141,30 @@ static flb_sds_t msgpack_to_json_sds(const msgpack_object *obj)
     return out_buf;
 }
 
-static void playground(const void *data, size_t bytes)
+struct record {
+    flb_sds_t json;
+    time_t timestamp;
+}
+
+struct record *msg_pack_to_records(const void *data, size_t bytes,
+                                   int *num_records)
 {
     size_t off = 0;
     int i = 0;
     int ret;
-    int total_records;
-    struct flb_time tm;
+    int total_records = 0;
+    struct flb_time tms;
     msgpack_unpacked result;
     msgpack_object  *obj;
+    flb_sds_t json;
+    struct record *record;
 
-    flb_sds_t record;
-
-    /* Iterate over each item */
     msgpack_unpacked_init(&result);
+
+    //TODO: can we find out the number of records ahead of time?
+    // if not, then iterate once and find number of them, and alloc that much
+    // memory
+
     while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
         /*
          * Each record is a msgpack array [timestamp, map] of the
@@ -162,18 +176,20 @@ static void playground(const void *data, size_t bytes)
         }
 
         /* unpack the array of [timestamp, map] */
-        flb_time_pop_from_msgpack(&tm, &result, &obj);
+        flb_time_pop_from_msgpack(&tms, &result, &obj);
 
         /* obj should now be the record map */
         if (obj->type != MSGPACK_OBJECT_MAP) {
             continue;
         }
 
-        record = msgpack_to_json_sds(obj);
-        flb_info("[wip] record: %s", record);
+        json = msgpack_to_json_sds(obj);
+        if (!json) {
+
+        }
+
 
     }
-
     msgpack_unpacked_destroy(&result);
 }
 
