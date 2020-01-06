@@ -76,11 +76,11 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
-    ctx->provider = new_ec2_provider(config, generator());
-    if (!ctx->provider) {
-        flb_errno();
-        flb_error("Failed to initialize provider");
-    }
+    // ctx->provider = new_ec2_provider(config, generator());
+    // if (!ctx->provider) {
+    //     flb_errno();
+    //     flb_error("Failed to initialize provider");
+    // }
 
     /* Date format for JSON output */
     ctx->json_date_format = FLB_PACK_JSON_DATE_DOUBLE;
