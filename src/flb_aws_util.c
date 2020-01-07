@@ -257,9 +257,9 @@ error:
 
 /* parses AWS API error responses and returns the value of the __type field */
 flb_sds_t flb_aws_error(char *response, size_t response_len) {
-    jsmntok_t *tokens;
-    const jsmntok_t *t;
-    char *current_token;
+    jsmntok_t *tokens = NULL;
+    const jsmntok_t *t = NULL;
+    char *current_token = NULL;
     jsmn_parser parser;
     int tokens_size = 10;
     size_t size;
@@ -321,6 +321,6 @@ flb_sds_t flb_aws_error(char *response, size_t response_len) {
 
         i++;
     }
-
+    flb_free(tokens);
     return error_type;
 }

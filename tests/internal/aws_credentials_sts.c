@@ -76,6 +76,12 @@ xmlns=\"https://sts.amazonaws.com/doc/\n\
   </ResponseMetadata>\n\
 </AssumeRoleResponse>"
 
+/*
+ * Global Variable that allows us to check the number of calls
+ * made in each test
+ */
+int Request_Count;
+
 /* Each test case has its own request function */
 int request_eks_test1(struct flb_aws_client *aws_client,
                       int method, const char *uri)
@@ -87,6 +93,10 @@ int request_eks_test1(struct flb_aws_client *aws_client,
     TEST_CHECK(strstr(uri, "WebIdentityToken=this-is-a-fake-jwt") != NULL);
     TEST_CHECK(strstr(uri, "RoleSessionName=session_name") != NULL);
 
+    /* free client from previous request */
+    if (aws_client->c) {
+        flb_http_client_destroy(aws_client->c);
+    }
     /* create an http client so that we can set the response */
     aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
     if (!aws_client->c) {
@@ -115,6 +125,11 @@ int request_eks_flb_sts_session_name(struct flb_aws_client *aws_client,
     TEST_CHECK(strstr(uri, "RoleSessionName=") != NULL);
     /* session name should not be the same as test 1 */
     TEST_CHECK(strstr(uri, "RoleSessionName=session_name") == NULL);
+
+    /* free client from previous request */
+    if (aws_client->c) {
+        flb_http_client_destroy(aws_client->c);
+    }
 
     /* create an http client so that we can set the response */
     aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
@@ -145,6 +160,11 @@ int request_eks_api_error(struct flb_aws_client *aws_client,
     /* session name should not be the same as test 1 */
     TEST_CHECK(strstr(uri, "RoleSessionName=session_name") == NULL);
 
+    /* free client from previous request */
+    if (aws_client->c) {
+        flb_http_client_destroy(aws_client->c);
+    }
+
     /* create an http client so that we can set the response */
     aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
     if (!aws_client->c) {
@@ -170,6 +190,11 @@ int request_sts_test1(struct flb_aws_client *aws_client,
                != NULL);
     TEST_CHECK(strstr(uri, "ExternalId=external_id") != NULL);
     TEST_CHECK(strstr(uri, "RoleSessionName=session_name") != NULL);
+
+    /* free client from previous request */
+    if (aws_client->c) {
+        flb_http_client_destroy(aws_client->c);
+    }
 
     /* create an http client so that we can set the response */
     aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
@@ -197,6 +222,11 @@ int request_sts_api_error(struct flb_aws_client *aws_client,
     TEST_CHECK(strstr(uri, "ExternalId=external_id") != NULL);
     TEST_CHECK(strstr(uri, "RoleSessionName=session_name") != NULL);
 
+    /* free client from previous request */
+    if (aws_client->c) {
+        flb_http_client_destroy(aws_client->c);
+    }
+
     /* create an http client so that we can set the response */
     aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
     if (!aws_client->c) {
@@ -220,6 +250,7 @@ int test_http_client_request(struct flb_aws_client *aws_client,
                              struct flb_aws_header *dynamic_headers,
                              size_t dynamic_headers_len)
 {
+    Request_Count++;
     if (strcmp(aws_client->name, "sts_client_eks_provider") == 0) {
         /*
          * route to the correct test case fn using the uri - the role
@@ -307,6 +338,8 @@ static void test_flb_sts_session_name()
     char *session_name = flb_sts_session_name();
 
     TEST_CHECK(strlen(session_name) == 32);
+
+    flb_free(session_name);
 }
 
 static void test_sts_uri()
@@ -341,6 +374,8 @@ static void test_eks_provider() {
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     int ret;
+
+    Request_Count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -395,8 +430,16 @@ static void test_eks_provider() {
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret == 0);
 
+    /*
+     * Request count should be 2:
+     * - One for the first call to get_credentials (2nd should hit cred cache)
+     * - One for the call to refresh
+     */
+     TEST_CHECK(Request_Count == 2);
+
     flb_aws_provider_destroy(provider);
     unsetenv_eks();
+    flb_free(config);
 }
 
 static void test_eks_provider_random_session_name() {
@@ -404,6 +447,8 @@ static void test_eks_provider_random_session_name() {
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     int ret;
+
+    Request_Count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -455,8 +500,16 @@ static void test_eks_provider_random_session_name() {
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret == 0);
 
+    /*
+     * Request count should be 2:
+     * - One for the first call to get_credentials (2nd should hit cred cache)
+     * - One for the call to refresh
+     */
+     TEST_CHECK(Request_Count == 2);
+
     flb_aws_provider_destroy(provider);
     unsetenv_eks();
+    flb_free(config);
 }
 
 static void test_eks_provider_api_error() {
@@ -464,6 +517,8 @@ static void test_eks_provider_api_error() {
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     int ret;
+
+    Request_Count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -498,8 +553,16 @@ static void test_eks_provider_api_error() {
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret < 0);
 
+    /*
+     * Request count should be 3:
+     * - Each call to get_credentials and refresh invokes the client's
+     * request method and returns a request failure.
+     */
+     TEST_CHECK(Request_Count == 3);
+
     flb_aws_provider_destroy(provider);
     unsetenv_eks();
+    flb_free(config);
 }
 
 static void test_sts_provider() {
@@ -508,6 +571,8 @@ static void test_sts_provider() {
     struct flb_aws_provider *base_provider;
     struct flb_aws_credentials *creds;
     int ret;
+
+    Request_Count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -575,8 +640,16 @@ static void test_sts_provider() {
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret == 0);
 
+    /*
+     * Request count should be 2:
+     * - One for the first call to get_credentials (2nd should hit cred cache)
+     * - One for the call to refresh
+     */
+     TEST_CHECK(Request_Count == 2);
+
     flb_aws_provider_destroy(base_provider);
     flb_aws_provider_destroy(provider);
+    flb_free(config);
 }
 
 static void test_sts_provider_api_error() {
@@ -585,6 +658,8 @@ static void test_sts_provider_api_error() {
     struct flb_aws_provider *base_provider;
     struct flb_aws_credentials *creds;
     int ret;
+
+    Request_Count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -636,8 +711,16 @@ static void test_sts_provider_api_error() {
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret < 0);
 
+    /*
+     * Request count should be 3:
+     * - Each call to get_credentials and refresh invokes the client's
+     * request method and returns a request failure.
+     */
+     TEST_CHECK(Request_Count == 3);
+
     flb_aws_provider_destroy(base_provider);
     flb_aws_provider_destroy(provider);
+    flb_free(config);
 }
 
 TEST_LIST = {

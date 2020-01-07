@@ -372,7 +372,6 @@ void destroy_fn_eks(struct flb_aws_provider *provider) {
         if (implementation->endpoint) {
             flb_free(implementation->endpoint);
         }
-
         if (implementation->free_session_name == FLB_TRUE) {
             flb_free(implementation->session_name);
         }
