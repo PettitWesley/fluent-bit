@@ -27,6 +27,20 @@
 
 #define FLB_AWS_CREDENTIAL_REFRESH_LIMIT       300
 
+#define AWS_IMDS_V2_TOKEN_HEADER               "X-aws-ec2-metadata-token"
+#define AWS_IMDS_V2_TOKEN_HEADER_LEN           24
+
+#define AWS_IMDS_V2_TOKEN_TTL_HEADER           "X-aws-ec2-metadata-token-ttl-seconds"
+#define AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN       36
+
+#define AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL       "21600"
+#define AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN   5
+
+#define AWS_IMDS_V2_TOKEN_TTL                  21600
+
+#define AWS_IMDS_V2_HOST                       "169.254.169.254"
+#define AWS_IMDS_V2_TOKEN_PATH                 "/latest/api/token"
+
 /*
  * The AWS HTTP Client is a wrapper around the Fluent Bit's http library.
  * It handles tasks which are common to all AWS API requests (retries,
@@ -134,6 +148,19 @@ struct aws_http_client_generator *generator();
 char *endpoint_for(char* service, char* region);
 
 flb_sds_t parse_error(char *response, size_t response_len);
+
+/*
+ * Get an IMDSv2 token
+ */
+int get_ec2_token(struct aws_http_client *client, flb_sds_t *token,
+                  size_t *token_len);
+
+/*
+ * Get data from an IMDSv2 path
+ */
+int get_metadata(struct aws_http_client *client, char *metadata_path,
+                 flb_sds_t *metadata, size_t *metadata_len,
+                 flb_sds_t token, size_t token_len);
 
 #endif
 #endif /* FLB_HAVE_AWS */

@@ -37,13 +37,6 @@ struct aws_credentials_provider_http *implementation;
 static int http_credentials_request(struct aws_credentials_provider_http
                                     *implementation);
 
-static struct aws_credentials *process_http_credentials_response(char
-                                                                 *response,
-                                                                 size_t
-                                                                 response_len,
-                                                                 time_t
-                                                                 *expiration);
-
 /* Environment Provider */
 struct aws_credentials *get_credentials_fn_environment(struct
                                                        aws_credentials_provider
@@ -427,24 +420,21 @@ static int http_credentials_request(struct aws_credentials_provider_http
  * (some implementations (IMDS) have additional fields)
  * Returns NULL if any part of parsing was unsuccessful.
  */
-static struct aws_credentials *process_http_credentials_response(char
-                                                                 *response,
-                                                                 size_t
-                                                                 response_len,
-                                                                 time_t
-                                                                 *expiration)
+struct aws_credentials *process_http_credentials_response(char *response,
+                                                          size_t response_len,
+                                                          time_t *expiration)
 {
-    jsmntok_t *tokens;
-    const jsmntok_t *t;
-    char *current_token;
+    jsmntok_t *tokens = NULL;
+    const jsmntok_t *t = NULL;
+    char *current_token = NULL;
     jsmn_parser parser;
     int tokens_size = 50;
     size_t size;
     int ret;
-    struct aws_credentials *creds;
+    struct aws_credentials *creds = NULL;
     int i = 0;
     int len;
-    flb_sds_t tmp;
+    flb_sds_t tmp = NULL;
 
     /*
      * Remove/reset existing value of expiration.
