@@ -100,6 +100,63 @@ static void test_environment_provider()
     flb_aws_provider_destroy(provider);
 }
 
+/* test for the env provider */
+static void test_environment_provider_no_token()
+{
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    int ret;
+
+    /* set environment */
+    ret = setenv(AWS_ACCESS_KEY_ID, ACCESS_KEY, 1);
+    if (ret < 0) {
+        flb_errno();
+        return;
+    }
+    ret = setenv(AWS_SECRET_ACCESS_KEY, SECRET_KEY, 1);
+    if (ret < 0) {
+        flb_errno();
+        return;
+    }
+
+    provider = flb_aws_env_provider_create();
+    if (!provider) {
+        flb_errno();
+        return;
+    }
+
+    /* repeated calls to get credentials should return the same set */
+    creds = provider->provider_vtable->get_credentials(provider);
+    if (!creds) {
+        flb_errno();
+        return;
+    }
+    TEST_CHECK(strcmp(ACCESS_KEY, creds->access_key_id) == 0);
+    TEST_CHECK(strcmp(SECRET_KEY, creds->secret_access_key) == 0);
+    TEST_CHECK(creds->session_token == NULL);
+
+    flb_aws_credentials_destroy(creds);
+
+    creds = provider->provider_vtable->get_credentials(provider);
+    if (!creds) {
+        flb_errno();
+        return;
+    }
+    TEST_CHECK(strcmp(ACCESS_KEY, creds->access_key_id) == 0);
+    TEST_CHECK(strcmp(SECRET_KEY, creds->secret_access_key) == 0);
+    TEST_CHECK(creds->session_token == NULL);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* refresh should return 0 (success) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret == 0);
+
+    unsetenv_credentials();
+
+    flb_aws_provider_destroy(provider);
+}
+
 /* test the env provider when no cred env vars are set */
 static void test_environment_provider_unset()
 {
@@ -146,9 +203,12 @@ static void test_credential_expiration()
     TEST_CHECK(exp_actual == exp_expected);
 }
 
+test_environment_provider_token_not_set
+
 TEST_LIST = {
     { "test_credential_expiration" , test_credential_expiration},
     { "environment_credential_provider" , test_environment_provider},
+    { "test_environment_provider_no_token" , test_environment_provider_no_token},
     { "environment_credential_provider_unset" ,
       test_environment_provider_unset},
     { 0 }
