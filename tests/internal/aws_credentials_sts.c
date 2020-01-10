@@ -77,12 +77,52 @@ xmlns=\"https://sts.amazonaws.com/doc/\n\
 </AssumeRoleResponse>"
 
 /*
+ * Unexpected/invalid STS response. The goal of this is not to test anything
+ * that might happen in production, but rather to test the error handling
+ * code for the providers. This helps ensure all code paths are tested and
+ * the error handling code does not introduce memory leaks.
+ */
+
+#define STS_RESPONSE_MALFORMED "{\n\
+    \"__type\": \"some unexpected response\",\n\
+    \"this tests\": the error handling code\",\n\
+\"This looks like JSON but is not valid.\"\n\
+<Credentials><AccessKeyId>It also contains xml tags that a correct\n\
+response would have</SecretAccessKey>"
+
+/*
  * Global Variable that allows us to check the number of calls
  * made in each test
  */
 int Request_Count;
 
 /* Each test case has its own request function */
+
+/* unexpected output test- see description for STS_RESPONSE_MALFORMED */
+int request_unexpected_response(struct flb_aws_client *aws_client,
+                                int method, const char *uri)
+{
+    TEST_CHECK(method == FLB_HTTP_GET);
+
+    /* free client from previous request */
+    if (aws_client->c) {
+        flb_http_client_destroy(aws_client->c);
+    }
+    /* create an http client so that we can set the response */
+    aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
+    if (!aws_client->c) {
+        flb_errno();
+        return -1;
+    }
+    mk_list_init(&aws_client->c->headers);
+
+    aws_client->c->resp.status = 200;
+    aws_client->c->resp.payload = STS_RESPONSE_MALFORMED;
+    aws_client->c->resp.payload_size = strlen(STS_RESPONSE_MALFORMED);
+    aws_client->error_type = NULL;
+
+    return 0;
+}
 int request_eks_test1(struct flb_aws_client *aws_client,
                       int method, const char *uri)
 {
@@ -262,6 +302,8 @@ int test_http_client_request(struct flb_aws_client *aws_client,
             return request_eks_flb_sts_session_name(aws_client, method, uri);
         } else if (strstr(uri, "apierror") != NULL) {
             return request_eks_api_error(aws_client, method, uri);
+        } else if (strstr(uri, "unexpected_api_response") != NULL) {
+            return request_unexpected_response(aws_client, method, uri);
         }
 
         /* uri should match one of the above conditions */
@@ -273,6 +315,8 @@ int test_http_client_request(struct flb_aws_client *aws_client,
             return request_sts_test1(aws_client, method, uri);
         } else if (strstr(uri, "apierror") != NULL) {
             return request_sts_api_error(aws_client, method, uri);
+        } else if (strstr(uri, "unexpected_api_response") != NULL) {
+            return request_unexpected_response(aws_client, method, uri);
         }
         /* uri should match one of the above conditions */
         flb_errno();
@@ -512,6 +556,60 @@ static void test_eks_provider_random_session_name() {
     flb_free(config);
 }
 
+/* unexpected output test- see description for STS_RESPONSE_MALFORMED */
+static void test_eks_provider_unexpected_api_response() {
+    struct flb_config *config;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    int ret;
+
+    Request_Count = 0;
+
+    config = flb_malloc(sizeof(struct flb_config));
+    if (!config) {
+        flb_errno();
+        return;
+    }
+
+    unsetenv_eks();
+    ret = setenv(ROLE_ARN_ENV_VAR, "arn:aws:iam::123456789012:role/"
+                 "unexpected_api_response", 1);
+    if (ret < 0) {
+        flb_errno();
+        return;
+    }
+    ret = setenv(TOKEN_FILE_ENV_VAR, WEB_TOKEN_FILE, 1);
+    if (ret < 0) {
+        flb_errno();
+        return;
+    }
+
+    provider = flb_eks_provider_create(config, NULL, "us-west-2", NULL,
+                                generator_in_test());
+
+    /* API will return an error - creds will be NULL */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_CHECK(creds == NULL);
+
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_CHECK(creds == NULL);
+
+    /* refresh should return -1 (failure) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret < 0);
+
+    /*
+     * Request count should be 3:
+     * - Each call to get_credentials and refresh invokes the client's
+     * request method and returns a request failure.
+     */
+     TEST_CHECK(Request_Count == 3);
+
+    flb_aws_provider_destroy(provider);
+    unsetenv_eks();
+    flb_free(config);
+}
+
 static void test_eks_provider_api_error() {
     struct flb_config *config;
     struct flb_aws_provider *provider;
@@ -723,6 +821,80 @@ static void test_sts_provider_api_error() {
     flb_free(config);
 }
 
+/* unexpected output test- see description for STS_RESPONSE_MALFORMED */
+static void test_sts_provider_unexpected_api_response() {
+    struct flb_config *config;
+    struct flb_aws_provider *provider;
+    struct flb_aws_provider *base_provider;
+    struct flb_aws_credentials *creds;
+    int ret;
+
+    Request_Count = 0;
+
+    config = flb_malloc(sizeof(struct flb_config));
+    if (!config) {
+        flb_errno();
+        return;
+    }
+
+    /* use the env provider as the base provider */
+    /* set environment */
+    ret = setenv(AWS_ACCESS_KEY_ID, "base_akid", 1);
+    if (ret < 0) {
+        flb_errno();
+        return;
+    }
+    ret = setenv(AWS_SECRET_ACCESS_KEY, "base_skid", 1);
+    if (ret < 0) {
+        flb_errno();
+        return;
+    }
+    ret = setenv(AWS_SESSION_TOKEN, "base_token", 1);
+    if (ret < 0) {
+        flb_errno();
+        return;
+    }
+
+    base_provider = flb_aws_env_provider_create();
+    if (!base_provider) {
+        flb_errno();
+        return;
+    }
+
+    provider = flb_sts_provider_create(config, NULL, base_provider, "external_id",
+                                       "arn:aws:iam::123456789012:role/"
+                                       "unexpected_api_response",
+                                       "session_name", "cn-north-1", NULL,
+                                       generator_in_test());
+    if (!provider) {
+        flb_errno();
+        return;
+    }
+
+    /* repeated calls to get credentials should return the same set */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_CHECK(creds == NULL);
+
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_CHECK(creds == NULL);
+
+    /* refresh should return -1 (failure) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret < 0);
+
+    /*
+     * Request count should be 3:
+     * - Each call to get_credentials and refresh invokes the client's
+     * request method and returns a request failure.
+     */
+     TEST_CHECK(Request_Count == 3);
+
+    flb_aws_provider_destroy(base_provider);
+    flb_aws_provider_destroy(provider);
+    flb_free(config);
+}
+
+
 TEST_LIST = {
     { "test_flb_sts_session_name" , test_flb_sts_session_name},
     { "test_sts_uri" , test_sts_uri},
@@ -730,8 +902,12 @@ TEST_LIST = {
     { "eks_credential_provider" , test_eks_provider},
     { "eks_credential_provider_random_session_name" ,
       test_eks_provider_random_session_name},
+    { "test_eks_provider_unexpected_api_response" ,
+      test_eks_provider_unexpected_api_response},
     { "eks_credential_provider_api_error" , test_eks_provider_api_error},
     { "sts_credential_provider" , test_sts_provider},
     { "sts_credential_provider_api_error" , test_sts_provider_api_error},
+    { "sts_credential_provider_unexpected_api_response" ,
+    test_sts_provider_unexpected_api_response},
     { 0 }
 };
