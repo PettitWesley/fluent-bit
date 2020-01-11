@@ -81,7 +81,6 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     struct flb_aws_provider *provider;
-    struct flb_aws_credentials *creds;
 
     base_provider = flb_aws_env_provider_create();
     if (!base_provider) {
@@ -122,7 +121,9 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_time tmp;
     msgpack_object *p;
 
-    creds = ctx->provider->provider_vtable->get_credentials(provider);
+    struct flb_aws_credentials *creds;
+
+    creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
     if (!creds) {
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_OK);
