@@ -715,6 +715,15 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     }
 
     /* Signed Headers for authorization header (Task 4) */
+
+    /* host header is mandatory */
+    tmp = flb_sds_printf(signed_headers, "%s", "host");
+    if (!tmp) {
+        flb_error("[signv4] error composing auth signed headers");
+        flb_kv_release(&list_tmp);
+        flb_sds_destroy(cr);
+        return NULL;
+    }
     for (i = 0; i < items; i++) {
         kv = (struct flb_kv *) arr[i];
 
