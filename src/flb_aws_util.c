@@ -375,17 +375,26 @@ int get_metadata(struct aws_http_client *client, char *metadata_path,
 {
     int ret;
     flb_sds_t ec2_metadata;
+    struct aws_http_header token_ttl_header;
 
-    struct aws_http_header token_ttl_header = {
-        .key = AWS_IMDS_V2_TOKEN_HEADER,
-        .key_len = AWS_IMDS_V2_TOKEN_HEADER_LEN,
-        .val = token,
-        .val_len = token_len,
-    };
+    if (token_len > 0) {
+        /* setting the header is what determines whether we're using V1 or V1 */
+        token_ttl_header.key = AWS_IMDS_V2_TOKEN_HEADER;
+        token_ttl_header.key_len = AWS_IMDS_V2_TOKEN_HEADER_LEN;
+        token_ttl_header.val = token;
+        token_ttl_header.val_len = token_len;
 
-    ret = client->client_vtable->request(client, FLB_HTTP_GET,
-                                         metadata_path, NULL, 0,
-                                         &token_ttl_header, 1);
+        flb_debug("[imds] Using instance metadata V2");
+
+        ret = client->client_vtable->request(client, FLB_HTTP_GET,
+                                             metadata_path, NULL, 0,
+                                             &token_ttl_header, 1);
+    } else {
+        flb_debug("[imds] Using instance metadata V1");
+        ret = client->client_vtable->request(client, FLB_HTTP_GET,
+                                             metadata_path, NULL, 0,
+                                             NULL, 0);
+    }
 
     if (ret != 0 || client->c->resp.status != 200) {
         if (client->c->resp.payload_size > 0) {

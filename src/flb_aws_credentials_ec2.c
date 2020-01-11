@@ -29,13 +29,16 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#define AWS_IMDS_V2_ROLE_PATH      "/latest/meta-data/iam/security-credentials/"
-#define AWS_IMDS_V2_ROLE_PATH_LEN  43
+#define AWS_IMDS_ROLE_PATH      "/latest/meta-data/iam/security-credentials/"
+#define AWS_IMDS_ROLE_PATH_LEN  43
 
 struct aws_credentials_provider_ec2;
 static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation);
 static int ec2_credentials_request(struct aws_credentials_provider_ec2
                                    *implementation, char *cred_path);
+
+int get_metadata_v1(struct aws_http_client *client, char *metadata_path,
+                    flb_sds_t *metadata, size_t *metadata_len);
 
 /* EC2 IMDS Provider */
 
@@ -209,7 +212,7 @@ struct aws_credentials_provider *new_ec2_provider(struct flb_config *config,
     return provider;
 }
 
-/* Requests creds from IMDS and sets them on the provider */
+/* Requests creds from IMDSv1 and sets them on the provider */
 static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
 {
     int ret;
@@ -223,20 +226,33 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
     if (!implementation->imds_v2_token ||
         (time(NULL) > implementation->token_refresh)) {
         flb_debug("[aws_credentials] requesting a new IMDSv2 token");
+
+        /* free existing token */
+        if (implementation->imds_v2_token) {
+            flb_sds_destroy(implementation->imds_v2_token);
+            implementation->imds_v2_token = NULL;
+        }
+
         ret = get_ec2_token(implementation->client,
                             &implementation->imds_v2_token,
                             &implementation->imds_v2_token_len);
-        if (ret < 0) {
-            return -1;
-        }
 
-        implementation->token_refresh = time(NULL)
-                                        + AWS_IMDS_V2_TOKEN_TTL
-                                        - FLB_AWS_REFRESH_WINDOW;
+        if (ret == 0) {
+            implementation->token_refresh = time(NULL)
+                                            + AWS_IMDS_V2_TOKEN_TTL
+                                            - FLB_AWS_REFRESH_WINDOW;
+        } else {
+            /*
+             * If the token request fails, we fall back to V1
+             * V1 is exactly the same, the token is just not required.
+             * Setting the token length to zero tells our code to use V1.
+             */
+             implementation->imds_v2_token_len = 0;
+        }
     }
 
     /* Get the name of the instance role */
-    ret = get_metadata(implementation->client, AWS_IMDS_V2_ROLE_PATH,
+    ret = get_metadata(implementation->client, AWS_IMDS_ROLE_PATH,
                        &instance_role, &instance_role_len,
                        implementation->imds_v2_token,
                        implementation->imds_v2_token_len);
@@ -249,7 +265,7 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
               instance_role);
 
     /* Construct path where we will find the credentials */
-    cred_path_size = sizeof(char) * (AWS_IMDS_V2_ROLE_PATH_LEN +
+    cred_path_size = sizeof(char) * (AWS_IMDS_ROLE_PATH_LEN +
                                      instance_role_len) + 1;
     cred_path = flb_malloc(cred_path_size);
     if (!cred_path) {
@@ -258,7 +274,7 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
         return -1;
     }
 
-    ret = snprintf(cred_path, cred_path_size, "%s%s", AWS_IMDS_V2_ROLE_PATH,
+    ret = snprintf(cred_path, cred_path_size, "%s%s", AWS_IMDS_ROLE_PATH,
                    instance_role);
     if (ret < 0) {
         flb_sds_destroy(instance_role);

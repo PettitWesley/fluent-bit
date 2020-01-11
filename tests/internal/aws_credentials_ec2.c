@@ -24,8 +24,29 @@
     \"Token\": \"ec2_token\"\n\
 }"
 
+/*
+ * Unexpected/invalid response. The goal of this is not to test anything
+ * that might happen in production, but rather to test the error handling
+ * code for the providers. This helps ensure all code paths are tested and
+ * the error handling code does not introduce memory leaks.
+ */
+#define MALFORMED_RESPONSE "some complete garbage that is not expected"
+
 #define EC2_TOKEN_RESPONSE     "AQAEAGB5i7Jq-RWC7OFZcjSs3Y5uxo06c5VB1vtYIOyVA=="
 #define EC2_ROLE_NAME_RESPONSE "my-role-Ec2InstanceRole-1CBV45ZZHA1E5"
+
+/*
+ * The only difference between V1 and V2 is the header
+ * So we re-use the http mock and use this global variable
+ * to determine which we are testing.
+ */
+int g_use_v2;
+
+/*
+ * Global variable to track number of http requests made.
+ * This ensures credentials are being cached properly.
+ */
+int g_call_count;
 
 int ec2_token_response(struct aws_http_client *aws_client,
                        int method, const char *uri)
@@ -45,18 +66,32 @@ int ec2_token_response(struct aws_http_client *aws_client,
     }
     mk_list_init(&aws_client->c->headers);
 
-    aws_client->c->resp.status = 200;
-    aws_client->c->resp.payload = EC2_TOKEN_RESPONSE;
-    aws_client->c->resp.payload_size = strlen(EC2_TOKEN_RESPONSE);
-    aws_client->error_type = NULL;
+    if (g_use_v2 == FLB_TRUE) {
+        aws_client->c->resp.status = 200;
+        aws_client->c->resp.payload = EC2_TOKEN_RESPONSE;
+        aws_client->c->resp.payload_size = strlen(EC2_TOKEN_RESPONSE);
+        aws_client->error_type = NULL;
+    } else {
+        aws_client->c->resp.status = 404;
+        aws_client->c->resp.payload = NULL;
+        aws_client->c->resp.payload_size = 0;
+        aws_client->error_type = NULL;
+    }
 
     return 0;
 }
 
 int ec2_role_name_response(struct aws_http_client *aws_client,
-                           int method, const char *uri)
+                           int method, const char *uri,
+                           size_t dynamic_headers_len)
 {
     TEST_CHECK(method == FLB_HTTP_GET);
+
+    if (g_use_v2 == FLB_TRUE) {
+        TEST_CHECK(dynamic_headers_len == 1);
+    } else {
+        TEST_CHECK(dynamic_headers_len == 0);
+    }
 
     /* destroy client from previous request */
     if (aws_client->c) {
@@ -80,9 +115,16 @@ int ec2_role_name_response(struct aws_http_client *aws_client,
 }
 
 int ec2_credentials_response(struct aws_http_client *aws_client,
-                             int method, const char *uri)
+                             int method, const char *uri,
+                             size_t dynamic_headers_len)
 {
     TEST_CHECK(method == FLB_HTTP_GET);
+
+    if (g_use_v2 == FLB_TRUE) {
+        TEST_CHECK(dynamic_headers_len == 1);
+    } else {
+        TEST_CHECK(dynamic_headers_len == 0);
+    }
 
     /* destroy client from previous request */
     if (aws_client->c) {
@@ -112,6 +154,7 @@ int test_http_client_request(struct aws_http_client *aws_client,
                              struct aws_http_header *dynamic_headers,
                              size_t dynamic_headers_len)
 {
+    g_call_count++;
     /*
      * route to the correct response fn using the uri
      */
@@ -119,10 +162,12 @@ int test_http_client_request(struct aws_http_client *aws_client,
          return ec2_token_response(aws_client, method, uri);
      } else if (strstr(uri, "latest/meta-data/iam/security-credentials/"
                             "my-role-Ec2InstanceRole-1CBV45ZZHA1E5") != NULL) {
-         return ec2_credentials_response(aws_client, method, uri);
+         return ec2_credentials_response(aws_client, method, uri,
+                                         dynamic_headers_len);
      } else if (strstr(uri, "latest/meta-data/iam/security-credentials") != NULL)
      {
-         return ec2_role_name_response(aws_client, method, uri);
+         return ec2_role_name_response(aws_client, method, uri,
+                                       dynamic_headers_len);
      }
 
     /* uri should match one of the above conditions */
@@ -156,6 +201,71 @@ static struct aws_http_client_generator test_generator = {
 struct aws_http_client_generator *generator_in_test()
 {
     return &test_generator;
+}
+
+/* test/mock version of the aws_http_client request function */
+int malformed_http_client_request(struct aws_http_client *aws_client,
+                                  int method, const char *uri,
+                                  const char *body, size_t body_len,
+                                  struct aws_http_header *dynamic_headers,
+                                  size_t dynamic_headers_len)
+{
+    /*
+     * route to the correct response fn using the uri
+     */
+     if (strstr(uri, "latest/api/token") != NULL) {
+         return ec2_token_response(aws_client, method, uri);
+     } else {
+         TEST_CHECK(method == FLB_HTTP_GET);
+
+         /* destroy client from previous request */
+         if (aws_client->c) {
+             flb_http_client_destroy(aws_client->c);
+         }
+
+         /* create an http client so that we can set the response */
+         aws_client->c = flb_calloc(1, sizeof(struct flb_http_client));
+         if (!aws_client->c) {
+             flb_errno();
+             return -1;
+         }
+         mk_list_init(&aws_client->c->headers);
+
+         aws_client->c->resp.status = 200;
+         aws_client->c->resp.payload = MALFORMED_RESPONSE;
+         aws_client->c->resp.payload_size = strlen(MALFORMED_RESPONSE);
+         aws_client->error_type = NULL;
+
+         return 0;
+     }
+
+}
+
+/* Test/mock aws_http_client */
+static struct aws_http_client_vtable malformed_vtable = {
+    .request = malformed_http_client_request,
+};
+
+struct aws_http_client *malformed_http_client_create()
+{
+    struct aws_http_client *client = flb_calloc(1,
+                                                sizeof(struct aws_http_client));
+    if (!client) {
+        flb_errno();
+        return NULL;
+    }
+    client->client_vtable = &malformed_vtable;
+    return client;
+}
+
+/* Generator that returns clients with the test vtable */
+static struct aws_http_client_generator malformed_generator = {
+    .new = malformed_http_client_create,
+};
+
+struct aws_http_client_generator *generator_malformed()
+{
+    return &malformed_generator;
 }
 
 /* Error case mock - uses a different client and generator than happy case */
@@ -209,12 +319,75 @@ struct aws_http_client_generator *generator_in_test_error_case()
     return &error_case_generator;
 }
 
-static void test_ec2_provider()
+static void test_ec2_provider_v2()
 {
     struct aws_credentials_provider *provider;
     struct aws_credentials *creds;
     int ret;
     struct flb_config *config;
+
+    g_use_v2 = FLB_TRUE;
+    g_call_count = 0;
+
+    config = flb_malloc(sizeof(struct flb_config));
+    if (!config) {
+        flb_errno();
+        return;
+    }
+
+    provider = new_ec2_provider(config, generator_in_test());
+
+    if (!provider) {
+        flb_errno();
+        return;
+    }
+
+    /* repeated calls to get credentials should return the same set */
+    creds = provider->provider_vtable->get_credentials(provider);
+    if (!creds) {
+        flb_errno();
+        return;
+    }
+    TEST_CHECK(strcmp(ACCESS_KEY_EC2, creds->access_key_id) == 0);
+    TEST_CHECK(strcmp(SECRET_KEY_EC2, creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp(TOKEN_EC2, creds->session_token) == 0);
+
+    aws_credentials_destroy(creds);
+
+    creds = provider->provider_vtable->get_credentials(provider);
+    if (!creds) {
+        flb_errno();
+        return;
+    }
+    TEST_CHECK(strcmp(ACCESS_KEY_EC2, creds->access_key_id) == 0);
+    TEST_CHECK(strcmp(SECRET_KEY_EC2, creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp(TOKEN_EC2, creds->session_token) == 0);
+
+    aws_credentials_destroy(creds);
+
+    /* refresh should return 0 (success) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret == 0);
+    /*
+     * The first time credentials are obtained, it takes 3 requests- the first
+     * call to get_credentials. The second call should use cache.
+     * The call to refresh should make 2 requests- because the IMDSv2 token
+     * from the first call is cached.
+     */
+    TEST_CHECK(g_call_count == 5);
+
+    aws_provider_destroy(provider);
+}
+
+static void test_ec2_provider_v1()
+{
+    struct aws_credentials_provider *provider;
+    struct aws_credentials *creds;
+    int ret;
+    struct flb_config *config;
+
+    g_use_v2 = FLB_FALSE;
+    g_call_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -256,6 +429,13 @@ static void test_ec2_provider()
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret == 0);
 
+    /*
+     * See call count comment in test_ec2_provider_v2() above.
+     * V1 is only used when a V2 token request fails, so this test makes
+     * 6 calls.
+     */
+    TEST_CHECK(g_call_count == 6);
+
     aws_provider_destroy(provider);
 }
 
@@ -293,8 +473,46 @@ static void test_ec2_provider_error_case()
     aws_provider_destroy(provider);
 }
 
+/* unexpected output test- see description for MALFORMED_RESPONSE */
+static void test_ec2_provider_malformed_case()
+{
+    struct aws_credentials_provider *provider;
+    struct aws_credentials *creds;
+    int ret;
+    struct flb_config *config;
+
+    config = flb_malloc(sizeof(struct flb_config));
+    if (!config) {
+        flb_errno();
+        return;
+    }
+
+    provider = new_ec2_provider(config, generator_malformed());
+
+    if (!provider) {
+        flb_errno();
+        return;
+    }
+
+    /* get_credentials will fail */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_CHECK(creds == NULL);
+
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_CHECK(creds == NULL);
+
+    /* refresh should return -1 (failure) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret < 0);
+
+    aws_provider_destroy(provider);
+}
+
 TEST_LIST = {
-    { "test_ec2_provider" , test_ec2_provider},
+    { "test_ec2_provider_v2" , test_ec2_provider_v2},
+    { "test_ec2_provider_v1" , test_ec2_provider_v1},
     { "test_ec2_provider_error_case" , test_ec2_provider_error_case},
+    { "test_ec2_provider_malformed_response" ,
+    test_ec2_provider_malformed_case},
     { 0 }
 };

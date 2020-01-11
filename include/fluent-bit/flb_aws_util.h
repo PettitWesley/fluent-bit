@@ -156,7 +156,9 @@ int get_ec2_token(struct aws_http_client *client, flb_sds_t *token,
                   size_t *token_len);
 
 /*
- * Get data from an IMDSv2 path
+ * Get data from an IMDS path.
+ * If token_len > 0, a V2 metadata request is made.
+ * If not, a V1 metadata request is made.
  */
 int get_metadata(struct aws_http_client *client, char *metadata_path,
                  flb_sds_t *metadata, size_t *metadata_len,
