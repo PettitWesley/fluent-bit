@@ -239,11 +239,11 @@ struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
     implementation->sts_client->provider = base_provider;
     implementation->sts_client->region = region;
     implementation->sts_client->service = "sts";
-    implementation->sts_client->port = 80;
+    implementation->sts_client->port = 443;
     implementation->sts_client->flags = 0;
     implementation->sts_client->proxy = proxy;
 
-    upstream = flb_upstream_create(config, implementation->endpoint, 80,
+    upstream = flb_upstream_create(config, implementation->endpoint, 443,
                                    FLB_IO_TLS, tls);
     if (!upstream) {
         flb_error("[aws_credentials] Connection initialization error");
