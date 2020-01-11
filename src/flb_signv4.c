@@ -642,7 +642,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     }
     host = tmp;
     flb_debug("host: %s", host);
-    len = flb_sds_len(amzdate);
+    len = flb_sds_len(host);
     flb_debug("len: %d", len);
     flb_http_add_header(c, "host", 4, host, len);
 
