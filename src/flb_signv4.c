@@ -476,6 +476,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     flb_sds_t uri;
     flb_sds_t tmp = NULL;
     flb_sds_t params;
+    flb_sds_t host;
     struct flb_kv *kv;
     struct mk_list list_tmp;
     struct mk_list *head;
@@ -623,11 +624,26 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
      * Canonical Headers
      *
      * Add the required custom headers:
-     *
+     * - host
      * - x-amz-date
      * - x-amz-security-token (if set)
      */
     mk_list_init(&list_tmp);
+
+    /* host must always be included */
+    host = flb_sds_create_size(256);
+    tmp = flb_sds_printf(&host, "%s:%i", c->u_conn->tcp_host,
+                         c->u_conn->tcp_port);
+    if (!tmp) {
+        flb_errno();
+        flb_kv_release(&list_tmp);
+        flb_sds_destroy(cr);
+        return NULL;
+    }
+    host = tmp;
+    flb_debug("host: %s", host);
+    len = flb_sds_len(amzdate);
+    flb_http_add_header(c, "host", 4, host, len);
 
     /* include x-amz-date header ? */
     if (amz_date_header == FLB_TRUE) {
@@ -716,18 +732,18 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
 
     /* Signed Headers for authorization header (Task 4) */
 
-    /* host header is mandatory */
-    if (items == 0) {
-        tmp = flb_sds_printf(signed_headers, "%s", "host");
-    } else {
-        tmp = flb_sds_printf(signed_headers, "%s;", "host");
-    }
-    if (!tmp) {
-        flb_error("[signv4] error composing auth signed headers");
-        flb_kv_release(&list_tmp);
-        flb_sds_destroy(cr);
-        return NULL;
-    }
+    // /* host header is mandatory */
+    // if (items == 0) {
+    //     tmp = flb_sds_printf(signed_headers, "%s", "host");
+    // } else {
+    //     tmp = flb_sds_printf(signed_headers, "%s;", "host");
+    // }
+    // if (!tmp) {
+    //     flb_error("[signv4] error composing auth signed headers");
+    //     flb_kv_release(&list_tmp);
+    //     flb_sds_destroy(cr);
+    //     return NULL;
+    // }
     for (i = 0; i < items; i++) {
         kv = (struct flb_kv *) arr[i];
 

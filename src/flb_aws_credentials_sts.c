@@ -29,7 +29,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include <stdio.h>
 
 #define STS_ASSUME_ROLE_URI_FORMAT    "/?Version=2011-06-15&Action=%s\
 &RoleSessionName=%s&RoleArn=%s"
@@ -624,7 +623,6 @@ static int sts_assume_role_request(struct flb_aws_client *sts_client,
     if (sts_client->c && sts_client->c->resp.payload_size > 0) {
         flb_debug("[aws_credentials] STS raw response: \n%s",
                   sts_client->c->resp.payload);
-        printf("\n%s\n", sts_client->c->resp.payload);
     }
 
     flb_error("[aws_credentials] STS assume role request failed");
