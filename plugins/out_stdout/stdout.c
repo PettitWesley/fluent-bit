@@ -99,6 +99,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     ctx->provider = provider;
+    ctx->tls = &ins->tls;
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -121,6 +122,24 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+    struct flb_upstream_conn *u_conn = NULL;
+    struct flb_upstream *upstream = NULL;
+
+    upstream = flb_upstream_create(config, "https://sts.us-west-2.amazonaws.com", 80,
+                                   FLB_IO_TLS, ctx->tls);
+    if (!upstream) {
+        flb_error("[test] Connection initialization error");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+
+    u_conn = flb_upstream_conn_get(upstream);
+    if (!u_conn) {
+        flb_error("[test] connection initialization error");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+    flb_debug("[yay] connection successful!!");
 
     struct flb_aws_credentials *creds;
 
