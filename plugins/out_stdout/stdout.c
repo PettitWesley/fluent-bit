@@ -138,6 +138,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_upstream_conn *u_conn = NULL;
     struct flb_upstream *upstream = NULL;
     int ret;
+    struct flb_aws_credentials *creds;
 
     upstream = flb_upstream_create(config, "ec2.amazonaws.com", 443,
                                    FLB_IO_TLS, ctx->tls);
@@ -199,7 +200,6 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
 sts:
-    struct flb_aws_credentials *creds;
 
     creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
     if (!creds) {
