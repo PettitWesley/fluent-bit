@@ -39,6 +39,8 @@
 #include <fluent-bit/flb_mem.h>
 #include <fluent-bit/flb_http_client.h>
 
+#include <stdio.h>
+
 #include <mbedtls/base64.h>
 
 /* check if there is enough space in the client header buffer */
@@ -904,7 +906,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     c->header_buf[c->header_len++] = '\n';
     c->header_buf[c->header_len] = '\0';
 
-    flb_debug("[remove] raw request: \n\n%s\n\n", c->header_buf);
+    printf("[remove] raw request: \n\n%s\n\n", c->header_buf);
 
     /* Write the header */
     ret = flb_io_net_write(c->u_conn,
