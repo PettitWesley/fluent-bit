@@ -94,7 +94,7 @@ response would have</SecretAccessKey>"
  * Global Variable that allows us to check the number of calls
  * made in each test
  */
-int Request_Count;
+int g_request_count;
 
 /* Each test case has its own request function */
 
@@ -290,7 +290,7 @@ int test_http_client_request(struct flb_aws_client *aws_client,
                              struct flb_aws_header *dynamic_headers,
                              size_t dynamic_headers_len)
 {
-    Request_Count++;
+    g_request_count++;
     if (strcmp(aws_client->name, "sts_client_eks_provider") == 0) {
         /*
          * route to the correct test case fn using the uri - the role
@@ -419,7 +419,7 @@ static void test_eks_provider() {
     struct flb_aws_credentials *creds;
     int ret;
 
-    Request_Count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -479,7 +479,7 @@ static void test_eks_provider() {
      * - One for the first call to get_credentials (2nd should hit cred cache)
      * - One for the call to refresh
      */
-     TEST_CHECK(Request_Count == 2);
+     TEST_CHECK(g_request_count == 2);
 
     flb_aws_provider_destroy(provider);
     unsetenv_eks();
@@ -492,7 +492,7 @@ static void test_eks_provider_random_session_name() {
     struct flb_aws_credentials *creds;
     int ret;
 
-    Request_Count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -549,7 +549,7 @@ static void test_eks_provider_random_session_name() {
      * - One for the first call to get_credentials (2nd should hit cred cache)
      * - One for the call to refresh
      */
-     TEST_CHECK(Request_Count == 2);
+     TEST_CHECK(g_request_count == 2);
 
     flb_aws_provider_destroy(provider);
     unsetenv_eks();
@@ -563,7 +563,7 @@ static void test_eks_provider_unexpected_api_response() {
     struct flb_aws_credentials *creds;
     int ret;
 
-    Request_Count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -603,7 +603,7 @@ static void test_eks_provider_unexpected_api_response() {
      * - Each call to get_credentials and refresh invokes the client's
      * request method and returns a request failure.
      */
-     TEST_CHECK(Request_Count == 3);
+     TEST_CHECK(g_request_count == 3);
 
     flb_aws_provider_destroy(provider);
     unsetenv_eks();
@@ -616,7 +616,7 @@ static void test_eks_provider_api_error() {
     struct flb_aws_credentials *creds;
     int ret;
 
-    Request_Count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -656,7 +656,7 @@ static void test_eks_provider_api_error() {
      * - Each call to get_credentials and refresh invokes the client's
      * request method and returns a request failure.
      */
-     TEST_CHECK(Request_Count == 3);
+     TEST_CHECK(g_request_count == 3);
 
     flb_aws_provider_destroy(provider);
     unsetenv_eks();
@@ -670,7 +670,7 @@ static void test_sts_provider() {
     struct flb_aws_credentials *creds;
     int ret;
 
-    Request_Count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -743,7 +743,7 @@ static void test_sts_provider() {
      * - One for the first call to get_credentials (2nd should hit cred cache)
      * - One for the call to refresh
      */
-     TEST_CHECK(Request_Count == 2);
+     TEST_CHECK(g_request_count == 2);
 
     flb_aws_provider_destroy(base_provider);
     flb_aws_provider_destroy(provider);
@@ -757,7 +757,7 @@ static void test_sts_provider_api_error() {
     struct flb_aws_credentials *creds;
     int ret;
 
-    Request_Count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -814,7 +814,7 @@ static void test_sts_provider_api_error() {
      * - Each call to get_credentials and refresh invokes the client's
      * request method and returns a request failure.
      */
-     TEST_CHECK(Request_Count == 3);
+     TEST_CHECK(g_request_count == 3);
 
     flb_aws_provider_destroy(base_provider);
     flb_aws_provider_destroy(provider);
@@ -829,7 +829,7 @@ static void test_sts_provider_unexpected_api_response() {
     struct flb_aws_credentials *creds;
     int ret;
 
-    Request_Count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -887,7 +887,7 @@ static void test_sts_provider_unexpected_api_response() {
      * - Each call to get_credentials and refresh invokes the client's
      * request method and returns a request failure.
      */
-     TEST_CHECK(Request_Count == 3);
+     TEST_CHECK(g_request_count == 3);
 
     flb_aws_provider_destroy(base_provider);
     flb_aws_provider_destroy(provider);
