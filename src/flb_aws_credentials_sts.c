@@ -198,9 +198,9 @@ struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
                                                  flb_aws_client_generator
                                                  *generator)
 {
-    struct flb_aws_provider_sts *implementation;
-    struct flb_aws_provider *provider;
-    struct flb_upstream *upstream;
+    struct flb_aws_provider_sts *implementation = NULL;
+    struct flb_aws_provider *provider = NULL;
+    struct flb_upstream *upstream = NULL;
 
     provider = flb_calloc(1, sizeof(struct flb_aws_provider));
 
@@ -295,7 +295,7 @@ struct flb_aws_provider_eks {
 struct flb_aws_credentials *get_credentials_fn_eks(struct flb_aws_provider
                                                    *provider)
 {
-    struct flb_aws_credentials *creds;
+    struct flb_aws_credentials *creds = NULL;
     int ret;
     int refresh = FLB_FALSE;
     struct flb_aws_provider_eks *implementation = provider->implementation;
@@ -562,9 +562,9 @@ static int assume_with_web_identity(struct flb_aws_provider_eks
                                     *implementation)
 {
     int ret;
-    char *web_token;
+    char *web_token = NULL;
     size_t web_token_size;
-    char *uri;
+    char *uri = NULL;
 
     ret = flb_read_file(implementation->token_file, &web_token,
                         &web_token_size);
@@ -595,7 +595,7 @@ static int sts_assume_role_request(struct flb_aws_client *sts_client,
 {
     int ret;
     time_t expiration;
-    struct flb_aws_credentials *credentials;
+    struct flb_aws_credentials *credentials = NULL;
     /* unset and free existing credentials first */
     flb_aws_credentials_destroy(*creds);
     *creds = NULL;
@@ -643,7 +643,7 @@ static int sts_assume_role_request(struct flb_aws_client *sts_client,
 struct flb_aws_credentials *flb_parse_sts_resp(char *response,
                                                     time_t *expiration)
 {
-    struct flb_aws_credentials *creds;
+    struct flb_aws_credentials *creds = NULL;
     char *cred_node;
     flb_sds_t tmp = NULL;
 
@@ -703,7 +703,7 @@ error:
 char *flb_sts_uri(char *action, char *role_arn, char *session_name,
               char *external_id, char *identity_token)
 {
-    char *uri;
+    char *uri = NULL;
     size_t len = STS_ASSUME_ROLE_URI_BASE_LEN;
 
     if (external_id) {
@@ -745,9 +745,9 @@ char *flb_sts_uri(char *action, char *role_arn, char *session_name,
 
 static flb_sds_t get_node(char *cred_node, char* node_name, int node_len)
 {
-    char *node;
-    char *end;
-    flb_sds_t val;
+    char *node = NULL;
+    char *end = NULL;
+    flb_sds_t val = NULL;
     int len;
 
     node = strstr(cred_node, node_name);

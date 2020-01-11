@@ -42,10 +42,10 @@ struct flb_aws_credentials *get_credentials_fn_environment(struct
                                                            flb_aws_provider
                                                            *provider)
 {
-    char *access_key;
-    char *secret_key;
-    char *session_token;
-    struct flb_aws_credentials *creds;
+    char *access_key = NULL;
+    char *secret_key = NULL;
+    char *session_token = NULL;
+    struct flb_aws_credentials *creds = NULL;
 
     flb_debug("[aws_credentials] Requesting credentials from the "
               "env provider..");
@@ -102,8 +102,8 @@ struct flb_aws_credentials *get_credentials_fn_environment(struct
  */
 int refresh_fn_environment(struct flb_aws_provider *provider)
 {
-    char *access_key;
-    char *secret_key;
+    char *access_key = NULL;
+    char *secret_key = NULL;
 
     flb_debug("[aws_credentials] Refresh called on the env provider");
 
@@ -235,8 +235,8 @@ int flb_read_file(const char *path, char **out_buf, size_t *out_size)
 {
     int ret;
     long bytes;
-    char *buf;
-    FILE *fp;
+    char *buf = NULL;
+    FILE *fp = NULL;
     struct stat st;
 
     ret = stat(path, &st);

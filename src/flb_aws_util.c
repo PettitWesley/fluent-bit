@@ -38,7 +38,7 @@ int request_do(struct flb_aws_client *aws_client,
  */
 char *flb_aws_endpoint(char* service, char* region)
 {
-    char *endpoint;
+    char *endpoint = NULL;
     size_t len = AWS_SERVICE_ENDPOINT_BASE_LEN;
     int is_cn = FLB_FALSE;
 
