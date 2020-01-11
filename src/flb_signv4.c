@@ -966,6 +966,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
     if (!creds) {
         flb_error("[signv4] Provider returned no credentials, service=%s",
                   service);
+        return NULL;
     }
 
     gmt = flb_malloc(sizeof(struct tm));
