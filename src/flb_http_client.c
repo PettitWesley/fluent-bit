@@ -775,7 +775,7 @@ static int http_headers_compose(struct flb_http_client *c)
     mk_list_foreach(head, &c->headers) {
         header = mk_list_entry(head, struct flb_kv, _head);
         if (strcmp(header->key, "host") == 0) {
-            flb_debug("ignoring host header");
+            flb_debug("[remove] ignoring host header");
             continue;
         }
         ret = http_header_push(c, header);

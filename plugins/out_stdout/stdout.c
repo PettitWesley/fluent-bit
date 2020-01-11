@@ -136,7 +136,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_upstream_conn *u_conn = NULL;
     struct flb_upstream *upstream = NULL;
 
-    upstream = flb_upstream_create(config, "sts.us-west-2.amazonaws.com", 443,
+    upstream = flb_upstream_create(config, "ec2.amazonaws.com", 443,
                                    FLB_IO_TLS, ctx->tls);
     if (!upstream) {
         flb_error("[test] Connection initialization error");
@@ -152,6 +152,50 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
     flb_debug("[yay] connection successful!!");
 
+    /* Compose HTTP request */
+    struct flb_http_client *client = flb_http_client(u_conn, FLB_HTTP_GET, "/?Action=DescribeRegions&Version=2013-10-15",
+                                    NULL, 0,
+                                    "ec2.amazonaws.com", 443,
+                                    NULL, 0);
+
+    if (!client) {
+        flb_error("[aws_client] could not initialize request");
+        flb_errno();
+        goto sts;
+    }
+
+    struct flb_aws_provider *base_provider;
+
+    base_provider = flb_aws_env_provider_create();
+    if (!base_provider) {
+        flb_errno();
+        goto sts;
+    }
+
+    flb_sds_t signature = flb_signv4_do(client, FLB_TRUE, FLB_TRUE, time(NULL),
+                              "us-east-1", "ec2",
+                              base_provider);
+    if (!signature) {
+        flb_error("[aws_client] could not sign request");
+        flb_errno();
+        goto sts;
+    }
+
+    /* Perform request */
+    size_t b_sent;
+    ret = flb_http_do(client, &b_sent);
+
+    if (ret != 0 || aws_client->c->resp.status != 200) {
+        flb_error("[aws_client] request error: http_do=%i, HTTP Status: %i",
+                  ret, aws_client->c->resp.status);
+    }
+
+    if (aws_client->c->resp.payload_size > 0) {
+        /* try to parse the error */
+        printf("Raw response from ec2: \n%s\n\n", client->resp.payload);
+    }
+
+sts:
     struct flb_aws_credentials *creds;
 
     creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
