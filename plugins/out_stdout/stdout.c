@@ -81,6 +81,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     struct flb_aws_provider *provider;
+    struct flb_aws_provider *base_provider;
 
     base_provider = flb_aws_env_provider_create();
     if (!base_provider) {
