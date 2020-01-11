@@ -98,7 +98,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         return -1;
     }
 
-    ctx-provider = provider;
+    ctx->provider = provider;
 
     /* Export context */
     flb_output_set_context(ins, ctx);
