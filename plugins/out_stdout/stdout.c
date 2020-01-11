@@ -125,7 +125,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_upstream_conn *u_conn = NULL;
     struct flb_upstream *upstream = NULL;
 
-    upstream = flb_upstream_create(config, "https://sts.us-west-2.amazonaws.com", 80,
+    upstream = flb_upstream_create(config, "https://sts.us-west-2.amazonaws.com", 443,
                                    FLB_IO_TLS, ctx->tls);
     if (!upstream) {
         flb_error("[test] Connection initialization error");
