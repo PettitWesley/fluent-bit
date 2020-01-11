@@ -188,12 +188,12 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     size_t b_sent;
     ret = flb_http_do(client, &b_sent);
 
-    if (ret != 0 || aws_client->c->resp.status != 200) {
+    if (ret != 0 || client->resp.status != 200) {
         flb_error("[aws_client] request error: http_do=%i, HTTP Status: %i",
-                  ret, aws_client->c->resp.status);
+                  ret, client->resp.status);
     }
 
-    if (aws_client->c->resp.payload_size > 0) {
+    if (client->resp.payload_size > 0) {
         /* try to parse the error */
         printf("Raw response from ec2: \n%s\n\n", client->resp.payload);
     }
