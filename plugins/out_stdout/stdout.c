@@ -26,6 +26,8 @@
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_signv4.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <msgpack.h>
 
@@ -135,6 +137,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     msgpack_object *p;
     struct flb_upstream_conn *u_conn = NULL;
     struct flb_upstream *upstream = NULL;
+    int ret;
 
     upstream = flb_upstream_create(config, "ec2.amazonaws.com", 443,
                                    FLB_IO_TLS, ctx->tls);
