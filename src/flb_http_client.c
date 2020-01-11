@@ -890,7 +890,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
 
     /* check enough space for the ending CRLF */
     if (header_available(c, crlf) != 0) {
-        new_size = c->header_size + 2;
+        new_size = c->header_size + 3;
         tmp = flb_realloc(c->header_buf, new_size);
         if (!tmp) {
             return -1;
@@ -902,6 +902,9 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     /* Append the ending header CRLF */
     c->header_buf[c->header_len++] = '\r';
     c->header_buf[c->header_len++] = '\n';
+    c->header_buf[c->header_len] = '\0';
+
+    flb_debug("[remove] raw request: \n\n%s\n\n", c->header_buf);
 
     /* Write the header */
     ret = flb_io_net_write(c->u_conn,
