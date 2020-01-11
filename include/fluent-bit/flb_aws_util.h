@@ -22,8 +22,8 @@
 #ifndef FLB_AWS_UTIL_H
 #define FLB_AWS_UTIL_H
 
-#define AWS_SERVICE_ENDPOINT_FORMAT            "https://%s.%s.amazonaws.com"
-#define AWS_SERVICE_ENDPOINT_BASE_LEN          25
+#define AWS_SERVICE_ENDPOINT_FORMAT            "%s.%s.amazonaws.com"
+#define AWS_SERVICE_ENDPOINT_BASE_LEN          15
 
 #define FLB_AWS_CREDENTIAL_REFRESH_LIMIT       300
 
