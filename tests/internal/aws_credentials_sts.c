@@ -703,9 +703,9 @@ static void test_sts_provider() {
     }
 
     provider = flb_sts_provider_create(config, NULL, base_provider, "external_id",
-                                "arn:aws:iam::123456789012:role/test1",
-                                "session_name", "cn-north-1", NULL,
-                                generator_in_test());
+                                       "arn:aws:iam::123456789012:role/test1",
+                                       "session_name", "cn-north-1", NULL,
+                                       generator_in_test());
     if (!provider) {
         flb_errno();
         return;

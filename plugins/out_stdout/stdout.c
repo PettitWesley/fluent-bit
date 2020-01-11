@@ -25,6 +25,8 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
+#include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_aws_credentials.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -78,6 +80,26 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+
+    base_provider = flb_aws_env_provider_create();
+    if (!base_provider) {
+        flb_errno();
+        return -1;
+    }
+
+    provider = flb_sts_provider_create(config, &ins->tls, base_provider, NULL,
+                                       "arn:aws:iam::144718711470:role/provider-testing",
+                                       "session_name", "us-west-2", NULL,
+                                       flb_aws_client_generator());
+    if (!provider) {
+        flb_errno();
+        return -1;
+    }
+
+    ctx-provider = provider;
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -99,6 +121,16 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+
+    creds = ctx->provider->provider_vtable->get_credentials(provider);
+    if (!creds) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+
+    flb_debug("[test] access: %s", creds->access_key_id);
+    flb_debug("[test] secret: %s", creds->secret_access_key);
+    flb_debug("[test] token: %s", creds->session_token);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
