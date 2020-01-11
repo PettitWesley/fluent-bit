@@ -94,8 +94,8 @@ int flb_aws_client_request(struct flb_aws_client *aws_client,
      * refresh on the provider. For safety a refresh can be performed only once
      * per FLB_AWS_CREDENTIAL_REFRESH_LIMIT.
      */
-    if (aws_client->c->resp.status == 400 ||
-        aws_client->c->resp.status == 403) {
+    if (ret == 0 && (aws_client->c->resp.status == 400 ||
+        aws_client->c->resp.status == 403)) {
         if (aws_client->has_auth && time(NULL) > aws_client->refresh_limit) {
             aws_client->refresh_limit = time(NULL)
                                         + FLB_AWS_CREDENTIAL_REFRESH_LIMIT;
