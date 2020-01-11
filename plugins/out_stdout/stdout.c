@@ -89,7 +89,19 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         return -1;
     }
 
-    provider = flb_sts_provider_create(config, &ins->tls, base_provider, NULL,
+    ctx->tls = &ins->tls;
+
+    /* Create TLS context */
+    ctx->tls->context = flb_tls_context_new(FLB_TRUE,  /* verify */
+                                           FLB_TRUE,        /* debug */
+                                           NULL,      /* vhost */
+                                           NULL,      /* ca_path */
+                                           NULL,      /* ca_file */
+                                           NULL,      /* crt_file */
+                                           NULL,      /* key_file */
+                                           NULL);     /* key_passwd */
+
+    provider = flb_sts_provider_create(config, ctx->tls, base_provider, NULL,
                                        "arn:aws:iam::144718711470:role/provider-testing",
                                        "session_name", "us-west-2", NULL,
                                        flb_aws_client_generator());
@@ -99,7 +111,6 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     ctx->provider = provider;
-    ctx->tls = &ins->tls;
 
     /* Export context */
     flb_output_set_context(ins, ctx);
