@@ -46,7 +46,7 @@ int g_use_v2;
  * Global variable to track number of http requests made.
  * This ensures credentials are being cached properly.
  */
-int g_call_count;
+int g_request_count;
 
 int ec2_token_response(struct aws_http_client *aws_client,
                        int method, const char *uri)
@@ -154,7 +154,7 @@ int test_http_client_request(struct aws_http_client *aws_client,
                              struct aws_http_header *dynamic_headers,
                              size_t dynamic_headers_len)
 {
-    g_call_count++;
+    g_request_count++;
     /*
      * route to the correct response fn using the uri
      */
@@ -327,7 +327,7 @@ static void test_ec2_provider_v2()
     struct flb_config *config;
 
     g_use_v2 = FLB_TRUE;
-    g_call_count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -374,7 +374,7 @@ static void test_ec2_provider_v2()
      * The call to refresh should make 2 requests- because the IMDSv2 token
      * from the first call is cached.
      */
-    TEST_CHECK(g_call_count == 5);
+    TEST_CHECK(g_request_count == 5);
 
     aws_provider_destroy(provider);
 }
@@ -387,7 +387,7 @@ static void test_ec2_provider_v1()
     struct flb_config *config;
 
     g_use_v2 = FLB_FALSE;
-    g_call_count = 0;
+    g_request_count = 0;
 
     config = flb_malloc(sizeof(struct flb_config));
     if (!config) {
@@ -434,7 +434,7 @@ static void test_ec2_provider_v1()
      * V1 is only used when a V2 token request fails, so this test makes
      * 6 calls.
      */
-    TEST_CHECK(g_call_count == 6);
+    TEST_CHECK(g_request_count == 6);
 
     aws_provider_destroy(provider);
 }
