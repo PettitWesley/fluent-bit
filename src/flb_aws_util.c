@@ -52,19 +52,14 @@ char *flb_aws_endpoint(char* service, char* region)
         len += 3;
         is_cn = FLB_TRUE;
     }
-    flb_debug("[remove] len: %d", len);
-    len += strlen(service);
-    flb_debug("[remove] len: %d", len);
-    len += strlen(region);
-    flb_debug("[remove] len: %d", len);
-    endpoint = flb_malloc(sizeof(char) * (len + 1));
+    len ++; /* null byte */
+    endpoint = flb_malloc(sizeof(char) * len);
     if (!endpoint) {
         flb_errno();
         return NULL;
     }
 
     snprintf(endpoint, len, AWS_SERVICE_ENDPOINT_FORMAT, service, region);
-    flb_debug("[remove] endpoint: %s", endpoint);
 
     if (is_cn) {
         strncat(endpoint, ".cn", 3);
