@@ -444,7 +444,7 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
     char *str_method = NULL;
     char *fmt_plain =                           \
         "%s %s HTTP/1.%i\r\n"
-        "Host: %s:%i\r\n"
+        "Host: %s\r\n"
         "Content-Length: %i\r\n";
     char *fmt_vanilla =                         \
         "%s %s HTTP/1.%i\r\n";
@@ -486,7 +486,6 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
                        uri,
                        flags & FLB_HTTP_10 ? 0 : 1,
                        u->tcp_host,
-                       u->tcp_port,
                        body_len);
     }
     else if (host && port > 0) {
