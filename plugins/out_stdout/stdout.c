@@ -155,6 +155,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_OK);
     }
     flb_debug("[yay] connection successful!!");
+    flb_debug("[yay] This code successfully can make a request to EC2!");
 
     /* Compose HTTP request */
     struct flb_http_client *client = flb_http_client(u_conn, FLB_HTTP_GET, "/?Action=DescribeRegions&Version=2013-10-15",
