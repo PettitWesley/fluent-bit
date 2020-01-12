@@ -1025,7 +1025,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         flb_aws_credentials_destroy(creds);
         return NULL;
     }
-    printf("canonical request: \n%s\n----", cr);
+    printf("canonical request: \n%s\n----\n\n", cr);
 
     /* Task 2: string to sign */
     string_to_sign = flb_signv4_string_to_sign(c, cr, amzdate,
@@ -1037,7 +1037,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         flb_aws_credentials_destroy(creds);
         return NULL;
     }
-    printf("string to sign: \n%s\n----", string_to_sign);
+    printf("string to sign: \n%s\n----\n\n", string_to_sign);
     flb_sds_destroy(cr);
 
     /* Task 3: calculate the signature */
@@ -1051,7 +1051,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
     flb_sds_destroy(string_to_sign);
-    printf("signature: \n%s\n----", signature);
+    printf("signature: \n%s\n----\n\n", signature);
 
     /* Task 4: add signature to HTTP request */
     auth_header = flb_signv4_add_authorization(c,
@@ -1066,6 +1066,6 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         flb_error("[signv4] error creating authorization header");
         return NULL;
     }
-    printf("auth_header: \n%s\n----", auth_header);
+    printf("auth_header: \n%s\n----\n\n", auth_header);
     return auth_header;
 }
