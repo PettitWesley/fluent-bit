@@ -200,17 +200,17 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
     flb_debug("[yay] This code successfully can make a request to EC2!");
 
-sts:
-
-    creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
-    if (!creds) {
-        flb_errno();
-        FLB_OUTPUT_RETURN(FLB_OK);
-    }
-
-    flb_debug("[test] access: %s", creds->access_key_id);
-    flb_debug("[test] secret: %s", creds->secret_access_key);
-    flb_debug("[test] token: %s", creds->session_token);
+// sts:
+//
+//     creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
+//     if (!creds) {
+//         flb_errno();
+//         FLB_OUTPUT_RETURN(FLB_OK);
+//     }
+//
+//     flb_debug("[test] access: %s", creds->access_key_id);
+//     flb_debug("[test] secret: %s", creds->secret_access_key);
+//     flb_debug("[test] token: %s", creds->session_token);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
