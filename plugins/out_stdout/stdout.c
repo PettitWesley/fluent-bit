@@ -140,7 +140,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     int ret;
     struct flb_aws_credentials *creds;
 
-    upstream = flb_upstream_create(config, "ec2.us-west-2.amazonaws.com", 443,
+    upstream = flb_upstream_create(config, "sts.us-west-2.amazonaws.com", 443,
                                    FLB_IO_TLS, ctx->tls);
     if (!upstream) {
         flb_error("[test] Connection initialization error");
@@ -159,7 +159,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     /* Compose HTTP request */
     struct flb_http_client *client = flb_http_client(u_conn, FLB_HTTP_GET, "/?Action=DescribeRegions&Version=2013-10-15",
                                     NULL, 0,
-                                    "ec2.us-west-2.amazonaws.com", 443,
+                                    "sts.us-west-2.amazonaws.com", 443,
                                     NULL, 0);
 
     if (!client) {
@@ -177,7 +177,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     flb_sds_t signature = flb_signv4_do(client, FLB_TRUE, FLB_TRUE, time(NULL),
-                              "us-west-2", "ec2",
+                              "us-west-2", "sts",
                               base_provider);
     if (!signature) {
         flb_error("[aws_client] could not sign request");
