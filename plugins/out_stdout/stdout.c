@@ -157,7 +157,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     flb_debug("[yay] connection successful!!");
 
     /* Compose HTTP request */
-    struct flb_http_client *client = flb_http_client(u_conn, FLB_HTTP_GET, "/?Action=DescribeRegions&Version=2013-10-15",
+    struct flb_http_client *client = flb_http_client(u_conn, FLB_HTTP_GET, "/?Version=2011-06-15&Action=AssumeRole&RoleSessionName=session_name&RoleArn=arn:aws:iam::144718711470:role/provider-testing",
                                     NULL, 0,
                                     "sts.us-west-2.amazonaws.com", 443,
                                     NULL, 0);
