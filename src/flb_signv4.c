@@ -89,7 +89,7 @@ static int kv_key_cmp(const void *a_arg, const void *b_arg)
     struct flb_kv *kv_a = *(struct flb_kv **) a_arg;
     struct flb_kv *kv_b = *(struct flb_kv **) b_arg;
 
-    return strcmp(kv_a->key, kv_b->key);
+    return -1 * strcmp(kv_a->key, kv_b->key);
 }
 
 static int kv_val_cmp(const void *a_arg, const void *b_arg)
@@ -97,7 +97,7 @@ static int kv_val_cmp(const void *a_arg, const void *b_arg)
     struct flb_kv *kv_a = *(struct flb_kv **) a_arg;
     struct flb_kv *kv_b = *(struct flb_kv **) b_arg;
 
-    return strcmp(kv_a->val, kv_b->val);
+    return -1 * strcmp(kv_a->val, kv_b->val);
 }
 
 static inline int to_encode(char c)
