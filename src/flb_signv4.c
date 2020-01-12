@@ -633,9 +633,9 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
 
     /* host must always be included */
     host = flb_sds_create_size(256);
-    // tmp = flb_sds_printf(&host, "%s:%i", c->u_conn->u->tcp_host,
-    //                      c->u_conn->u->tcp_port);
-    tmp = flb_sds_printf(&host, "%s", c->u_conn->u->tcp_host);
+    tmp = flb_sds_printf(&host, "%s:%i", c->u_conn->u->tcp_host,
+                         c->u_conn->u->tcp_port);
+    // tmp = flb_sds_printf(&host, "%s", c->u_conn->u->tcp_host);
     if (!tmp) {
         flb_errno();
         flb_kv_release(&list_tmp);
