@@ -643,7 +643,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     }
     host = tmp;
     len = flb_sds_len(host);
-    flb_debug("[remove] host: %s");
+    flb_debug("[remove] host: %s", host);
     flb_http_add_header(c, "host", 4, host, len);
 
     /* include x-amz-date header ? */
