@@ -200,7 +200,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
     flb_debug("[yay] This code successfully can make a request to EC2!");
 
-// sts:
+sts:
 //
 //     creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
 //     if (!creds) {
