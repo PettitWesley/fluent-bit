@@ -158,7 +158,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     /* Compose HTTP request */
     //"/?Action=AssumeRole&RoleArn=arn%3Aaws%3Aiam%3A%3A144718711470%3Arole%2Fprovider-testing&RoleSessionName=session_name&Version=2011-06-15"
-    struct flb_http_client *client = flb_http_client(u_conn, FLB_HTTP_GET, "/?Action=AssumeRole&RoleArn=arnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn&RoleSessionName=session_name&Version=2011-06-15",
+    struct flb_http_client *client = flb_http_client(u_conn, FLB_HTTP_GET, "/?Action=AssumeRole&RoleArn=arn%3Aaws%3Aiam%3A%3A144718711470%3Arole%2Fprovider-testing&RoleSessionName=session_name&Version=2011-06-15",
                                     NULL, 0,
                                     "sts.us-west-2.amazonaws.com", 443,
                                     NULL, 0);
