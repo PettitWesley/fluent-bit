@@ -24,6 +24,7 @@
 
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_sds.h>
+#include <monkey/mk_core/mk_list.h>
 
 struct flb_stdout {
     int out_format;

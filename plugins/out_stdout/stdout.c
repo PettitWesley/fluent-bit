@@ -118,6 +118,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_time tmp;
     msgpack_object *p;
 
+    struct mk_list *tmp;
+    struct mk_list *head;
     struct item *an_item;
 
     /* mklist example */
