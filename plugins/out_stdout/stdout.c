@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
 #include <msgpack.h>
+#include <monkey/mk_core/mk_list.h>
 
 #include "stdout.h"
 
@@ -85,7 +86,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     struct item *an_item;
 
     for (i = 0; i < strlen(characters); i++) {
-        an_item = flb_malloc(sizeof(struct record));
+        an_item = flb_malloc(sizeof(struct item));
         if (!an_item) {
             flb_errno();
             return -1;
