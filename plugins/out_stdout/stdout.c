@@ -129,6 +129,8 @@ static int example(struct flb_stdout *ctx)
         an_item = mk_list_entry(head, struct item, _head);
         flb_info("list item data value: %c", an_item->some_data);
     }
+
+    return 0;
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
