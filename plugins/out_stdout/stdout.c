@@ -102,22 +102,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     return 0;
 }
 
-static void cb_stdout_flush(const void *data, size_t bytes,
-                            const char *tag, int tag_len,
-                            struct flb_input_instance *i_ins,
-                            void *out_context,
-                            struct flb_config *config)
+static int example(struct flb_stdout *ctx)
 {
-    msgpack_unpacked result;
-    size_t off = 0, cnt = 0;
-    struct flb_stdout *ctx = out_context;
-    flb_sds_t json;
-    char *buf = NULL;
-    (void) i_ins;
-    (void) config;
-    struct flb_time tmp;
-    msgpack_object *p;
-
     struct mk_list *tmp;
     struct mk_list *head;
     struct item *an_item;
@@ -143,7 +129,25 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         an_item = mk_list_entry(head, struct item, _head);
         flb_info("list item data value: %c", an_item->some_data);
     }
+}
 
+static void cb_stdout_flush(const void *data, size_t bytes,
+                            const char *tag, int tag_len,
+                            struct flb_input_instance *i_ins,
+                            void *out_context,
+                            struct flb_config *config)
+{
+    msgpack_unpacked result;
+    size_t off = 0, cnt = 0;
+    struct flb_stdout *ctx = out_context;
+    flb_sds_t json;
+    char *buf = NULL;
+    (void) i_ins;
+    (void) config;
+    struct flb_time tmp;
+    msgpack_object *p;
+
+    example(ctx);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
