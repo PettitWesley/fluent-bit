@@ -110,13 +110,13 @@ static int example(struct flb_stdout *ctx)
 
     /* mklist example */
     flb_info("Iterating through list");
-    mk_list_foreach_safe(head, tmp, &ctx->items)) {
+    mk_list_foreach_safe(head, tmp, &ctx->items) {
         an_item = mk_list_entry(head, struct item, _head);
         flb_info("list item data value: %c", an_item->some_data);
     }
 
     /* remove an item */
-    mk_list_foreach_safe(head, tmp, &ctx->items)) {
+    mk_list_foreach_safe(head, tmp, &ctx->items) {
         an_item = mk_list_entry(head, struct item, _head);
         if (an_item->some_data == 'b') {
             mk_list_del(&an_item->_head);
