@@ -78,6 +78,23 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    /* mk list example */
+    int i;
+    char characters[] = "abcdefghijk";
+    mk_list_init(&ctx->items);
+    struct item *an_item;
+
+    for (i = 0; i < strlen(characters); i++) {
+        an_item = flb_malloc(sizeof(struct record));
+        if (!an_item) {
+            flb_errno();
+            return -1;
+        }
+        an_item->some_data = characters[i];
+
+        mk_list_add(&an_item->_head, &ctx->items);
+    }
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -99,6 +116,31 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+
+    struct item *an_item;
+
+    /* mklist example */
+    flb_info("Iterating through list");
+    mk_list_foreach_safe(head, tmp, &ctx->items)) {
+        an_item = mk_list_entry(head, struct item, _head);
+        flb_info("list item data value: %c", an_item->some_data);
+    }
+
+    /* remove an item */
+    mk_list_foreach_safe(head, tmp, &ctx->items)) {
+        an_item = mk_list_entry(head, struct item, _head);
+        if (an_item->some_data == 'b') {
+            mk_list_del(&an_item->_head);
+            flb_free(an_item);
+        }
+    }
+
+    flb_info("Iterating through list");
+    mk_list_foreach_safe(head, tmp, &ctx->items)) {
+        an_item = mk_list_entry(head, struct item, _head);
+        flb_info("list item data value: %c", an_item->some_data);
+    }
+
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,

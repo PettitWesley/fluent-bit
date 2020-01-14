@@ -29,6 +29,14 @@ struct flb_stdout {
     int out_format;
     int json_date_format;
     flb_sds_t json_date_key;
+
+    struct mk_list items;
+};
+
+struct item {
+    char some_data;
+
+    struct mk_list _head;
 };
 
 #endif
