@@ -301,15 +301,12 @@ static struct flb_http_client *convert_request_file(char *request,
      mk_list_foreach(head, &req->headers) {
          kv = mk_list_entry(head, struct flb_kv, _head);
          flb_info("header: %s", kv->key);
-         if (strncasecmp(kv->key, "Host", 4) == 0) {
-             flb_info("deleting host");
+         if (strncasecmp(kv->key, "Host", 4) == 0 ||
+             strncasecmp(kv->key, "Content-Length", 14) == 0) {
+             flb_info("deleting");
              mk_list_del(&kv->_head);
              flb_kv_item_destroy(kv);
-         }
-         if (strncasecmp(kv->key, "Content-Length", 14) == 0) {
-             flb_info("deleting Content-Length");
-             mk_list_del(&kv->_head);
-             flb_kv_item_destroy(kv);
+             flb_info("deleted");
          }
      }
 
