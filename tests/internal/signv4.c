@@ -302,7 +302,7 @@ static struct flb_http_client *convert_request_file(char *request,
          flb_info("iterating...");
          kv = mk_list_entry(head, struct flb_kv, _head);
          flb_info("header: %s", kv->key);
-         if (strncasecmp(kv->key, "Host", 4) == 0) == 0) {
+         if (strncasecmp(kv->key, "Host", 4) == 0) {
              flb_info("deleting");
              flb_kv_item_destroy(kv);
              flb_info("deleted");
