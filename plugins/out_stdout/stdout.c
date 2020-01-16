@@ -118,12 +118,12 @@ static int example(struct flb_stdout *ctx)
     /* remove an item */
     mk_list_foreach_safe(head, tmp, &ctx->items) {
         an_item = mk_list_entry(head, struct item, _head);
-        if (an_item->some_data == 'b') {
+        if (an_item->some_data == 'j') {
             mk_list_del(&an_item->_head);
             flb_free(an_item);
         }
 
-        if (an_item->some_data == 'c') {
+        if (an_item->some_data == 'k') {
             mk_list_del(&an_item->_head);
             flb_free(an_item);
         }
