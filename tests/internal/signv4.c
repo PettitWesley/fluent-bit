@@ -297,6 +297,12 @@ static struct flb_http_client *convert_request_file(char *request,
      * for the tests we remove these since all headers come from
      * the the test file
      */
+     mk_list_foreach(head, &c->headers) {
+         flb_info("iterating...");
+         kv = mk_list_entry(head, struct flb_kv, _head);
+         flb_info("head: %p", kv);
+         flb_info("header: %s", kv->key);
+     }
      flb_info("about to delete headers..");
      flb_info("list size: %d", mk_list_size(&c->headers));
      mk_list_foreach(head, &c->headers) {
