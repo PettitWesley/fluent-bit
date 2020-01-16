@@ -24,11 +24,14 @@
 
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_sds.h>
+#include <fluent-bit/flb_io_tls.h>
 
 struct flb_stdout {
     int out_format;
     int json_date_format;
     flb_sds_t json_date_key;
+
+    struct flb_tls *tls;
 };
 
 #endif

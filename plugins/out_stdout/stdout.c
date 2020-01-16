@@ -25,7 +25,10 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
+#include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_signv4.h>
 #include <msgpack.h>
+#include <stdlib.h>
 
 #include "stdout.h"
 
@@ -78,6 +81,18 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    ctx->tls = &ins->tls;
+
+    /* Create TLS context */
+    ctx->tls->context = flb_tls_context_new(FLB_TRUE,  /* verify */
+                                            FLB_TRUE,        /* debug */
+                                            NULL,      /* vhost */
+                                            NULL,      /* ca_path */
+                                            NULL,      /* ca_file */
+                                            NULL,      /* crt_file */
+                                            NULL,      /* key_file */
+                                            NULL);     /* key_passwd */
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -99,6 +114,76 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+
+    struct flb_upstream_conn *u_conn = NULL;
+    struct flb_upstream *upstream = NULL;
+    int ret;
+
+    upstream = flb_upstream_create(config, "sts.us-west-2.amazonaws.com", 443,
+                                   FLB_IO_TLS, ctx->tls);
+    if (!upstream) {
+        flb_error("[test] upstream connection error");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+
+    u_conn = flb_upstream_conn_get(upstream);
+    if (!u_conn) {
+        flb_error("[test] connection initialization error");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+    flb_debug("[yay] connection successful!!");
+
+    struct flb_http_client *client = flb_http_client(u_conn, FLB_HTTP_GET, "/?Action=AssumeRole&RoleArn=arn:aws:iam::144718711470:role/provider-testing&RoleSessionName=session_name&Version=2011-06-15",
+                                    NULL, 0,
+                                    "sts.us-west-2.amazonaws.com", 443,
+                                    NULL, 0);
+
+    if (!client) {
+        flb_error("[test] could not initialize request");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+
+    char *access_key = getenv("AWS_ACCESS_KEY_ID");
+    if (!access_key) {
+        flb_error("[test] no access key");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+    char *secret_key = getenv("AWS_SECRET_ACCESS_KEY");
+    if (!secret_key) {
+        flb_error("[test] no secret key");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+
+    flb_sds_t signature = flb_signv4_do(client, FLB_TRUE, FLB_TRUE, time(NULL),
+                                        access_key,
+                                        "us-west-2", "sts", secret_key,
+                                        NULL);
+    if (!signature) {
+        flb_error("[test] could not sign request");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
+
+    /* Perform request */
+    size_t b_sent;
+    ret = flb_http_do(client, &b_sent);
+
+    if (ret != 0 || client->resp.status != 200) {
+        flb_error("[test] request error: http_do=%i, HTTP Status: %i",
+                  ret, client->resp.status);
+    }
+
+    if (client->resp.payload_size > 0) {
+        /* try to parse the error */
+        printf("Raw response from ec2: \n%s\n\n", client->resp.payload);
+    }
+    flb_debug("[yay] This code successfully can make a request to EC2!");
+
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
