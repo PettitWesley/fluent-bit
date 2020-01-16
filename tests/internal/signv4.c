@@ -298,7 +298,8 @@ static struct flb_http_client *convert_request_file(char *request,
      * the the test file
      */
      flb_info("about to delete headers..");
-     mk_list_foreach(head, &req->headers) {
+     flb_info("list size: %d", mk_list_size(&c->headers));
+     mk_list_foreach(head, &c->headers) {
          flb_info("iterating...");
          kv = mk_list_entry(head, struct flb_kv, _head);
          flb_info("header: %s", kv->key);
@@ -309,7 +310,7 @@ static struct flb_http_client *convert_request_file(char *request,
          }
      }
      flb_info("about to delete headers 2..");
-     mk_list_foreach(head, &req->headers) {
+     mk_list_foreach(head, &c->headers) {
          flb_info("iterating...");
          kv = mk_list_entry(head, struct flb_kv, _head);
          flb_info("header: %s", kv->key);
