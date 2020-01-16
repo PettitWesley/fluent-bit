@@ -298,34 +298,16 @@ static struct flb_http_client *convert_request_file(char *request,
      * the the test file
      */
      mk_list_foreach(head, &c->headers) {
-         flb_info("iterating...");
          kv = mk_list_entry(head, struct flb_kv, _head);
-         flb_info("head: %p", kv);
-         flb_info("header: %s", kv->key);
-     }
-     flb_info("about to delete headers..");
-     flb_info("list size: %d", mk_list_size(&c->headers));
-     mk_list_foreach(head, &c->headers) {
-         flb_info("iterating...");
-         kv = mk_list_entry(head, struct flb_kv, _head);
-         flb_info("head: %p", kv);
-         flb_info("header: %s", kv->key);
          if (strncasecmp(kv->key, "Host", 4) == 0) {
-             flb_info("deleting");
              flb_kv_item_destroy(kv);
-             flb_info("deleted");
              break;
          }
      }
-     flb_info("about to delete headers 2..");
      mk_list_foreach(head, &c->headers) {
-         flb_info("iterating...");
          kv = mk_list_entry(head, struct flb_kv, _head);
-         flb_info("header: %s", kv->key);
          if (strncasecmp(kv->key, "Content-Length", 14) == 0) {
-             flb_info("deleting");
              flb_kv_item_destroy(kv);
-             flb_info("deleted");
              break;
          }
      }
