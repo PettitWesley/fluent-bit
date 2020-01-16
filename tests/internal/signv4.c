@@ -314,6 +314,7 @@ static struct flb_http_client *convert_request_file(char *request,
              flb_info("deleting");
              flb_kv_item_destroy(kv);
              flb_info("deleted");
+             break;
          }
      }
      flb_info("about to delete headers 2..");
@@ -325,6 +326,7 @@ static struct flb_http_client *convert_request_file(char *request,
              flb_info("deleting");
              flb_kv_item_destroy(kv);
              flb_info("deleted");
+             break;
          }
      }
 
