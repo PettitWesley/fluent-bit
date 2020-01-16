@@ -121,11 +121,13 @@ static int example(struct flb_stdout *ctx)
         if (an_item->some_data == 'j') {
             mk_list_del(&an_item->_head);
             flb_free(an_item);
+            continue;
         }
 
         if (an_item->some_data == 'k') {
             mk_list_del(&an_item->_head);
             flb_free(an_item);
+            continue;
         }
         mk_list_del(&an_item->_head);
         flb_free(an_item);
