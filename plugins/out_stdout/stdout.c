@@ -180,7 +180,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     if (client->resp.payload_size > 0) {
         /* try to parse the error */
-        printf("Raw response from ec2: \n%s\n\n", client->resp.payload);
+        printf("Raw response from STS: \n%s\n\n", client->resp.payload);
     }
     flb_debug("[yay] This code successfully can make a request to EC2!");
 

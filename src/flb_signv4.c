@@ -85,10 +85,16 @@ static int hmac_sha256_sign(unsigned char out[32],
 
 static int kv_key_cmp(const void *a_arg, const void *b_arg)
 {
+    int ret;
     struct flb_kv *kv_a = *(struct flb_kv **) a_arg;
     struct flb_kv *kv_b = *(struct flb_kv **) b_arg;
 
-    return strcmp(kv_a->key, kv_b->key);
+    ret = strcmp(kv_a->key, kv_b->key);
+    if (ret == 0) {
+        ret = strcmp(kv_a->val, kv_b->val);
+    }
+
+    return ret;
 }
 
 static inline int to_encode(char c)
