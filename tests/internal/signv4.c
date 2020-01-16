@@ -299,6 +299,7 @@ static struct flb_http_client *convert_request_file(char *request,
      */
      flb_info("about to delete headers..");
      mk_list_foreach(head, &req->headers) {
+         flb_info("iterating...");
          kv = mk_list_entry(head, struct flb_kv, _head);
          flb_info("header: %s", kv->key);
          if (strncasecmp(kv->key, "Host", 4) == 0 ||
