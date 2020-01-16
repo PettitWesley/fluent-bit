@@ -122,6 +122,11 @@ static int example(struct flb_stdout *ctx)
             mk_list_del(&an_item->_head);
             flb_free(an_item);
         }
+
+        if (an_item->some_data == 'c') {
+            mk_list_del(&an_item->_head);
+            flb_free(an_item);
+        }
     }
 
     flb_info("Iterating through list");
