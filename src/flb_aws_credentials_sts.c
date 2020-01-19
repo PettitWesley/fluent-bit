@@ -614,7 +614,7 @@ static int sts_assume_role_request(struct flb_aws_client *sts_client,
             return -1;
         }
         if (sts_client->c && sts_client->c->resp.payload_size > 0) {
-            flb_debug("[aws_credentials] STS raw response: \n%s",
+            printf("[aws_credentials] STS raw response: \n%s",
                       sts_client->c->resp.payload);
         }
         *next_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
