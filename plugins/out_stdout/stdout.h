@@ -29,6 +29,9 @@ struct flb_stdout {
     int out_format;
     int json_date_format;
     flb_sds_t json_date_key;
+
+    struct flb_aws_provider *provider;
+    struct flb_tls *tls;
 };
 
 #endif
