@@ -32,6 +32,7 @@
 #include <msgpack.h>
 
 #include "stdout.h"
+#include <stdio.h>
 
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
@@ -142,9 +143,9 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_OK);
     }
 
-    flb_debug("[test] access: %s", creds->access_key_id);
-    flb_debug("[test] secret: %s", creds->secret_access_key);
-    flb_debug("[test] token: %s", creds->session_token);
+    printf("[test] access: %s", creds->access_key_id);
+    printf("[test] secret: %s", creds->secret_access_key);
+    printf("[test] token: %s", creds->session_token);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
