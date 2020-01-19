@@ -462,7 +462,7 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
     implementation->sts_client->flags = 0;
     implementation->sts_client->proxy = proxy;
 
-    upstream = flb_upstream_create(config, implementation->endpoint, 80,
+    upstream = flb_upstream_create(config, implementation->endpoint, 443,
                                    FLB_IO_TLS, tls);
 
     implementation->sts_client->upstream = upstream;
