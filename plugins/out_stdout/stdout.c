@@ -83,13 +83,13 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     struct flb_aws_provider *provider;
-    struct flb_aws_provider *base_provider;
+    // struct flb_aws_provider *base_provider;
 
-    base_provider = flb_aws_env_provider_create();
-    if (!base_provider) {
-        flb_errno();
-        return -1;
-    }
+    // base_provider = flb_aws_env_provider_create();
+    // if (!base_provider) {
+    //     flb_errno();
+    //     return -1;
+    // }
 
     ctx->tls = &ins->tls;
 
@@ -103,9 +103,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
                                            NULL,      /* key_file */
                                            NULL);     /* key_passwd */
 
-    provider = flb_sts_provider_create(config, ctx->tls, base_provider, NULL,
-                                       "arn:aws:iam::144718711470:role/provider-testing",
-                                       "session_name", "us-west-2", NULL,
+    provider = flb_eks_provider_create(config, ctx->tls, "us-west-2", NULL,
                                        flb_aws_client_generator());
     if (!provider) {
         flb_errno();
