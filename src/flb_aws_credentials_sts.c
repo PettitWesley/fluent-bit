@@ -604,6 +604,8 @@ static int sts_assume_role_request(struct flb_aws_client *sts_client,
     flb_aws_credentials_destroy(*creds);
     *creds = NULL;
 
+    flb_debug("[aws_credentials] Calling STS..");
+
     ret = sts_client->client_vtable->request(sts_client, FLB_HTTP_GET,
                                              uri, NULL, 0, NULL, 0);
 
