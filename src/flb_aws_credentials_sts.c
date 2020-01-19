@@ -573,6 +573,8 @@ static int assume_with_web_identity(struct flb_aws_provider_eks
         return -1;
     }
 
+    flb_debug("web file contents:\n%s--end--", web_token);
+
     uri = flb_sts_uri("AssumeRoleWithWebIdentity", implementation->role_arn,
                   implementation->session_name, NULL, web_token);
     if (!uri) {
