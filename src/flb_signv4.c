@@ -976,7 +976,7 @@ static flb_sds_t flb_signv4_add_authorization(struct flb_http_client *c,
 }
 
 flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
-                        int amz_date,
+                        int amz_date_header,
                         time_t t_now,
                         char *region, char *service,
                         struct flb_aws_provider *provider)
