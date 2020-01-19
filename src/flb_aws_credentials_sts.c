@@ -29,7 +29,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include <stdio.h>
 
 #define STS_ASSUME_ROLE_URI_FORMAT    "/?Version=2011-06-15&Action=%s\
 &RoleSessionName=%s&RoleArn=%s"
@@ -574,8 +573,6 @@ static int assume_with_web_identity(struct flb_aws_provider_eks
         return -1;
     }
 
-    printf("web file contents:\n%s--end--\n", web_token);
-
     uri = flb_sts_uri("AssumeRoleWithWebIdentity", implementation->role_arn,
                   implementation->session_name, NULL, web_token);
     if (!uri) {
@@ -613,10 +610,7 @@ static int sts_assume_role_request(struct flb_aws_client *sts_client,
             flb_error("[aws_credentials] Failed to parse response from STS");
             return -1;
         }
-        if (sts_client->c && sts_client->c->resp.payload_size > 0) {
-            printf("[aws_credentials] STS raw response: \n%s",
-                      sts_client->c->resp.payload);
-        }
+
         *next_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
         *creds = credentials;
         return 0;
