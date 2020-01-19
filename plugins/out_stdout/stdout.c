@@ -143,9 +143,9 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_OK);
     }
 
-    printf("[test] access: %s", creds->access_key_id);
-    printf("[test] secret: %s", creds->secret_access_key);
-    printf("[test] token: %s", creds->session_token);
+    printf("[test] access: %s\n", creds->access_key_id);
+    printf("[test] secret: %s\n", creds->secret_access_key);
+    printf("[test] token: %s\n", creds->session_token);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
