@@ -458,7 +458,7 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
     implementation->sts_client->provider = NULL;
     implementation->sts_client->region = region;
     implementation->sts_client->service = "sts";
-    implementation->sts_client->port = 80;
+    implementation->sts_client->port = 443;
     implementation->sts_client->flags = 0;
     implementation->sts_client->proxy = proxy;
 
