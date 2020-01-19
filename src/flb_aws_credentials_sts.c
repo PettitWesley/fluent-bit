@@ -96,6 +96,8 @@ struct flb_aws_credentials *get_credentials_fn_sts(struct flb_aws_provider
     if (implementation->next_refresh > 0
         && time(NULL) > implementation->next_refresh) {
         refresh = FLB_TRUE;
+        flb_debug("[aws_credentials] STS Provider: Refreshing credential "
+                  "cache.");
     }
     if (!implementation->creds || refresh == FLB_TRUE) {
         ret = sts_assume_role_request(implementation->sts_client,
@@ -307,6 +309,8 @@ struct flb_aws_credentials *get_credentials_fn_eks(struct flb_aws_provider
     if (implementation->next_refresh > 0
         && time(NULL) > implementation->next_refresh) {
         refresh = FLB_TRUE;
+        flb_debug("[aws_credentials] EKS Provider: Refreshing credential "
+                  "cache.");
     }
     if (!implementation->creds || refresh == FLB_TRUE) {
         ret = assume_with_web_identity(implementation);
