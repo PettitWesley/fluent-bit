@@ -714,6 +714,10 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     /* Iterate sorted headers and append them to the outgoing buffer */
     for (i = 0; i < items; i++) {
         kv = (struct flb_kv *) arr[i];
+        if (strcasecmp(kv->key, "content-length") == 0) {
+            flb_debug("Skipping non-signed header %s", kv-key);
+            continue;
+        }
         tmp = flb_sds_printf(&cr, "%s:%s\n", kv->key, kv->val);
         if (!tmp) {
             flb_error("[signv4] error composing canonical headers");
