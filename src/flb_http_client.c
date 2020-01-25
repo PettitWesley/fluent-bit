@@ -460,7 +460,8 @@ static int add_host_and_content_length(struct flb_http_client *c)
         out_port = c->port;
     }
 
-    tmp = flb_sds_printf(&host, "%s:%i", out_host, out_port);
+    //tmp = flb_sds_printf(&host, "%s:%i", out_host, out_port);
+    tmp = flb_sds_printf(&host, "%s", out_host);
     if (!tmp) {
         flb_sds_destroy(host);
         flb_error("[http_client] cannot compose temporary host header");
