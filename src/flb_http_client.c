@@ -430,6 +430,32 @@ static int proxy_parse(const char *proxy, struct flb_http_client *c)
     return 0;
 }
 
+/*
+ * Removes the port from the host header
+ */
+int flb_http_strip_port_from_host(struct flb_http_client *c)
+{
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct flb_kv *kv;
+    char *out_host;
+    struct flb_upstream *u = c->u_conn->u;
+
+    if (!c->host) {
+        out_host = u->tcp_host;
+    } else {
+        out_host = (char *) c->host;
+    }
+
+    mk_list_foreach(head, &c->headers) {
+        kv = mk_list_entry(head, struct flb_kv, _head);
+        if (strcasecmp("Host", kv->key) == 0) {
+            flb_sds_destroy(kv->val);
+            kv->val = flb_sds_create(out_host);
+        }
+    }
+}
+
 static int add_host_and_content_length(struct flb_http_client *c)
 {
     int len;
@@ -460,8 +486,7 @@ static int add_host_and_content_length(struct flb_http_client *c)
         out_port = c->port;
     }
 
-    //tmp = flb_sds_printf(&host, "%s:%i", out_host, out_port);
-    tmp = flb_sds_printf(&host, "%s", out_host);
+    tmp = flb_sds_printf(&host, "%s:%i", out_host, out_port);
     if (!tmp) {
         flb_sds_destroy(host);
         flb_error("[http_client] cannot compose temporary host header");
