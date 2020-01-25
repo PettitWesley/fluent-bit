@@ -181,7 +181,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
                  c->resp.status, c->resp.payload);
     }
 
-    flb_info("_________")
+    flb_info("_________");
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
