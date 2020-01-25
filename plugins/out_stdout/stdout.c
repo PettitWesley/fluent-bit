@@ -26,6 +26,8 @@
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
 #include <msgpack.h>
+#include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_signv4.h>
 
 #include "stdout.h"
 
@@ -78,6 +80,21 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    ctx->tls = &ins->tls;
+
+    /* Create TLS context */
+    ctx->tls->context = flb_tls_context_new(FLB_TRUE,  /* verify */
+                                           FLB_TRUE,        /* debug */
+                                           NULL,      /* vhost */
+                                           NULL,      /* ca_path */
+                                           NULL,      /* ca_file */
+                                           NULL,      /* crt_file */
+                                           NULL,      /* key_file */
+                                           NULL);     /* key_passwd */
+
+    ctx->u = flb_upstream_create(config, "vpc-test-domain-ke7thhzoo7jawrhmz6mb7ite7y.us-west-2.es.amazonaws.com",
+                                 443, FLB_IO_TLS, ctx->tls);
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -99,6 +116,72 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+
+    struct flb_upstream_conn *u_conn;
+    struct flb_http_client *c;
+    int ret;
+    size_t b_sent;
+    flb_sds_t signature = NULL;
+    char *body = "{\"index\":{\"_index\":\"my_index\",\"_type\":\"my_type\"}}\n"
+                 "{\"@timestamp\":\"2020-01-21T04:34:04.000Z\",\"cpu_p\":0.000000,\"user_p\":0.000000}\n";
+    int len = strlen(body);
+    flb_info("len: %d", len);
+
+    char *access = NULL;
+    access = getenv("AWS_ACCESS_KEY_ID");
+    if (!access) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    char *secret = NULL;
+    secret = getenv("AWS_SECRET_ACCESS_KEY");
+    if (!secret) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    /* Get upstream connection */
+    u_conn = flb_upstream_conn_get(ctx->u);
+    if (!u_conn) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    /* Compose HTTP Client request */
+    c = flb_http_client(u_conn, FLB_HTTP_POST, "/_bulk",
+                        NULL, 0, NULL, 0, NULL, 0);
+
+    //flb_http_buffer_size(c, ctx->buffer_size);
+
+    //flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+    flb_http_add_header(c, "Content-Type", 12, "application/x-ndjson", 20);
+
+    flb_debug("[out_es] Signing request with AWS Sigv4");
+    signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
+                              access, "us-west-2", "es",
+                              secret, NULL);
+    if (!signature) {
+        flb_error("[out_es] could not sign request with sigv4");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    ret = flb_http_do(c, &b_sent);
+    if (ret != 0) {
+        flb_warn("[out_es] http_do=%i URI=/_bulk", ret);
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    flb_info("[out_es_test] Wat?? It worked?? ret=%s", ret);
+    flb_info("[out_es] HTTP Status=%i URI=/_bulk", c->resp.status);
+    if (c->resp.payload_size > 0) {
+        flb_info("[out_es] HTTP status=%i URI=/_bulk, response:\n%s\n",
+                 c->resp.status, c->resp.payload);
+    }
+
+    flb_info("_________")
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
