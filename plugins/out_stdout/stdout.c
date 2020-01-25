@@ -150,7 +150,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     /* Compose HTTP Client request */
     c = flb_http_client(u_conn, FLB_HTTP_POST, "/_bulk",
-                        NULL, 0, "vpc-test-domain-ke7thhzoo7jawrhmz6mb7ite7y.us-west-2.es.amazonaws.com", 443, NULL, 0);
+                        body, len, "vpc-test-domain-ke7thhzoo7jawrhmz6mb7ite7y.us-west-2.es.amazonaws.com", 443, NULL, 0);
 
     //flb_http_buffer_size(c, ctx->buffer_size);
 
