@@ -715,7 +715,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     for (i = 0; i < items; i++) {
         kv = (struct flb_kv *) arr[i];
         if (strcasecmp(kv->key, "content-length") == 0) {
-            flb_debug("Skipping non-signed header %s", kv-key);
+            flb_debug("Skipping non-signed header %s", kv->key);
             continue;
         }
         tmp = flb_sds_printf(&cr, "%s:%s\n", kv->key, kv->val);
