@@ -1027,6 +1027,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         flb_sds_destroy(signed_headers);
         return NULL;
     }
+    flb_info("Canonical Request:\n___start___\n%s\n___end___", cr);
 
     /* Task 2: string to sign */
     string_to_sign = flb_signv4_string_to_sign(c, cr, amzdate,
@@ -1038,6 +1039,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
     flb_sds_destroy(cr);
+    flb_info("string_to_sign:\n___start___\n%s\n___end___", string_to_sign);
 
     /* Task 3: calculate the signature */
     signature = flb_signv4_calculate_signature(string_to_sign, datestamp, service,
@@ -1049,6 +1051,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
     flb_sds_destroy(string_to_sign);
+    flb_info("signature:\n___start___\n%s\n___end___", signature);
 
     /* Task 4: add signature to HTTP request */
     auth_header = flb_signv4_add_authorization(c,
