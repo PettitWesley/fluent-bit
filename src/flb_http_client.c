@@ -433,7 +433,7 @@ static int proxy_parse(const char *proxy, struct flb_http_client *c)
 /*
  * Removes the port from the host header
  */
-int flb_http_strip_port_from_host(struct flb_http_client *c)
+void flb_http_strip_port_from_host(struct flb_http_client *c)
 {
     struct mk_list *head;
     struct flb_kv *kv;
@@ -451,11 +451,9 @@ int flb_http_strip_port_from_host(struct flb_http_client *c)
         if (strcasecmp("Host", kv->key) == 0) {
             flb_sds_destroy(kv->val);
             kv->val = flb_sds_create(out_host);
-            return 0;
+            break;
         }
     }
-
-    return -1;
 }
 
 static int add_host_and_content_length(struct flb_http_client *c)

@@ -156,6 +156,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     //flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
     flb_http_add_header(c, "Content-Type", 12, "application/x-ndjson", 20);
+    flb_http_strip_port_from_host(c);
 
     flb_debug("[out_es] Signing request with AWS Sigv4");
     signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
