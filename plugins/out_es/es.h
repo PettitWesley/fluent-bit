@@ -41,6 +41,16 @@ struct flb_elasticsearch {
     char *http_user;
     char *http_passwd;
 
+    /* AWS Auth */
+    #ifdef FLB_HAVE_AWS
+    int has_aws_auth;
+    struct flb_aws_provider *aws_provider;
+    struct flb_aws_provider *base_aws_provider;
+    char *aws_region;
+    /* tls instances can't be re-used; aws provider requires a separate one */
+    struct flb_tls aws_tls;
+    #endif
+
     /* HTTP Client Setup */
     size_t buffer_size;
 

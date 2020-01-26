@@ -29,6 +29,7 @@
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_signv4.h>
 #include <fluent-bit/flb_aws_credentials.h>
+#include <mbedtls/sha256.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -83,9 +84,9 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
-    struct flb_aws_provider *provider;
+    // struct flb_aws_provider *provider;
     // struct flb_aws_provider *base_provider;
-
+    //
     // base_provider = flb_aws_env_provider_create();
     // if (!base_provider) {
     //     flb_errno();
@@ -104,14 +105,43 @@ static int cb_stdout_init(struct flb_output_instance *ins,
                                            NULL,      /* key_file */
                                            NULL);     /* key_passwd */
 
-    provider = flb_eks_provider_create(config, ctx->tls, "us-west-2", NULL,
-                                       flb_aws_client_generator());
-    if (!provider) {
+    struct flb_aws_provider *base_provider;
+    struct flb_aws_provider *sts_provider;
+
+    base_provider = flb_aws_env_provider_create();
+    if (!base_provider) {
         flb_errno();
         return -1;
     }
 
-    ctx->provider = provider;
+    ctx->base_provider = base_provider;
+
+    sts_provider = flb_sts_provider_create(config, ctx->tls, base_provider, NULL,
+                                       "arn:aws:iam::144718711470:role/provider-testing",
+                                       "session_name", "us-west-2", NULL,
+                                       flb_aws_client_generator());
+    if (!sts_provider) {
+        flb_errno();
+        return -1;
+    }
+
+    ctx->sts_provider = sts_provider;
+
+    // provider = flb_eks_provider_create(config, ctx->tls, "us-west-2", NULL,
+    //                                    flb_aws_client_generator());
+    // if (!provider) {
+    //     flb_errno();
+    //     return -1;
+    // }
+    //
+    // ctx->provider = provider;
+    // ctx->provider = flb_aws_env_provider_create();
+    // if (!ctx->provider) {
+    //     flb_error("[out_es] Failed to create AWS Credential Provider");
+    //     return -1;
+    // }
+    // ctx->u = flb_upstream_create(config, "vpc-test-domain-ke7thhzoo7jawrhmz6mb7ite7y.us-west-2.es.amazonaws.com",
+    //                              443, FLB_IO_TLS, ctx->tls);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -125,23 +155,115 @@ static void cb_stdout_flush(const void *data, size_t bytes,
                             void *out_context,
                             struct flb_config *config)
 {
-    msgpack_unpacked result;
-    size_t off = 0, cnt = 0;
+    // msgpack_unpacked result;
+    // size_t off = 0, cnt = 0;
     struct flb_stdout *ctx = out_context;
-    flb_sds_t json;
-    char *buf = NULL;
-    (void) i_ins;
-    (void) config;
-    struct flb_time tmp;
-    msgpack_object *p;
+
+    struct flb_upstream_conn *u_conn;
+    struct flb_http_client *c;
+    int ret;
+    size_t b_sent;
+    flb_sds_t signature = NULL;
+    char *body = "{\"index\":{\"_index\":\"my_index\",\"_type\":\"my_type\"}}\n"
+                 "{\"@timestamp\":\"2020-01-21T04:34:04.000Z\",\"cpu_p\":0.000000,\"user_p\":0.000000}\n";
+    int len = strlen(body);
+    flb_info("len: %d", len);
+
     struct flb_aws_credentials *creds;
 
-    creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
+    creds = ctx->sts_provider->provider_vtable->get_credentials(ctx->sts_provider);
     if (!creds) {
         flb_errno();
         flb_debug("[test] no creds.");
         FLB_OUTPUT_RETURN(FLB_OK);
     }
+
+    flb_debug("[test] access: %s", creds->access_key_id);
+    flb_debug("[test] secret: %s", creds->secret_access_key);
+    flb_debug("[test] token: %s", creds->session_token);
+
+    flb_debug("exiting");
+    FLB_OUTPUT_RETURN(FLB_OK);
+
+    /* Get upstream connection */
+    u_conn = flb_upstream_conn_get(ctx->u);
+    if (!u_conn) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    /* Compose HTTP Client request */
+    c = flb_http_client(u_conn, FLB_HTTP_POST, "/_bulk",
+                        NULL, 0, NULL, 0, NULL, 0);
+
+    //flb_http_buffer_size(c, ctx->buffer_size);
+
+    //flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+    flb_http_add_header(c, "Content-Type", 12, "application/x-ndjson", 20);
+
+    flb_debug("[out_es] Signing request with AWS Sigv4");
+    signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
+                              "us-west-2", "es",
+                              ctx->provider);
+    if (!signature) {
+        flb_error("[out_es] could not sign request with sigv4");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    ret = flb_http_do(c, &b_sent);
+    if (ret != 0) {
+        flb_warn("[out_es] http_do=%i URI=/_bulk", ret);
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    flb_info("[out_es_test] Wat?? It worked?? ret=%s", ret);
+    flb_info("[out_es] HTTP Status=%i URI=/_bulk", c->resp.status);
+    if (c->resp.payload_size > 0) {
+        flb_info("[out_es] HTTP status=%i URI=/_bulk, response:\n%s\n",
+                 c->resp.status, c->resp.payload);
+    }
+
+    // flb_sds_t json;
+    // char *buf = NULL;
+    // (void) i_ins;
+    // (void) config;
+    // //struct flb_time tmp;
+    // msgpack_object *p;
+    // struct flb_aws_credentials *creds;
+    // int i;
+    //
+    // unsigned char sha256_buf[64] = {0};
+    // mbedtls_sha256_context sha256_ctx;
+    // flb_sds_t tmp;
+    // flb_sds_t cr = flb_sds_create("");
+    // char *body_buf = "@cats\"\n/";
+    //
+    // /* Hashed Payload */
+    // mbedtls_sha256_init(&sha256_ctx);
+    // mbedtls_sha256_starts(&sha256_ctx, 0);
+    // mbedtls_sha256_update(&sha256_ctx, (const unsigned char *) body_buf,
+    //                           strlen(body_buf));
+    // mbedtls_sha256_finish(&sha256_ctx, sha256_buf);
+    //
+    // for (i = 0; i < 32; i++) {
+    //     tmp = flb_sds_printf(&cr, "%02x", (unsigned char) sha256_buf[i]);
+    //     if (!tmp) {
+    //         flb_error("[signedv4] error formatting hashed payload");
+    //         flb_sds_destroy(cr);
+    //         return NULL;
+    //     }
+    //     cr = tmp;
+    // }
+    // flb_warn("[test] Hex encoded hash: %s", cr);
+
+    // creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
+    // if (!creds) {
+    //     flb_errno();
+    //     flb_debug("[test] no creds.");
+    //     FLB_OUTPUT_RETURN(FLB_OK);
+    // }
 
     FLB_OUTPUT_RETURN(FLB_OK);
     return;

@@ -656,6 +656,13 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
 
     /* query string / POST separator */
     tmp = flb_sds_cat(cr, "\n", 1);
+    if (!tmp) {
+        flb_error("[signv4] error concatenating newline for payload params");
+        flb_sds_destroy(params);
+        flb_sds_destroy(cr);
+        return NULL;
+    }
+    cr = tmp;
 
     /*
      * Canonical Headers

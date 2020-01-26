@@ -22,6 +22,9 @@
 #include <fluent-bit/flb_mem.h>
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_signv4.h>
+#include <fluent-bit/flb_aws_credentials.h>
+#include <fluent-bit/flb_aws_util.h>
 
 #include "es.h"
 #include "es_conf.h"
@@ -34,6 +37,9 @@ struct flb_elasticsearch *flb_es_conf_create(struct flb_output_instance *ins,
     ssize_t ret;
     const char *tmp;
     const char *path;
+    char *aws_role_arn = NULL;
+    char *aws_external_id = NULL;
+    char *aws_session_name = NULL;
     struct flb_uri *uri = ins->host.uri;
     struct flb_uri_field *f_index = NULL;
     struct flb_uri_field *f_type = NULL;
@@ -121,6 +127,84 @@ struct flb_elasticsearch *flb_es_conf_create(struct flb_output_instance *ins,
     else {
         snprintf(ctx->uri, sizeof(ctx->uri) - 1, "%s/_bulk", path);
     }
+
+    #ifdef FLB_HAVE_AWS
+    /* AWS Auth */
+    ctx->has_aws_auth = FLB_FALSE;
+    tmp = flb_output_get_property("aws_auth", ins);
+    if (tmp) {
+        if (strncasecmp(tmp, "On", 2) == 0) {
+            ctx->has_aws_auth = FLB_TRUE;
+            flb_debug("[out_es] Enabled AWS Auth");
+
+            /* AWS provider needs a separate TLS instance */
+            ctx->aws_tls.context = flb_tls_context_new(FLB_TRUE,
+                                                       ins->tls_debug,
+                                                       ins->tls_vhost,
+                                                       ins->tls_ca_path,
+                                                       ins->tls_ca_file,
+                                                       ins->tls_crt_file,
+                                                       ins->tls_key_file,
+                                                       ins->tls_key_passwd);
+
+            tmp = flb_output_get_property("aws_region", ins);
+            if (!tmp) {
+                flb_error("[out_es] aws_auth enabled but aws_region not set");
+                flb_es_conf_destroy(ctx);
+                return NULL;
+            }
+            ctx->aws_region = (char *) tmp;
+
+            /* TODO: replace with standard chain when providers completed */
+            ctx->aws_provider = flb_aws_env_provider_create();
+            if (!ctx->aws_provider) {
+                flb_error("[out_es] Failed to create AWS Credential Provider");
+                flb_es_conf_destroy(ctx);
+                return NULL;
+            }
+
+            tmp = flb_output_get_property("aws_role_arn", ins);
+            if (tmp) {
+                /* Use the STS Provider */
+                ctx->base_aws_provider = ctx->aws_provider;
+                aws_role_arn = (char *) tmp;
+                aws_external_id = NULL;
+                tmp = flb_output_get_property("aws_external_id", ins);
+                if (tmp) {
+                    aws_external_id = (char *) tmp;
+                }
+
+                aws_session_name = flb_sts_session_name();
+                if (!aws_session_name) {
+                    flb_error("[out_es] Failed to create aws iam role "
+                              "session name");
+                    flb_es_conf_destroy(ctx);
+                    return NULL;
+                }
+
+                ctx->aws_provider = flb_sts_provider_create(config,
+                                                            &ctx->aws_tls,
+                                                            ctx->
+                                                            base_aws_provider,
+                                                            aws_external_id,
+                                                            aws_role_arn,
+                                                            aws_session_name,
+                                                            ctx->aws_region,
+                                                            NULL,
+                                                            flb_aws_client_generator());
+                /* Session name can be freed once provider is created */
+                flb_free(aws_session_name);
+                if (!ctx->aws_provider) {
+                    flb_error("[out_es] Failed to create AWS STS Credential "
+                              "Provider");
+                    flb_es_conf_destroy(ctx);
+                    return NULL;
+                }
+
+            }
+        }
+    }
+    #endif
 
     return ctx;
 }

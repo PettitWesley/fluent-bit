@@ -25,6 +25,8 @@
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_time.h>
+#include <fluent-bit/flb_signv4.h>
+#include <fluent-bit/flb_aws_credentials.h>
 #include <msgpack.h>
 
 #include <time.h>
@@ -549,6 +551,7 @@ void cb_es_flush(const void *data, size_t bytes,
     struct flb_elasticsearch *ctx = out_context;
     struct flb_upstream_conn *u_conn;
     struct flb_http_client *c;
+    flb_sds_t signature = NULL;
     (void) i_ins;
     (void) tag;
     (void) tag_len;
@@ -578,6 +581,27 @@ void cb_es_flush(const void *data, size_t bytes,
     if (ctx->http_user && ctx->http_passwd) {
         flb_http_basic_auth(c, ctx->http_user, ctx->http_passwd);
     }
+
+    #ifdef FLB_HAVE_AWS
+    if (ctx->has_aws_auth == FLB_TRUE) {
+        flb_debug("[out_es] Signing request with AWS Sigv4");
+
+        /* Amazon ES Sigv4 does not allow the host header to include the port */
+        ret = flb_http_strip_port_from_host(c);
+        if (ret < 0) {
+            flb_error("[out_es] could not strip port from host for sigv4");
+            goto retry;
+        }
+
+        signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
+                                  ctx->aws_region, "es",
+                                  ctx->aws_provider);
+        if (!signature) {
+            flb_error("[out_es] could not sign request with sigv4");
+            goto retry;
+        }
+    }
+    #endif
 
     ret = flb_http_do(c, &b_sent);
     if (ret != 0) {
@@ -671,6 +695,28 @@ static struct flb_config_map config_map[] = {
     {
      FLB_CONFIG_MAP_STR, "http_passwd", "",
      0, FLB_TRUE, offsetof(struct flb_elasticsearch, http_passwd),
+     NULL
+    },
+
+    /* AWS Authentication */
+    {
+     FLB_CONFIG_MAP_BOOL, "aws_auth", "false",
+     0, FLB_TRUE, offsetof(struct flb_elasticsearch, has_aws_auth),
+     NULL
+    },
+    {
+     FLB_CONFIG_MAP_STR, "aws_region", "",
+     0, FLB_TRUE, offsetof(struct flb_elasticsearch, aws_region),
+     NULL
+    },
+    {
+     FLB_CONFIG_MAP_STR, "aws_role_arn", "",
+     0, FLB_FALSE, 0,
+     NULL
+    },
+    {
+     FLB_CONFIG_MAP_STR, "aws_external_id", "",
+     0, FLB_FALSE, 0,
      NULL
     },
 
