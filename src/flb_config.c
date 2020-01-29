@@ -411,7 +411,9 @@ int flb_config_set_property(struct flb_config *config,
     while (key != NULL) {
         if (prop_key_check(key, k,len) == 0) {
             if (!strncasecmp(key, FLB_CONF_STR_LOGLEVEL, 256)) {
+                #ifndef FLB_HAVE_STATIC_CONF
                 if (set_log_level_from_env(config) < 0) {
+                #endif
                     tmp = flb_env_var_translate(config->env, v);
                     if (tmp) {
                         ret = set_log_level(config, tmp);
@@ -421,7 +423,9 @@ int flb_config_set_property(struct flb_config *config,
                     else {
                         ret = set_log_level(config, v);
                     }
+                #ifndef FLB_HAVE_STATIC_CONF
                 }
+                #endif
             }
             else if (!strncasecmp(key, FLB_CONF_STR_PARSERS_FILE, 32)) {
 #ifdef FLB_HAVE_PARSER
