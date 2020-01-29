@@ -44,6 +44,7 @@
 #include <fluent-bit/flb_slist.h>
 #include <fluent-bit/flb_plugin.h>
 #include <fluent-bit/flb_parser.h>
+#include <fluent-bit/flb_log.h>
 
 /* Libbacktrace support */
 #ifdef FLB_HAVE_LIBBACKTRACE
