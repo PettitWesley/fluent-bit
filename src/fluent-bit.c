@@ -846,6 +846,7 @@ int main(int argc, char **argv)
     /* debug or warning */
     flb_info("verbose: %d, debug: %d", config->verbose, FLB_LOG_DEBUG);
     if (config->verbose >= FLB_LOG_DEBUG) {
+        flb_info("printing stuff");
         flb_utils_print_setup(config);
     }
 
