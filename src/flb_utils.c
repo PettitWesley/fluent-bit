@@ -36,7 +36,6 @@
 #include <fluent-bit/flb_output.h>
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_utf8.h>
-#include <fluent-bit/flb_log.h>
 
 void flb_utils_error(int err)
 {
@@ -173,52 +172,52 @@ void flb_utils_print_setup(struct flb_config *config)
     struct flb_filter_instance *f;
     struct flb_output_instance *out;
 
-    flb_debug("Configuration:");
+    flb_info("Configuration:");
 
     /* general */
-    flb_debug(" flush time     | %f seconds", config->flush);
-    flb_debug(" grace          | %i seconds", config->grace);
-    flb_debug(" daemon         | %i", config->daemon);
+    flb_info(" flush time     | %f seconds", config->flush);
+    flb_info(" grace          | %i seconds", config->grace);
+    flb_info(" daemon         | %i", config->daemon);
 
     /* Inputs */
-    flb_debug("___________");
-    flb_debug(" inputs:");
+    flb_info("___________");
+    flb_info(" inputs:");
     mk_list_foreach(head, &config->inputs) {
         in = mk_list_entry(head, struct flb_input_instance, _head);
-        flb_debug("     %s", in->p->name);
+        flb_info("     %s", in->p->name);
     }
 
     /* Filters */
-    flb_debug("___________");
-    flb_debug(" filters:");
+    flb_info("___________");
+    flb_info(" filters:");
     mk_list_foreach(head, &config->filters) {
         f = mk_list_entry(head, struct flb_filter_instance, _head);
-        flb_debug("     %s", f->name);
+        flb_info("     %s", f->name);
     }
 
     /* Outputs */
-    flb_debug("___________");
-    flb_debug(" outputs:");
+    flb_info("___________");
+    flb_info(" outputs:");
     mk_list_foreach(head, &config->outputs) {
         out = mk_list_entry(head, struct flb_output_instance, _head);
-        flb_debug("     %s", out->name);
+        flb_info("     %s", out->name);
     }
 
     /* Collectors */
-    flb_debug("___________");
-    flb_debug(" collectors:");
+    flb_info("___________");
+    flb_info(" collectors:");
     mk_list_foreach(head, &config->collectors) {
         collector = mk_list_entry(head, struct flb_input_collector, _head);
         plugin = collector->instance->p;
 
         if (collector->seconds > 0) {
-            flb_debug("[%s %lus,%luns] ",
+            flb_info("[%s %lus,%luns] ",
                       plugin->name,
                       collector->seconds,
                       collector->nanoseconds);
         }
         else {
-            flb_debug("     [%s] ", plugin->name);
+            flb_info("     [%s] ", plugin->name);
         }
 
     }
