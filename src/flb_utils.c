@@ -169,33 +169,55 @@ void flb_utils_print_setup(struct flb_config *config)
     struct flb_input_plugin *plugin;
     struct flb_input_collector *collector;
     struct flb_input_instance *in;
+    struct flb_filter_instance *f;
+    struct flb_output_instance *out;
 
-    flb_info("Configuration");
+    flb_debug("Configuration:");
 
     /* general */
-    flb_info(" flush time     : %i seconds", config->flush);
+    flb_debug(" flush time     | %f seconds", config->flush);
+    flb_debug(" grace          | %i seconds", config->grace);
+    flb_debug(" daemon         | %i", config->daemon);
 
     /* Inputs */
-    flb_info(" input plugins  : ");
+    flb_debug("___________");
+    flb_debug(" inputs:");
     mk_list_foreach(head, &config->inputs) {
         in = mk_list_entry(head, struct flb_input_instance, _head);
-        flb_info("%s ", in->p->name);
+        flb_debug("     %s", in->p->name);
+    }
+
+    /* Filters */
+    flb_debug("___________");
+    flb_debug(" filters:");
+    mk_list_foreach(head, &config->filters) {
+        f = mk_list_entry(head, struct flb_filter_instance, _head);
+        flb_debug("     %s", f->name);
+    }
+
+    /* Outputs */
+    flb_debug("___________");
+    flb_debug(" outputs:");
+    mk_list_foreach(head, &config->outputs) {
+        out = mk_list_entry(head, struct flb_output_instance, _head);
+        flb_debug("     %s", out->name);
     }
 
     /* Collectors */
-    flb_info(" collectors     : ");
+    flb_debug("___________");
+    flb_debug(" collectors:");
     mk_list_foreach(head, &config->collectors) {
         collector = mk_list_entry(head, struct flb_input_collector, _head);
         plugin = collector->instance->p;
 
         if (collector->seconds > 0) {
-            flb_info("[%s %lus,%luns] ",
-                     plugin->name,
-                     collector->seconds,
-                     collector->nanoseconds);
+            flb_debug("[%s %lus,%luns] ",
+                      plugin->name,
+                      collector->seconds,
+                      collector->nanoseconds);
         }
         else {
-            printf("[%s] ", plugin->name);
+            flb_debug("     [%s] ", plugin->name);
         }
 
     }
