@@ -1062,6 +1062,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
         }
     }
     flb_info("http: returning 0 at end");
+    flb_info("resp.status at end: %i", c->resp.status);
     return 0;
 }
 
