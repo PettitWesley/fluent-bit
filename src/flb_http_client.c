@@ -399,7 +399,7 @@ static int process_data(struct flb_http_client *c)
         }
     }
     else if (c->resp.headers_end && c->resp.content_length <= 0) {
-        flb_info("returning because c->resp.headers_end && c->resp.content_length <= 0")
+        flb_info("returning because c->resp.headers_end && c->resp.content_length <= 0");
         return FLB_HTTP_OK;
     }
 
