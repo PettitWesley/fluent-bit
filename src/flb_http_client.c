@@ -327,7 +327,7 @@ static int process_data(struct flb_http_client *c)
         memcpy(code, c->resp.data + 9, 3);
         code[3] = '\0';
         c->resp.status = atoi(code);
-        flb_info("this should be the http code: %s and it is: %d", code, c->resp.status);
+        flb_info("this should be the http code: %s and it is: %i", code, c->resp.status);
     }
 
     /* Try to lookup content length */
