@@ -37,9 +37,6 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation);
 static int ec2_credentials_request(struct aws_credentials_provider_ec2
                                    *implementation, char *cred_path);
 
-int get_metadata_v1(struct aws_http_client *client, char *metadata_path,
-                    flb_sds_t *metadata, size_t *metadata_len);
-
 /* EC2 IMDS Provider */
 
 /*
@@ -51,6 +48,14 @@ struct aws_credentials_provider_ec2 {
 
     /* upstream connection to IMDS */
     struct aws_http_client *client;
+
+    /*
+     * We default to IMDSv2. However, if it is unavailable, for performance
+     * reasons we can not constantly check if its available. This field is
+     * initially set to 0, and then is set to the first successful IMDS version
+     * that returns a response. V2 is tried first.
+     */
+    int imds_version;
 
     /* IMDSv2 Token */
     flb_sds_t imds_v2_token;
@@ -223,31 +228,37 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
 
     flb_debug("[aws_credentials] requesting credentials from EC2 IMDS");
 
-    if (!implementation->imds_v2_token ||
-        (time(NULL) > implementation->token_refresh)) {
-        flb_debug("[aws_credentials] requesting a new IMDSv2 token");
+    if (implementation->imds_version != 1) {
+        if (!implementation->imds_v2_token ||
+            (time(NULL) > implementation->token_refresh)) {
+            flb_debug("[aws_credentials] requesting a new IMDSv2 token");
 
-        /* free existing token */
-        if (implementation->imds_v2_token) {
-            flb_sds_destroy(implementation->imds_v2_token);
-            implementation->imds_v2_token = NULL;
-        }
+            /* free existing token */
+            if (implementation->imds_v2_token) {
+                flb_sds_destroy(implementation->imds_v2_token);
+                implementation->imds_v2_token = NULL;
+            }
 
-        ret = get_ec2_token(implementation->client,
-                            &implementation->imds_v2_token,
-                            &implementation->imds_v2_token_len);
+            ret = get_ec2_token(implementation->client,
+                                &implementation->imds_v2_token,
+                                &implementation->imds_v2_token_len);
 
-        if (ret == 0) {
-            implementation->token_refresh = time(NULL)
-                                            + AWS_IMDS_V2_TOKEN_TTL
-                                            - FLB_AWS_REFRESH_WINDOW;
-        } else {
-            /*
-             * If the token request fails, we fall back to V1
-             * V1 is exactly the same, the token is just not required.
-             * Setting the token length to zero tells our code to use V1.
-             */
-             implementation->imds_v2_token_len = 0;
+            if (ret == 0) {
+                implementation->token_refresh = time(NULL)
+                                                + AWS_IMDS_V2_TOKEN_TTL
+                                                - FLB_AWS_REFRESH_WINDOW;
+                /* v2 is available */
+                implementation->imds_version = 2;
+                flb_debug("[aws_credentials] IMDSv2 is available; will use it "
+                          "from now on");
+            } else {
+                /*
+                 * If the token request fails, we try IMDSv1.
+                 * V1 is exactly the same, the token is just not required.
+                 * Setting the token length to zero tells our code to use V1.
+                 */
+                 implementation->imds_v2_token_len = 0;
+            }
         }
     }
 
@@ -285,6 +296,13 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
 
     /* request creds */
     ret = ec2_credentials_request(implementation, cred_path);
+
+    if (ret >= 0 && implementation->imds_v2_token_len == 0) {
+        /* successfully got creds from v1; v1 is available */
+        implementation->imds_version = 1;
+        flb_debug("[aws_credentials] IMDSv1 is available, and v2 appears "
+                  "unavailable. Will use v1 from now on");
+    }
 
     flb_sds_destroy(instance_role);
     flb_free(cred_path);
