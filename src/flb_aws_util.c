@@ -236,6 +236,7 @@ int request_do(struct flb_aws_client *aws_client,
                   ret, aws_client->c->resp.status);
         if (aws_client->c->resp.payload_size > 0) {
             /* try to parse the error */
+            flb_debug("raw resp: %s", aws_client->c->resp.payload);
             aws_client->error_type = flb_aws_error(aws_client->c->resp.payload,
                                                  aws_client->c->
                                                  resp.payload_size);
