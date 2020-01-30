@@ -105,8 +105,9 @@ int flb_aws_client_request(struct flb_aws_client *aws_client,
     }
 
     /* perform a single retry */
-    return request_do(aws_client, method, uri, body, body_len,
-                      dynamic_headers, dynamic_headers_len);
+    // return request_do(aws_client, method, uri, body, body_len,
+    //                   dynamic_headers, dynamic_headers_len);
+    return ret;
 }
 
 static struct flb_aws_client_vtable client_vtable = {
