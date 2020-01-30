@@ -464,7 +464,9 @@ int flb_io_net_write(struct flb_upstream_conn *u_conn, const void *data,
 ssize_t flb_io_net_read(struct flb_upstream_conn *u_conn, void *buf, size_t len)
 {
     int ret = -1;
+    flb_info("conn: %p", u_conn);
     struct flb_upstream *u = u_conn->u;
+    flb_info("upstream: %p", u);
     struct flb_thread *th = pthread_getspecific(flb_thread_key);
 
     flb_trace("[io thread=%p] [net_read] try up to %zd bytes",
