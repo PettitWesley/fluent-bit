@@ -1036,7 +1036,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
             c->resp.data_len += r_bytes;
             c->resp.data[c->resp.data_len] = '\0';
 
-            flb_info("resp data so far: %s", c->resp.data);
+            printf("resp data so far: %s\n", c->resp.data);
 
             ret = process_data(c);
             if (ret == FLB_HTTP_ERROR) {
