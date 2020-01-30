@@ -188,6 +188,9 @@ struct aws_credentials_provider *new_ec2_provider(struct flb_config *config,
     provider->provider_vtable = &ec2_provider_vtable;
     provider->implementation = implementation;
 
+    /* At initialization time, we do not know which imds version is available */
+    implementation->imds_version = 0;
+
     upstream = flb_upstream_create(config, AWS_IMDS_V2_HOST, 80,
                                    FLB_IO_TCP, NULL);
     if (!upstream) {

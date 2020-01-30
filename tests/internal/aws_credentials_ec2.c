@@ -430,11 +430,12 @@ static void test_ec2_provider_v1()
     TEST_CHECK(ret == 0);
 
     /*
-     * See call count comment in test_ec2_provider_v2() above.
-     * V1 is only used when a V2 token request fails, so this test makes
-     * 6 calls.
+     * V2 is tried first, and it fails. Then 2 requests are made with v1 for
+     * the first call to get_credentials. The second call hits cache. The call
+     * to refresh leads to 2 more calls.
+     *
      */
-    TEST_CHECK(g_request_count == 6);
+    TEST_CHECK(g_request_count == 5);
 
     aws_provider_destroy(provider);
 }
