@@ -1026,6 +1026,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
                                   available);
         if (r_bytes <= 0) {
             if (c->flags & FLB_HTTP_10) {
+                flb_info("breaking because no byte read");
                 break;
             }
         }
@@ -1040,6 +1041,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
                 return -1;
             }
             else if (ret == FLB_HTTP_OK) {
+                flb_info("breaking because resp was FLB_HTTP_OK");
                 break;
             }
             else if (ret == FLB_HTTP_MORE) {
