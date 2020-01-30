@@ -380,6 +380,7 @@ static int process_data(struct flb_http_client *c)
             c->resp.payload_size = c->resp.data_len;
             c->resp.payload_size -= (c->resp.headers_end - c->resp.data);
             if (c->resp.payload_size >= c->resp.content_length) {
+                flb_info("returning because of math");
                 return FLB_HTTP_OK;
             }
         }
@@ -393,10 +394,12 @@ static int process_data(struct flb_http_client *c)
             }
         }
         else {
+            flb_info("returning because headers_end and not chunked and content length is 0");
             return FLB_HTTP_OK;
         }
     }
     else if (c->resp.headers_end && c->resp.content_length <= 0) {
+        flb_info("returning because c->resp.headers_end && c->resp.content_length <= 0")
         return FLB_HTTP_OK;
     }
 
@@ -1045,6 +1048,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
             }
             else if (ret == FLB_HTTP_OK) {
                 flb_info("breaking because resp was FLB_HTTP_OK");
+                flb_info("resp.status before break: %i", c->resp.status);
                 break;
             }
             else if (ret == FLB_HTTP_MORE) {
