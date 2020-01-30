@@ -229,7 +229,9 @@ int request_do(struct flb_aws_client *aws_client,
     }
 
     /* Perform request */
+    flb_info("upstream before request: %p", aws_client->upstream);
     ret = flb_http_do(aws_client->c, &b_sent);
+    flb_info("upstream after request: %p", aws_client->upstream);
 
     if (ret != 0 || aws_client->c->resp.status != 200) {
         flb_error("[aws_client] request error: http_do=%i, HTTP Status: %i",
