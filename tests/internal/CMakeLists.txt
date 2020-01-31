@@ -3,6 +3,9 @@ find_package(Threads REQUIRED)
 include_directories(cutest/)
 
 set(UNIT_TESTS_FILES
+  aws_util.c
+  aws_credentials.c
+  aws_credentials_sts.c
   pack.c
   pipe.c
   sds.c

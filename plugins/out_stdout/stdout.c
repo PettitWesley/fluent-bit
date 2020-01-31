@@ -25,9 +25,14 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
+#include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_signv4.h>
+#include <fluent-bit/flb_aws_credentials.h>
 #include <msgpack.h>
 
 #include "stdout.h"
+#include <stdio.h>
 
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
@@ -78,6 +83,36 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    struct flb_aws_provider *provider;
+    // struct flb_aws_provider *base_provider;
+
+    // base_provider = flb_aws_env_provider_create();
+    // if (!base_provider) {
+    //     flb_errno();
+    //     return -1;
+    // }
+
+    ctx->tls = &ins->tls;
+
+    /* Create TLS context */
+    ctx->tls->context = flb_tls_context_new(FLB_TRUE,  /* verify */
+                                           FLB_TRUE,        /* debug */
+                                           NULL,      /* vhost */
+                                           NULL,      /* ca_path */
+                                           NULL,      /* ca_file */
+                                           NULL,      /* crt_file */
+                                           NULL,      /* key_file */
+                                           NULL);     /* key_passwd */
+
+    provider = flb_eks_provider_create(config, ctx->tls, "us-west-2", NULL,
+                                       flb_aws_client_generator());
+    if (!provider) {
+        flb_errno();
+        return -1;
+    }
+
+    ctx->provider = provider;
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -99,47 +134,62 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+    struct flb_aws_credentials *creds;
 
-    if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
-        json = flb_pack_msgpack_to_json_format(data, bytes,
-                                               ctx->out_format,
-                                               ctx->json_date_format,
-                                               ctx->json_date_key);
-        write(STDOUT_FILENO, json, flb_sds_len(json));
-        flb_sds_destroy(json);
+    creds = ctx->provider->provider_vtable->get_credentials(ctx->provider);
+    if (!creds) {
+        flb_errno();
+        flb_debug("[test] no creds.");
+        FLB_OUTPUT_RETURN(FLB_OK);
+    }
 
-        /*
-         * If we are 'not' in json_lines mode, we need to add an extra
-         * breakline.
-         */
-        if (ctx->out_format != FLB_PACK_JSON_FORMAT_LINES) {
-            printf("\n");
-        }
-        fflush(stdout);
-    }
-    else {
-        /* A tag might not contain a NULL byte */
-        buf = flb_malloc(tag_len + 1);
-        if (!buf) {
-            flb_errno();
-            FLB_OUTPUT_RETURN(FLB_RETRY);
-        }
-        memcpy(buf, tag, tag_len);
-        buf[tag_len] = '\0';
-        msgpack_unpacked_init(&result);
-        while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
-            printf("[%zd] %s: [", cnt++, buf);
-            flb_time_pop_from_msgpack(&tmp, &result, &p);
-            printf("%"PRIu32".%09lu, ", (uint32_t)tmp.tm.tv_sec, tmp.tm.tv_nsec);
-            msgpack_object_print(stdout, *p);
-            printf("]\n");
-        }
-        msgpack_unpacked_destroy(&result);
-        flb_free(buf);
-    }
-    fflush(stdout);
+    flb_debug("[test] access: %s", creds->access_key_id);
+    flb_debug("[test] secret: %s", creds->secret_access_key);
+    flb_debug("[test] token: %s", creds->session_token);
 
     FLB_OUTPUT_RETURN(FLB_OK);
+    return;
+
+    // if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
+    //     json = flb_pack_msgpack_to_json_format(data, bytes,
+    //                                            ctx->out_format,
+    //                                            ctx->json_date_format,
+    //                                            ctx->json_date_key);
+    //     write(STDOUT_FILENO, json, flb_sds_len(json));
+    //     flb_sds_destroy(json);
+    //
+    //     /*
+    //      * If we are 'not' in json_lines mode, we need to add an extra
+    //      * breakline.
+    //      */
+    //     if (ctx->out_format != FLB_PACK_JSON_FORMAT_LINES) {
+    //         printf("\n");
+    //     }
+    //     fflush(stdout);
+    // }
+    // else {
+    //     /* A tag might not contain a NULL byte */
+    //     buf = flb_malloc(tag_len + 1);
+    //     if (!buf) {
+    //         flb_errno();
+    //         FLB_OUTPUT_RETURN(FLB_RETRY);
+    //     }
+    //     memcpy(buf, tag, tag_len);
+    //     buf[tag_len] = '\0';
+    //     msgpack_unpacked_init(&result);
+    //     while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
+    //         printf("[%zd] %s: [", cnt++, buf);
+    //         flb_time_pop_from_msgpack(&tmp, &result, &p);
+    //         printf("%"PRIu32".%09lu, ", (uint32_t)tmp.tm.tv_sec, tmp.tm.tv_nsec);
+    //         msgpack_object_print(stdout, *p);
+    //         printf("]\n");
+    //     }
+    //     msgpack_unpacked_destroy(&result);
+    //     flb_free(buf);
+    // }
+    // fflush(stdout);
+    //
+    // FLB_OUTPUT_RETURN(FLB_OK);
 }
 
 static int cb_stdout_exit(void *data, struct flb_config *config)
