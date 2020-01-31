@@ -329,7 +329,7 @@ static void test_ec2_provider_v1()
     g_use_v2 = FLB_FALSE;
     g_request_count = 0;
 
-    config = flb_malloc(sizeof(struct flb_config));
+    config = flb_calloc(1, sizeof(struct flb_config));
     if (!config) {
         flb_errno();
         return;
@@ -377,6 +377,7 @@ static void test_ec2_provider_v1()
     TEST_CHECK(g_request_count == 4);
 
     aws_provider_destroy(provider);
+    flb_free(config);
 }
 
 static void test_ec2_provider_error_case()
@@ -386,7 +387,7 @@ static void test_ec2_provider_error_case()
     int ret;
     struct flb_config *config;
 
-    config = flb_malloc(sizeof(struct flb_config));
+    config = flb_calloc(1, sizeof(struct flb_config));
     if (!config) {
         flb_errno();
         return;
@@ -411,6 +412,7 @@ static void test_ec2_provider_error_case()
     TEST_CHECK(ret < 0);
 
     aws_provider_destroy(provider);
+    flb_free(config);
 }
 
 /* unexpected output test- see description for MALFORMED_RESPONSE */
@@ -421,7 +423,7 @@ static void test_ec2_provider_malformed_case()
     int ret;
     struct flb_config *config;
 
-    config = flb_malloc(sizeof(struct flb_config));
+    config = flb_calloc(1, sizeof(struct flb_config));
     if (!config) {
         flb_errno();
         return;
@@ -446,6 +448,7 @@ static void test_ec2_provider_malformed_case()
     TEST_CHECK(ret < 0);
 
     aws_provider_destroy(provider);
+    flb_free(config);
 }
 
 TEST_LIST = {
