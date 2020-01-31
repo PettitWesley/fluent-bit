@@ -47,7 +47,7 @@ struct aws_credentials_provider_ec2 {
     time_t next_refresh;
 
     /* upstream connection to IMDS */
-    struct aws_http_client *client;
+     struct flb_aws_client *client;
 
     /*
      * Currently, we only support IMDSv1. Once improvements in the core net IO
@@ -139,7 +139,7 @@ void destroy_fn_ec2(struct aws_credentials_provider *provider) {
         }
 
         if (implementation->client) {
-            aws_client_destroy(implementation->client);
+            flb_aws_client_destroy(implementation->client);
         }
 
         if (implementation->imds_v2_token) {
@@ -197,7 +197,7 @@ struct aws_credentials_provider *new_ec2_provider(struct flb_config *config,
         return NULL;
     }
 
-    implementation->client = generator->new();
+    implementation->client = generator->create();
     if (!implementation->client) {
         aws_provider_destroy(provider);
         flb_upstream_destroy(upstream);

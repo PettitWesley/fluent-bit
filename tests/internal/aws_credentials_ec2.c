@@ -48,7 +48,7 @@ int g_use_v2;
  */
 int g_request_count;
 
-int ec2_token_response(struct aws_http_client *aws_client,
+int ec2_token_response(struct flb_aws_client *aws_client,
                        int method, const char *uri)
 {
     TEST_CHECK(method == FLB_HTTP_PUT);
@@ -81,7 +81,7 @@ int ec2_token_response(struct aws_http_client *aws_client,
     return 0;
 }
 
-int ec2_role_name_response(struct aws_http_client *aws_client,
+int ec2_role_name_response(struct flb_aws_client *aws_client,
                            int method, const char *uri,
                            size_t dynamic_headers_len)
 {
@@ -114,7 +114,7 @@ int ec2_role_name_response(struct aws_http_client *aws_client,
     return 0;
 }
 
-int ec2_credentials_response(struct aws_http_client *aws_client,
+int ec2_credentials_response(struct flb_aws_client *aws_client,
                              int method, const char *uri,
                              size_t dynamic_headers_len)
 {
@@ -148,10 +148,10 @@ int ec2_credentials_response(struct aws_http_client *aws_client,
 }
 
 /* test/mock version of the aws_http_client request function */
-int test_http_client_request(struct aws_http_client *aws_client,
+int test_http_client_request(struct flb_aws_client *aws_client,
                              int method, const char *uri,
                              const char *body, size_t body_len,
-                             struct aws_http_header *dynamic_headers,
+                             struct flb_aws_header *dynamic_headers,
                              size_t dynamic_headers_len)
 {
     g_request_count++;
@@ -177,14 +177,14 @@ int test_http_client_request(struct aws_http_client *aws_client,
 }
 
 /* Test/mock aws_http_client */
-static struct aws_http_client_vtable test_vtable = {
+static struct flb_aws_client_vtable test_vtable = {
     .request = test_http_client_request,
 };
 
-struct aws_http_client *test_http_client_create()
+struct flb_aws_client *test_http_client_create()
 {
-    struct aws_http_client *client = flb_calloc(1,
-                                                sizeof(struct aws_http_client));
+    struct flb_aws_client *client = flb_calloc(1,
+                                                sizeof(struct flb_aws_client));
     if (!client) {
         flb_errno();
         return NULL;
@@ -194,20 +194,20 @@ struct aws_http_client *test_http_client_create()
 }
 
 /* Generator that returns clients with the test vtable */
-static struct aws_http_client_generator test_generator = {
-    .new = test_http_client_create,
+static struct flb_aws_client_generator test_generator = {
+    .create = test_http_client_create,
 };
 
-struct aws_http_client_generator *generator_in_test()
+struct flb_aws_client_generator *generator_in_test()
 {
     return &test_generator;
 }
 
 /* test/mock version of the aws_http_client request function */
-int malformed_http_client_request(struct aws_http_client *aws_client,
+int malformed_http_client_request(struct flb_aws_client *aws_client,
                                   int method, const char *uri,
                                   const char *body, size_t body_len,
-                                  struct aws_http_header *dynamic_headers,
+                                  struct flb_aws_header *dynamic_headers,
                                   size_t dynamic_headers_len)
 {
     /*
@@ -242,14 +242,14 @@ int malformed_http_client_request(struct aws_http_client *aws_client,
 }
 
 /* Test/mock aws_http_client */
-static struct aws_http_client_vtable malformed_vtable = {
+static struct flb_aws_client_vtable malformed_vtable = {
     .request = malformed_http_client_request,
 };
 
-struct aws_http_client *malformed_http_client_create()
+struct flb_aws_client *malformed_http_client_create()
 {
-    struct aws_http_client *client = flb_calloc(1,
-                                                sizeof(struct aws_http_client));
+    struct flb_aws_client *client = flb_calloc(1,
+                                                sizeof(struct flb_aws_client));
     if (!client) {
         flb_errno();
         return NULL;
@@ -259,20 +259,20 @@ struct aws_http_client *malformed_http_client_create()
 }
 
 /* Generator that returns clients with the test vtable */
-static struct aws_http_client_generator malformed_generator = {
+static struct flb_aws_client_generator malformed_generator = {
     .new = malformed_http_client_create,
 };
 
-struct aws_http_client_generator *generator_malformed()
+struct flb_aws_client_generator *generator_malformed()
 {
     return &malformed_generator;
 }
 
 /* Error case mock - uses a different client and generator than happy case */
-int test_http_client_error_case(struct aws_http_client *aws_client,
+int test_http_client_error_case(struct flb_aws_client *aws_client,
                                 int method, const char *uri,
                                 const char *body, size_t body_len,
-                                struct aws_http_header *dynamic_headers,
+                                struct flb_aws_header *dynamic_headers,
                                 size_t dynamic_headers_len)
 {
     /* create an http client so that we can set the response */
@@ -293,14 +293,14 @@ int test_http_client_error_case(struct aws_http_client *aws_client,
 }
 
 /* Test/mock aws_http_client */
-static struct aws_http_client_vtable error_case_vtable = {
+static struct flb_aws_client_vtable error_case_vtable = {
     .request = test_http_client_error_case,
 };
 
-struct aws_http_client *test_http_client_create_error_case()
+struct flb_aws_client *test_http_client_create_error_case()
 {
-    struct aws_http_client *client = flb_calloc(1,
-                                                sizeof(struct aws_http_client));
+    struct flb_aws_client *client = flb_calloc(1,
+                                                sizeof(struct flb_aws_client));
     if (!client) {
         flb_errno();
         return NULL;
@@ -310,11 +310,11 @@ struct aws_http_client *test_http_client_create_error_case()
 }
 
 /* Generator that returns clients with the test vtable */
-static struct aws_http_client_generator error_case_generator = {
+static struct flb_aws_client_generator error_case_generator = {
     .new = test_http_client_create_error_case,
 };
 
-struct aws_http_client_generator *generator_in_test_error_case()
+struct flb_aws_client_generator *generator_in_test_error_case()
 {
     return &error_case_generator;
 }

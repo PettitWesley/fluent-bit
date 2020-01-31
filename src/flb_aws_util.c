@@ -27,6 +27,20 @@
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
 
+#define AWS_IMDS_V2_TOKEN_HEADER               "X-aws-ec2-metadata-token"
+#define AWS_IMDS_V2_TOKEN_HEADER_LEN           24
+
+#define AWS_IMDS_V2_TOKEN_TTL_HEADER           "X-aws-ec2-metadata-token-ttl-seconds"
+#define AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN       36
+
+#define AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL       "21600"
+#define AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN   5
+
+#define AWS_IMDS_V2_TOKEN_TTL                  21600
+
+#define AWS_IMDS_V2_HOST                       "169.254.169.254"
+#define AWS_IMDS_V2_TOKEN_PATH                 "/latest/api/token"
+
 int request_do(struct aws_http_client *aws_client,
                 int method, const char *uri,
                 const char *body, size_t body_len,
@@ -338,7 +352,7 @@ static struct aws_http_header token_ttl_header = {
     .val_len = AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN,
 };
 
-int get_ec2_token(struct aws_http_client *client, flb_sds_t *token,
+int get_ec2_token(struct flb_aws_client *client, flb_sds_t *token,
                   size_t *token_len)
 {
     int ret;
@@ -369,13 +383,13 @@ int get_ec2_token(struct aws_http_client *client, flb_sds_t *token,
     return 0;
 }
 
-int get_metadata(struct aws_http_client *client, char *metadata_path,
+int get_metadata(struct flb_aws_client *client, char *metadata_path,
                  flb_sds_t *metadata, size_t *metadata_len,
                  flb_sds_t token, size_t token_len)
 {
     int ret;
     flb_sds_t ec2_metadata;
-    struct aws_http_header token_ttl_header;
+    struct flb_aws_header token_ttl_header;
 
     if (token_len > 0) {
         /* setting the header is what determines whether we're using V1 or V1 */

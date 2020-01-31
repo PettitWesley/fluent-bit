@@ -27,20 +27,6 @@
 
 #define FLB_AWS_CREDENTIAL_REFRESH_LIMIT       300
 
-#define AWS_IMDS_V2_TOKEN_HEADER               "X-aws-ec2-metadata-token"
-#define AWS_IMDS_V2_TOKEN_HEADER_LEN           24
-
-#define AWS_IMDS_V2_TOKEN_TTL_HEADER           "X-aws-ec2-metadata-token-ttl-seconds"
-#define AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN       36
-
-#define AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL       "21600"
-#define AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN   5
-
-#define AWS_IMDS_V2_TOKEN_TTL                  21600
-
-#define AWS_IMDS_V2_HOST                       "169.254.169.254"
-#define AWS_IMDS_V2_TOKEN_PATH                 "/latest/api/token"
-
 /*
  * The AWS HTTP Client is a wrapper around the Fluent Bit's http library.
  * It handles tasks which are common to all AWS API requests (retries,
@@ -48,20 +34,21 @@
  * It is also easily mockable in unit tests.
  */
 
- struct aws_http_client;
+ struct flb_aws_client;
 
- struct aws_http_header {
+ struct flb_aws_header {
      char *key;
      size_t key_len;
      char *val;
      size_t val_len;
  };
 
-typedef int(aws_http_client_request_fn)(struct aws_http_client *aws_client,
-                                        int method, const char *uri,
-                                        const char *body, size_t body_len,
-                                        struct aws_http_header *dynamic_headers,
-                                        size_t dynamic_headers_len);
+typedef struct flb_http_client *(flb_aws_client_request_fn)
+                                (struct flb_aws_client *aws_client,
+                                int method, const char *uri,
+                                const char *body, size_t body_len,
+                                struct flb_aws_header *dynamic_headers,
+                                size_t dynamic_headers_len);
 
 /* TODO: Eventually will need to add a way to call flb_http_buffer_size */
 
@@ -69,19 +56,19 @@ typedef int(aws_http_client_request_fn)(struct aws_http_client *aws_client,
  * Virtual table for aws http client behavior.
  * This makes the client's functionality mockable in unit tests.
  */
-struct aws_http_client_vtable {
-    aws_http_client_request_fn *request;
+struct flb_aws_client_vtable {
+    flb_aws_client_request_fn *request;
 };
 
-struct aws_http_client {
-    struct aws_http_client_vtable *client_vtable;
+struct flb_aws_client {
+    struct flb_aws_client_vtable *client_vtable;
 
     /* Name to identify this client: used in log messages and tests */
     char *name;
 
     /* Sigv4 */
     int has_auth;
-    struct aws_credentials_provider *provider;
+    struct flb_aws_provider *provider;
     char *region;
     char *service;
 
@@ -97,15 +84,8 @@ struct aws_http_client {
      * The AWS client will add auth headers, content length,
      * and user agent.
      */
-     struct aws_http_header *static_headers;
+     struct flb_aws_header *static_headers;
      size_t static_headers_len;
-
-    /*
-     * Client from a successful request or the last failed retry.
-     * Caller code can use this to access the raw response.
-     * Caller code does not need to free this pointer.
-     */
-    struct flb_http_client *c;
 
     /*
      * If an API responds with 400, we refresh creds and retry.
@@ -113,41 +93,40 @@ struct aws_http_client {
      * FLB_AWS_CREDENTIAL_REFRESH_LIMIT.
      */
     time_t refresh_limit;
-
-    /*
-     * The parsed AWS API error type returned by the last request.
-     * Caller code does not need to free this pointer.
-     */
-    flb_sds_t error_type;
 };
 
 /*
- * Frees the aws_client and the internal flb_http_client.
- * Caller code must free all other memory.
+ * Frees the aws_client, the internal flb_http_client, error_code,
+ * and flb_upstream.
+ * Caller code must free any other memory.
+ * (Why? - Because all other memory may be static.)
  */
-void aws_client_destroy(struct aws_http_client *aws_client);
+void flb_aws_client_destroy(struct flb_aws_client *aws_client);
 
-typedef struct aws_http_client*(aws_http_client_create_fn)();
+typedef struct flb_aws_client*(flb_aws_client_create_fn)();
 
 /*
  * HTTP Client Generator creates a new client structure and sets the vtable.
- * Unit tests can implement a custom generator which returns a mock client.
+ * Unit tests can implement a custom flb_aws_client_generator which returns a mock client.
  * This structure is a virtual table.
  * Client code should not free it.
  */
-struct aws_http_client_generator {
-    aws_http_client_create_fn *new;
+struct flb_aws_client_generator {
+    flb_aws_client_create_fn *create;
 };
 
-/* Get the generator */
-struct aws_http_client_generator *generator();
+/* Get the flb_aws_client_generator */
+struct flb_aws_client_generator *flb_aws_client_generator();
 
 /*
  * Format an AWS regional API endpoint
  */
-char *endpoint_for(char* service, char* region);
+char *flb_aws_endpoint(char* service, char* region);
 
-flb_sds_t parse_error(char *response, size_t response_len);
+/*
+ * Parses an AWS API error type returned by a request.
+ */
+flb_sds_t flb_aws_error(char *response, size_t response_len);
 
 /*
  * Get an IMDSv2 token
