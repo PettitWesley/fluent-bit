@@ -472,9 +472,11 @@ ssize_t flb_io_net_read(struct flb_upstream_conn *u_conn, void *buf, size_t len)
 
     if (u->flags & FLB_IO_TCP) {
         if (u->flags & FLB_IO_ASYNC) {
+            flb_info("async");
             ret = net_io_read_async(th, u_conn, buf, len);
         }
         else {
+            flb_info("sync");
             ret = net_io_read(u_conn, buf, len);
         }
     }
