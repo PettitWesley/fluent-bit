@@ -50,10 +50,8 @@ struct aws_credentials_provider_ec2 {
     struct aws_http_client *client;
 
     /*
-     * We default to IMDSv2. However, if it is unavailable, for performance
-     * reasons we can not constantly check if its available. This field is
-     * initially set to 0, and then is set to the first successful IMDS version
-     * that returns a response. V2 is tried first.
+     * Currently, we only support IMDSv1. Once improvements in the core net IO
+     * library is made. We will support v2 and v1 and use whichever is available.
      */
     int imds_version;
 
@@ -188,8 +186,7 @@ struct aws_credentials_provider *new_ec2_provider(struct flb_config *config,
     provider->provider_vtable = &ec2_provider_vtable;
     provider->implementation = implementation;
 
-    /* At initialization time, we do not know which imds version is available */
-    implementation->imds_version = 0;
+    implementation->imds_version = 1;
 
     upstream = flb_upstream_create(config, AWS_IMDS_V2_HOST, 80,
                                    FLB_IO_TCP, NULL);
