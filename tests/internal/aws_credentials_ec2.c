@@ -370,12 +370,11 @@ static void test_ec2_provider_v1()
     TEST_CHECK(ret == 0);
 
     /*
-     * V2 is tried first, and it fails. Then 2 requests are made with v1 for
-     * the first call to get_credentials. The second call hits cache. The call
-     * to refresh leads to 2 more calls.
+     * 2 requests are made with v1 for the first call to get_credentials.
+     * The second call hits cache. The call to refresh leads to 2 more calls.
      *
      */
-    TEST_CHECK(g_request_count == 5);
+    TEST_CHECK(g_request_count == 4);
 
     aws_provider_destroy(provider);
 }
