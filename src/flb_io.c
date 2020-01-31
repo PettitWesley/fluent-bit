@@ -413,7 +413,9 @@ static FLB_INLINE ssize_t net_io_read_async(struct flb_thread *th,
                 flb_socket_close(u_conn->fd);
                 return -1;
             }
+            flb_info("about to switch back to caller..");
             flb_thread_yield(th, MK_FALSE);
+            flb_info("->back to this thread: retrying");
             goto retry_read;
         }
         return -1;
