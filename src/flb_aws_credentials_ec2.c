@@ -300,8 +300,11 @@ static int get_creds_ec2(struct aws_credentials_provider_ec2 *implementation)
     if (ret >= 0 && implementation->imds_v2_token_len == 0) {
         /* successfully got creds from v1; v1 is available */
         implementation->imds_version = 1;
-        flb_debug("[aws_credentials] IMDSv1 is available, and v2 appears "
-                  "unavailable. Will use v1 from now on");
+        /*
+         * TODO: re-enable when IMDSv2 support is added
+         * flb_debug("[aws_credentials] IMDSv1 is available, and v2 appears "
+         *      "unavailable. Will use v1 from now on");
+         */
     }
 
     flb_sds_destroy(instance_role);

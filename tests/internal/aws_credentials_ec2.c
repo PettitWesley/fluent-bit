@@ -319,66 +319,6 @@ struct aws_http_client_generator *generator_in_test_error_case()
     return &error_case_generator;
 }
 
-static void test_ec2_provider_v2()
-{
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
-    int ret;
-    struct flb_config *config;
-
-    g_use_v2 = FLB_TRUE;
-    g_request_count = 0;
-
-    config = flb_malloc(sizeof(struct flb_config));
-    if (!config) {
-        flb_errno();
-        return;
-    }
-
-    provider = new_ec2_provider(config, generator_in_test());
-
-    if (!provider) {
-        flb_errno();
-        return;
-    }
-
-    /* repeated calls to get credentials should return the same set */
-    creds = provider->provider_vtable->get_credentials(provider);
-    if (!creds) {
-        flb_errno();
-        return;
-    }
-    TEST_CHECK(strcmp(ACCESS_KEY_EC2, creds->access_key_id) == 0);
-    TEST_CHECK(strcmp(SECRET_KEY_EC2, creds->secret_access_key) == 0);
-    TEST_CHECK(strcmp(TOKEN_EC2, creds->session_token) == 0);
-
-    aws_credentials_destroy(creds);
-
-    creds = provider->provider_vtable->get_credentials(provider);
-    if (!creds) {
-        flb_errno();
-        return;
-    }
-    TEST_CHECK(strcmp(ACCESS_KEY_EC2, creds->access_key_id) == 0);
-    TEST_CHECK(strcmp(SECRET_KEY_EC2, creds->secret_access_key) == 0);
-    TEST_CHECK(strcmp(TOKEN_EC2, creds->session_token) == 0);
-
-    aws_credentials_destroy(creds);
-
-    /* refresh should return 0 (success) */
-    ret = provider->provider_vtable->refresh(provider);
-    TEST_CHECK(ret == 0);
-    /*
-     * The first time credentials are obtained, it takes 3 requests- the first
-     * call to get_credentials. The second call should use cache.
-     * The call to refresh should make 2 requests- because the IMDSv2 token
-     * from the first call is cached.
-     */
-    TEST_CHECK(g_request_count == 5);
-
-    aws_provider_destroy(provider);
-}
-
 static void test_ec2_provider_v1()
 {
     struct aws_credentials_provider *provider;
@@ -510,7 +450,6 @@ static void test_ec2_provider_malformed_case()
 }
 
 TEST_LIST = {
-    { "test_ec2_provider_v2" , test_ec2_provider_v2},
     { "test_ec2_provider_v1" , test_ec2_provider_v1},
     { "test_ec2_provider_error_case" , test_ec2_provider_error_case},
     { "test_ec2_provider_malformed_response" ,
