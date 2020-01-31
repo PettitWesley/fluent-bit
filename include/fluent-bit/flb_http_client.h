@@ -24,6 +24,8 @@
 #include <fluent-bit/flb_io.h>
 #include <fluent-bit/flb_upstream.h>
 
+#define FLB_HTTP_DEFAULT_TIMEOUT 60
+
 /* Buffer size */
 #define FLB_HTTP_BUF_SIZE        2048
 #define FLB_HTTP_DATA_SIZE_MAX   4096
@@ -89,6 +91,11 @@ struct flb_http_proxy {
 struct flb_http_client {
     /* Upstream connection */
     struct flb_upstream_conn *u_conn;
+
+    /* Number of seconds to wait for response from the server */
+    int timeout;
+    /* Time when the client will stop waiting */
+    time_t timeout_time;
 
     /* Request data */
     int method;

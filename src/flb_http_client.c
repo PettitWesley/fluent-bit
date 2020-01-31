@@ -528,6 +528,7 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
     c->header_size = FLB_HTTP_BUF_SIZE;
     c->header_len  = ret;
     c->flags       = flags;
+    c->timeout     = FLB_HTTP_DEFAULT_TIMEOUT;
     mk_list_init(&c->headers);
 
     /* Check if we have a query string */
@@ -903,6 +904,9 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     c->header_buf[c->header_len++] = '\r';
     c->header_buf[c->header_len++] = '\n';
 
+    /* start timeout */
+    c->timeout_time = time(NULL) + c->timeout;
+
     /* Write the header */
     ret = flb_io_net_write(c->u_conn,
                            c->header_buf, c->header_len,
@@ -973,6 +977,12 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
         }
         else {
             flb_error("[http_client] broken connection to %s:%i ?",
+                      c->u_conn->u->tcp_host, c->u_conn->u->tcp_port);
+            return -1;
+        }
+
+        if (r_bytes <= 0 && time(NULL) > c->timeout_time) {
+            flb_error("[http_client] Timed out waiting for response from %s:%i",
                       c->u_conn->u->tcp_host, c->u_conn->u->tcp_port);
             return -1;
         }
