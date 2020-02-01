@@ -483,7 +483,7 @@ int flb_engine_start(struct flb_config *config)
 
     while (1) {
         mk_event_wait(evl);
-        flb_info("evl: running...");
+        //flb_info("evl: running...");
         mk_event_foreach(event, evl) {
             if (event->type == FLB_ENGINE_EV_CORE) {
                 ret = flb_engine_handle_event(event->fd, event->mask, config);
