@@ -483,9 +483,9 @@ int flb_engine_start(struct flb_config *config)
 
     while (1) {
         mk_event_wait(evl);
-        flb_info("evl: running...");
+        //flb_info("evl: running...");
         mk_event_foreach(event, evl) {
-            flb_info("Got event: %d", event->type);
+            //flb_info("Got event: %d", event->type);
             if (event->type == FLB_ENGINE_EV_CORE) {
                 flb_info("FLB_ENGINE_EV_CORE");
                 ret = flb_engine_handle_event(event->fd, event->mask, config);
@@ -512,17 +512,17 @@ int flb_engine_start(struct flb_config *config)
             }
             else if (event->type & FLB_ENGINE_EV_SCHED) {
                 /* Event type registered by the Scheduler */
-                flb_sched_event_handler(config, event);
                 flb_info("FLB_ENGINE_EV_SCHED");
+                flb_sched_event_handler(config, event);
             }
             else if (event->type == FLB_ENGINE_EV_SCHED) {
-                event->handler(event);
                 flb_info("FLB_ENGINE_EV_SCHED");
+                event->handler(event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD) {
+                flb_info("FLB_ENGINE_EV_THREAD");
                 struct flb_upstream_conn *u_conn;
                 struct flb_thread *th;
-                flb_info("FLB_ENGINE_EV_THREAD");
 
                 /*
                  * Check if we have some co-routine associated to this event,

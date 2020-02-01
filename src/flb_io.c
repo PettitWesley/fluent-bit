@@ -394,8 +394,10 @@ static FLB_INLINE ssize_t net_io_read_async(struct flb_thread *th,
 {
     int ret;
     struct flb_upstream *u = u_conn->u;
+    static int retry_count = 0;
 
  retry_read:
+    flb_info("retry #%d", retry_count++);
 
     ret = recv(u_conn->fd, buf, len, 0);
     if (ret == -1) {
@@ -406,6 +408,7 @@ static FLB_INLINE ssize_t net_io_read_async(struct flb_thread *th,
                                FLB_ENGINE_EV_THREAD,
                                MK_EVENT_READ, &u_conn->event);
             if (ret == -1) {
+                flb_info("Failed to add event to event loop");
                 /*
                  * If we failed here there no much that we can do, just
                  * let the caller we failed
@@ -413,6 +416,7 @@ static FLB_INLINE ssize_t net_io_read_async(struct flb_thread *th,
                 flb_socket_close(u_conn->fd);
                 return -1;
             }
+            flb_info("[io] ret=%d", ret);
             flb_info("about to switch back to caller..");
             flb_thread_yield(th, MK_FALSE);
             flb_info("->back to this thread: retrying");
