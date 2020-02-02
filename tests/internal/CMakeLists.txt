@@ -7,6 +7,7 @@ set(UNIT_TESTS_FILES
   aws_credentials.c
   aws_credentials_sts.c
   aws_credentials_http.c
+  aws_credentials_profile.c
   pack.c
   pipe.c
   sds.c
