@@ -35,6 +35,16 @@
 #define AWS_SECRET_ACCESS_KEY          "AWS_SECRET_ACCESS_KEY"
 #define AWS_SESSION_TOKEN              "AWS_SESSION_TOKEN"
 
+/* HTTP Credentials Endpoints have a standard set of JSON Keys */
+#define AWS_HTTP_RESPONSE_ACCESS_KEY   "AccessKeyId"
+#define AWS_HTTP_RESPONSE_SECRET_KEY   "SecretAccessKey"
+#define AWS_HTTP_RESPONSE_TOKEN        "Token"
+#define AWS_HTTP_RESPONSE_EXPIRATION   "Expiration"
+
+#define ECS_CREDENTIALS_HOST           "169.254.170.2"
+#define ECS_CREDENTIALS_HOST_LEN       13
+#define ECS_CREDENTIALS_PATH_ENV_VAR   "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
+
 /*
  * A structure that wraps the sensitive data needed to sign an AWS request
  */
@@ -142,6 +152,33 @@ struct aws_credentials_provider *new_sts_provider(struct flb_config *config,
  * Standard environment variables
  */
 struct aws_credentials_provider *new_environment_provider();
+
+
+/*
+ * New http provider - retrieve credentials from a local http server.
+ * Equivalent to:
+ * https://github.com/aws/aws-sdk-go/tree/master/aws/credentials/endpointcreds
+ *
+ * Calling aws_provider_destroy on this provider frees the memory
+ * used by host and path.
+ */
+struct aws_credentials_provider *new_http_provider(struct flb_config *config,
+                                                   flb_sds_t host,
+                                                   flb_sds_t path,
+                                                   struct
+                                                   aws_http_client_generator
+                                                   *generator);
+
+/*
+ * ECS Provider
+ * The ECS Provider is just a wrapper around the HTTP Provider
+ * with the ECS credentials endpoint.
+ */
+
+struct aws_credentials_provider *new_ecs_provider(struct flb_config *config,
+                                                  struct
+                                                  aws_http_client_generator
+                                                  *generator);
 
 /*
  * Helper functions
