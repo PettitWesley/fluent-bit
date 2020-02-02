@@ -104,8 +104,10 @@ static int cb_stdout_init(struct flb_output_instance *ins,
                                            NULL,      /* key_file */
                                            NULL);     /* key_passwd */
 
-    provider = flb_eks_provider_create(config, ctx->tls, "us-west-2", NULL,
-                                       flb_aws_client_generator());
+    // provider = flb_eks_provider_create(config, ctx->tls, "us-west-2", NULL,
+    //                                    flb_aws_client_generator());
+
+    provider = flb_ecs_provider_create(config, flb_aws_client_generator());
     if (!provider) {
         flb_errno();
         return -1;

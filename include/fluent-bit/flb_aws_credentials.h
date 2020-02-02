@@ -134,6 +134,33 @@ struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
  */
 struct flb_aws_provider *flb_aws_env_provider_create();
 
+
+/*
+ * New http provider - retrieve credentials from a local http server.
+ * Equivalent to:
+ * https://github.com/aws/aws-sdk-go/tree/master/aws/credentials/endpointcreds
+ *
+ * Calling flb_aws_credentials_destroy on this provider frees the memory
+ * used by host and path.
+ */
+struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
+                                                  flb_sds_t host,
+                                                  flb_sds_t path,
+                                                  struct
+                                                  flb_aws_client_generator
+                                                  *generator);
+
+/*
+ * ECS Provider
+ * The ECS Provider is just a wrapper around the HTTP Provider
+ * with the ECS credentials endpoint.
+ */
+
+struct flb_aws_provider *flb_ecs_provider_create(struct flb_config *config,
+                                                 struct
+                                                 flb_aws_client_generator
+                                                 *generator);
+
 /*
  * Helper functions
  */
@@ -147,6 +174,10 @@ struct flb_aws_credentials *flb_parse_sts_resp(char *response,
 char *flb_sts_uri(char *action, char *role_arn, char *session_name,
                   char *external_id, char *identity_token);
 char *flb_sts_session_name();
+
+struct flb_aws_credentials *flb_parse_http_credentials(char *response,
+                                                       size_t response_len,
+                                                       time_t *expiration);
 
 
 #endif
