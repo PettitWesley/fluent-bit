@@ -102,6 +102,7 @@ if(FLB_AWS)
     "flb_signv4.c"
     "flb_aws_credentials.c"
     "flb_aws_credentials_sts.c"
+    "flb_aws_credentials_profile.c"
     "flb_aws_util.c"
     )
 endif()

@@ -143,6 +143,12 @@ struct aws_credentials_provider *new_sts_provider(struct flb_config *config,
  */
 struct aws_credentials_provider *new_environment_provider();
 
+
+/*
+ * New AWS Profile provider, reads from the shared credentials file
+ */
+struct aws_credentials_provider *new_profile_provider();
+
 /*
  * Helper functions
  */
