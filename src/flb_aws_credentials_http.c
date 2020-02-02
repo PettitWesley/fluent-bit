@@ -285,6 +285,7 @@ static int http_credentials_request(struct flb_aws_provider_http
 
     /* destroy existing credentials */
     flb_aws_credentials_destroy(implementation->creds);
+    implementation->creds = NULL;
 
     c = client->client_vtable->request(client, FLB_HTTP_GET,
                                        implementation->path, NULL, 0,
