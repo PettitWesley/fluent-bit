@@ -487,7 +487,7 @@ int flb_engine_start(struct flb_config *config)
         mk_event_foreach(event, evl) {
             //flb_info("Got event: %d", event->type);
             if (event->type == FLB_ENGINE_EV_CORE) {
-                flb_info("FLB_ENGINE_EV_CORE");
+                //flb_info("FLB_ENGINE_EV_CORE");
                 ret = flb_engine_handle_event(event->fd, event->mask, config);
                 if (ret == FLB_ENGINE_STOP) {
                     /*
@@ -512,11 +512,11 @@ int flb_engine_start(struct flb_config *config)
             }
             else if (event->type & FLB_ENGINE_EV_SCHED) {
                 /* Event type registered by the Scheduler */
-                flb_info("FLB_ENGINE_EV_SCHED");
+                //flb_info("FLB_ENGINE_EV_SCHED");
                 flb_sched_event_handler(config, event);
             }
             else if (event->type == FLB_ENGINE_EV_SCHED) {
-                flb_info("FLB_ENGINE_EV_SCHED");
+                //flb_info("FLB_ENGINE_EV_SCHED");
                 event->handler(event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD) {
