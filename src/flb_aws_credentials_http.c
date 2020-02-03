@@ -268,6 +268,7 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
     } else {
         flb_debug("[aws_credentials] Not initializing ECS Provider because"
                   " %s is not set", ECS_CREDENTIALS_PATH_ENV_VAR);
+        flb_free(host);
         return NULL;
     }
 
