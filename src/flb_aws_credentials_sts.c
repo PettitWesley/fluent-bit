@@ -436,7 +436,8 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
     if (!implementation->role_arn || strlen(implementation->role_arn) == 0) {
         flb_debug("[aws_credentials] Not initializing EKS provider because"
                   " %s was not set", ROLE_ARN_ENV_VAR);
-        goto error;
+        flb_aws_provider_destroy(provider);
+        return NULL;
     }
 
     implementation->token_file = getenv(TOKEN_FILE_ENV_VAR);
@@ -444,7 +445,8 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
     {
         flb_debug("[aws_credentials] Not initializing EKS provider because"
                   " %s was not set", TOKEN_FILE_ENV_VAR);
-        goto error;
+        flb_aws_provider_destroy(provider);
+        return NULL;
     }
 
     implementation->endpoint = flb_aws_endpoint("sts", region);

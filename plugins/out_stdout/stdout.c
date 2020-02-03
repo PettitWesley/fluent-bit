@@ -108,7 +108,10 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     //                                    flb_aws_client_generator());
 
     //provider = flb_ecs_provider_create(config, flb_aws_client_generator());
-    provider = flb_profile_provider_create();
+    //provider = flb_profile_provider_create();
+    provider = flb_standard_chain_provider_create(config, ctx->tls, "us-west-2",
+                                                  NULL,
+                                                  flb_aws_client_generator());
     if (!provider) {
         flb_errno();
         return -1;
@@ -202,6 +205,8 @@ static int cb_stdout_exit(void *data, struct flb_config *config)
     if (!ctx) {
         return 0;
     }
+
+    flb_aws_provider_destroy(ctx->provider);
 
     flb_free(ctx);
     return 0;
