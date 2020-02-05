@@ -91,6 +91,7 @@ struct flb_aws_credentials *get_credentials_fn_standard_chain(struct
                                                               flb_aws_provider
                                                               *provider)
 {
+    struct flb_aws_credentials *creds = NULL;
     struct flb_aws_provider_chain *implementation = provider->implementation;
     struct flb_aws_provider *sub_provider = implementation->sub_provider;
 
@@ -98,28 +99,51 @@ struct flb_aws_credentials *get_credentials_fn_standard_chain(struct
         return sub_provider->provider_vtable->get_credentials(sub_provider);
     }
 
-    return get_from_chain(implementation);
-}
-
-int refresh_fn_standard_chain(struct flb_aws_provider *provider)
-{
-    struct flb_aws_provider_chain *implementation = provider->implementation;
-    struct flb_aws_provider *sub_provider = implementation->sub_provider;
-
-    if (sub_provider) {
-        return sub_provider->provider_vtable->refresh(sub_provider);
+    if (try_lock_provider(provider)) {
+        creds = get_from_chain(implementation);
+        unlock_provider(provider);
+        return creds;
     }
 
     /*
-     * Refresh should not be called until a signed API request has failed
-     * with an auth error. Which means a successful call to get should have
-     * happened first. If the code below runs, the client code has a bug.
+     * We failed to lock the provider and sub_provider is unset. This means that
+     * another co-routine is selecting a provider from the chain.
      */
-    flb_errno();
-    flb_error("[aws_credentials] refresh() should not be called until after"
-              " a successful call to get_credentials()");
+    flb_warn("[aws_credentials] No cached credentials are available and "
+             "a credential refresh is already in progress. The current"
+             "co-routine will retry.");
+    return NULL;
+}
 
-    return -1;
+/*
+ * Client code should only call refresh on startup, or if there has been an
+ * error from the AWS APIs indicating creds are expired/invalid.
+ * Refresh may change the current sub_provider.
+ */
+int refresh_fn_standard_chain(struct flb_aws_provider *provider)
+{
+    struct flb_aws_provider_chain *implementation = provider->implementation;
+    struct flb_aws_provider *sub_provider = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    int ret = -1;
+
+    if (try_lock_provider(provider)) {
+        /* find the first provider that indicates successful refresh */
+        mk_list_foreach_safe(head, tmp, &implementation->sub_providers) {
+            sub_provider = mk_list_entry(head,
+                                         struct flb_aws_provider,
+                                         _head);
+            ret = sub_provider->provider_vtable->refresh(sub_provider);
+            if (ret >= 0) {
+                implementation->sub_provider = sub_provider;
+                break;
+            }
+        }
+        unlock_provider(provider);
+    }
+
+    return ret;
 }
 
 void destroy_fn_standard_chain(struct flb_aws_provider *provider) {
@@ -452,4 +476,30 @@ int flb_read_file(const char *path, char **out_buf, size_t *out_size)
     *out_size = st.st_size;
 
     return 0;
+}
+
+/*
+ * Fluent Bit is single-threaded but asynchonous. Only one co-routine will
+ * be running at a time, and they only pause/resume for IO.
+ *
+ * Thus, while synchronization is needed (to prevent multiple co-routines
+ * from duplicating effort and performing the same work), it can be obtained
+ * using a simple integer flag on the provider.
+ */
+
+/* Like a traditional try lock- it does not block if the lock is not obtained */
+int try_lock_provider(struct flb_aws_provider *provider)
+{
+    if (provider->locked == FLB_TRUE) {
+        return FLB_FALSE;
+    }
+    provider->locked = FLB_TRUE;
+    return FLB_TRUE;
+}
+
+void unlock_provider(struct flb_aws_provider *provider)
+{
+    if (provider->locked == FLB_TRUE) {
+        provider->locked = FLB_FALSE;
+    }
 }

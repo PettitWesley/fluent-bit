@@ -84,10 +84,8 @@ struct flb_aws_credentials *get_credentials_fn_sts(struct flb_aws_provider
                                                    *provider)
 {
     struct flb_aws_credentials *creds;
-    int ret;
     int refresh = FLB_FALSE;
-    struct flb_aws_provider_sts *implementation = provider->
-                                                          implementation;
+    struct flb_aws_provider_sts *implementation = provider->implementation;
 
     flb_debug("[aws_credentials] Requesting credentials from the "
               "STS provider..");
@@ -96,19 +94,33 @@ struct flb_aws_credentials *get_credentials_fn_sts(struct flb_aws_provider
     if (implementation->next_refresh > 0
         && time(NULL) > implementation->next_refresh) {
         refresh = FLB_TRUE;
-        flb_debug("[aws_credentials] STS Provider: Refreshing credential "
-                  "cache.");
     }
     if (!implementation->creds || refresh == FLB_TRUE) {
-        ret = sts_assume_role_request(implementation->sts_client,
-                                      &implementation->creds,
-                                      implementation->uri,
-                                      &implementation->next_refresh);
-        if (ret < 0) {
-            return NULL;
+        /* credentials need to be refreshed/obtained */
+        if (try_lock_provider(provider)) {
+            flb_debug("[aws_credentials] STS Provider: Refreshing credential "
+                      "cache.");
+            sts_assume_role_request(implementation->sts_client,
+                                    &implementation->creds,
+                                    implementation->uri,
+                                    &implementation->next_refresh);
+            unlock_provider(provider);
         }
     }
 
+    if (!implementation->creds) {
+        /*
+         * We failed to lock the provider and creds are unset. This means that
+         * another co-routine is performing the refresh.
+         */
+        flb_warn("[aws_credentials] No cached credentials are available and "
+                 "a credential refresh is already in progress. The current"
+                 "co-routine will retry.");
+
+        return NULL;
+    }
+
+    /* return a copy of the existing cached credentials */
     creds = flb_malloc(sizeof(struct flb_aws_credentials));
     if (!creds) {
         goto error;
@@ -145,12 +157,16 @@ error:
 }
 
 int refresh_fn_sts(struct flb_aws_provider *provider) {
-    struct flb_aws_provider_sts *implementation = provider->
-                                                          implementation;
+    struct flb_aws_provider_sts *implementation = provider->implementation;
+    int ret = -1;
     flb_debug("[aws_credentials] Refresh called on the STS provider");
-    int ret = sts_assume_role_request(implementation->sts_client,
-                                   &implementation->creds, implementation->uri,
-                                   &implementation->next_refresh);
+
+    if (try_lock_provider(provider)) {
+        ret = sts_assume_role_request(implementation->sts_client,
+                                       &implementation->creds, implementation->uri,
+                                       &implementation->next_refresh);
+        unlock_provider(provider);
+    }
     return ret;
 }
 
@@ -298,7 +314,6 @@ struct flb_aws_credentials *get_credentials_fn_eks(struct flb_aws_provider
                                                    *provider)
 {
     struct flb_aws_credentials *creds = NULL;
-    int ret;
     int refresh = FLB_FALSE;
     struct flb_aws_provider_eks *implementation = provider->implementation;
 
@@ -309,14 +324,26 @@ struct flb_aws_credentials *get_credentials_fn_eks(struct flb_aws_provider
     if (implementation->next_refresh > 0
         && time(NULL) > implementation->next_refresh) {
         refresh = FLB_TRUE;
-        flb_debug("[aws_credentials] EKS Provider: Refreshing credential "
-                  "cache.");
     }
     if (!implementation->creds || refresh == FLB_TRUE) {
-        ret = assume_with_web_identity(implementation);
-        if (ret < 0) {
-            return NULL;
+        if (try_lock_provider(provider)) {
+            flb_debug("[aws_credentials] EKS Provider: Refreshing credential "
+                      "cache.");
+            assume_with_web_identity(implementation);
+            unlock_provider(provider);
         }
+    }
+
+    if (!implementation->creds) {
+        /*
+         * We failed to lock the provider and creds are unset. This means that
+         * another co-routine is performing the refresh.
+         */
+        flb_warn("[aws_credentials] No cached credentials are available and "
+                 "a credential refresh is already in progress. The current"
+                 "co-routine will retry.");
+
+        return NULL;
     }
 
     creds = flb_malloc(sizeof(struct flb_aws_credentials));
@@ -355,10 +382,15 @@ error:
 }
 
 int refresh_fn_eks(struct flb_aws_provider *provider) {
+    int ret = -1;
     struct flb_aws_provider_eks *implementation = provider->
                                                           implementation;
     flb_debug("[aws_credentials] Refresh called on the EKS provider");
-    return assume_with_web_identity(implementation);
+    if (try_lock_provider(provider)) {
+        ret = assume_with_web_identity(implementation);
+        unlock_provider(provider);
+    }
+    return ret;
 }
 
 void destroy_fn_eks(struct flb_aws_provider *provider) {
@@ -603,9 +635,6 @@ static int sts_assume_role_request(struct flb_aws_client *sts_client,
     struct flb_aws_credentials *credentials = NULL;
     struct flb_http_client *c = NULL;
     flb_sds_t error_type;
-    /* unset and free existing credentials first */
-    flb_aws_credentials_destroy(*creds);
-    *creds = NULL;
 
     flb_debug("[aws_credentials] Calling STS..");
 
@@ -619,6 +648,10 @@ static int sts_assume_role_request(struct flb_aws_client *sts_client,
             flb_http_client_destroy(c);
             return -1;
         }
+
+        /* unset and free existing credentials first */
+        flb_aws_credentials_destroy(*creds);
+        *creds = NULL;
 
         *next_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
         *creds = credentials;
