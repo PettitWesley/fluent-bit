@@ -116,7 +116,7 @@ struct flb_aws_credentials *get_credentials_fn_standard_chain(struct
 }
 
 /*
- * Client code should only call refresh on startup, or if there has been an
+ * Client code should only call refresh if there has been an
  * error from the AWS APIs indicating creds are expired/invalid.
  * Refresh may change the current sub_provider.
  */
@@ -146,6 +146,29 @@ int refresh_fn_standard_chain(struct flb_aws_provider *provider)
     return ret;
 }
 
+int init_fn_standard_chain(struct flb_aws_provider *provider)
+{
+    struct flb_aws_provider_chain *implementation = provider->implementation;
+    struct flb_aws_provider *sub_provider = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    int ret = -1;
+
+    /* find the first provider that indicates successful initialization */
+    mk_list_foreach_safe(head, tmp, &implementation->sub_providers) {
+        sub_provider = mk_list_entry(head,
+                                     struct flb_aws_provider,
+                                     _head);
+        ret = sub_provider->provider_vtable->init(sub_provider);
+        if (ret >= 0) {
+            implementation->sub_provider = sub_provider;
+            break;
+        }
+    }
+
+    return ret;
+}
+
 void destroy_fn_standard_chain(struct flb_aws_provider *provider) {
     struct flb_aws_provider *sub_provider;
     struct flb_aws_provider_chain *implementation;
@@ -169,6 +192,7 @@ void destroy_fn_standard_chain(struct flb_aws_provider *provider) {
 static struct flb_aws_provider_vtable standard_chain_provider_vtable = {
     .get_credentials = get_credentials_fn_standard_chain,
     .refresh = refresh_fn_standard_chain,
+    .init = init_fn_standard_chain,
     .destroy = destroy_fn_standard_chain,
 };
 
@@ -300,16 +324,10 @@ struct flb_aws_credentials *get_credentials_fn_environment(struct
 
 }
 
-/*
- * For the env provider, refresh simply checks if the environment
- * variables are available.
- */
-int refresh_fn_environment(struct flb_aws_provider *provider)
+int refresh_env(struct flb_aws_provider *provider)
 {
     char *access_key = NULL;
     char *secret_key = NULL;
-
-    flb_debug("[aws_credentials] Refresh called on the env provider");
 
     access_key = getenv(AWS_ACCESS_KEY_ID);
     if (!access_key || strlen(access_key) <= 0) {
@@ -324,6 +342,24 @@ int refresh_fn_environment(struct flb_aws_provider *provider)
     return 0;
 }
 
+/*
+ * For the env provider, refresh simply checks if the environment
+ * variables are available.
+ */
+int refresh_fn_environment(struct flb_aws_provider *provider)
+{
+    flb_debug("[aws_credentials] Refresh called on the env provider");
+
+    return refresh_env(provider);
+}
+
+int init_fn_environment(struct flb_aws_provider *provider)
+{
+    flb_debug("[aws_credentials] Init called on the env provider");
+
+    return refresh_env(provider);
+}
+
 /* Destroy is a no-op for the env provider */
 void destroy_fn_environment(struct flb_aws_provider *provider) {
     return;
@@ -332,13 +368,13 @@ void destroy_fn_environment(struct flb_aws_provider *provider) {
 static struct flb_aws_provider_vtable environment_provider_vtable = {
     .get_credentials = get_credentials_fn_environment,
     .refresh = refresh_fn_environment,
+    .init = init_fn_environment,
     .destroy = destroy_fn_environment,
 };
 
 struct flb_aws_provider *flb_aws_env_provider_create() {
-    struct flb_aws_provider *provider = flb_calloc(1,
-                                                          sizeof(
-                                                          struct flb_aws_provider));
+    struct flb_aws_provider *provider = flb_calloc(1, sizeof(
+                                                   struct flb_aws_provider));
 
     if (!provider) {
         flb_errno();

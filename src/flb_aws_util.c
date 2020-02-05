@@ -91,12 +91,16 @@ struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client
      * 400 or 403 could indicate an issue with credentials- so we force a
      * refresh on the provider. For safety a refresh can be performed only once
      * per FLB_AWS_CREDENTIAL_REFRESH_LIMIT.
+     *
+     * Refresh requires async to be enabled
      */
-    if (c && (c->resp.status == 400 || c->resp.status == 403)) {
-        if (aws_client->has_auth && time(NULL) > aws_client->refresh_limit) {
-            aws_client->refresh_limit = time(NULL)
-                                        + FLB_AWS_CREDENTIAL_REFRESH_LIMIT;
-            aws_client->provider->provider_vtable->refresh(aws_client->provider);
+    if (aws_client->upstream->flags & FLB_IO_ASYNC) {
+        if (c && (c->resp.status == 400 || c->resp.status == 403)) {
+            if (aws_client->has_auth && time(NULL) > aws_client->refresh_limit) {
+                aws_client->refresh_limit = time(NULL)
+                                            + FLB_AWS_CREDENTIAL_REFRESH_LIMIT;
+                aws_client->provider->provider_vtable->refresh(aws_client->provider);
+            }
         }
     }
 

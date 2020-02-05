@@ -58,6 +58,13 @@ typedef struct flb_aws_credentials*(flb_aws_provider_get_credentials_fn)
  */
 typedef int(flb_aws_provider_refresh_fn)(struct flb_aws_provider *provider);
 
+/*
+ * Initialize the provider- make an initial request to obtain credentials and
+ * fill the providers credential cache. This is equivalent to refresh() in,
+ * except that it can be called outside of a co-routine context (during plugin
+ * initialization).
+ */
+typedef int(flb_aws_provider_init_fn)(struct flb_aws_provider *provider);
 
 /*
  * Clean up the underlying provider implementation.
@@ -72,6 +79,7 @@ typedef void(flb_flb_aws_provider_destroy_fn)(struct flb_aws_provider *provider)
 struct flb_aws_provider_vtable {
     flb_aws_provider_get_credentials_fn *get_credentials;
     flb_aws_provider_refresh_fn *refresh;
+    flb_aws_provider_init_fn *init;
     flb_flb_aws_provider_destroy_fn *destroy;
 };
 

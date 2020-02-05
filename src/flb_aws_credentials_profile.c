@@ -117,13 +117,22 @@ error:
     return NULL;
 }
 
-int refresh_fn_profile(struct flb_aws_provider *provider) {
+int refresh_fn_profile(struct flb_aws_provider *provider)
+{
     struct flb_aws_provider_profile *implementation = provider->implementation;
     flb_debug("[aws_credentials] Refresh called on the profile provider");
     return get_profile(implementation);
 }
 
-void destroy_fn_profile(struct flb_aws_provider *provider) {
+int init_fn_profile(struct flb_aws_provider *provider)
+{
+    struct flb_aws_provider_profile *implementation = provider->implementation;
+    flb_debug("[aws_credentials] Init called on the profile provider");
+    return get_profile(implementation);
+}
+
+void destroy_fn_profile(struct flb_aws_provider *provider)
+{
     struct flb_aws_provider_profile *implementation = provider->implementation;
 
     if (implementation) {
@@ -149,6 +158,7 @@ void destroy_fn_profile(struct flb_aws_provider *provider) {
 static struct flb_aws_provider_vtable profile_provider_vtable = {
     .get_credentials = get_credentials_fn_profile,
     .refresh = refresh_fn_profile,
+    .init = init_fn_profile,
     .destroy = destroy_fn_profile,
 };
 

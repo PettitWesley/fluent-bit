@@ -139,8 +139,31 @@ error:
 
 int refresh_fn_http(struct flb_aws_provider *provider) {
     struct flb_aws_provider_http *implementation = provider->implementation;
+    int ret = -1;
     flb_debug("[aws_credentials] Refresh called on the http provider");
-    return http_credentials_request(implementation);
+
+    if (try_lock_provider(provider)) {
+        ret = http_credentials_request(implementation);
+        unlock_provider(provider);
+    }
+    return ret;
+}
+
+int init_fn_http(struct flb_aws_provider *provider) {
+    int ret;
+    struct flb_aws_provider_http *implementation = provider->implementation;
+
+    flb_debug("[aws_credentials] Init called on the http provider");
+
+    /* init can be run outside of a co-routine context, async must be disabled*/
+    implementation->client->upstream->flags &= ~(FLB_IO_ASYNC);
+
+    ret = http_credentials_request(implementation);
+
+    /* re-enable async for future calls */
+    implementation->client->upstream->flags |= FLB_IO_ASYNC;
+
+    return ret;
 }
 
 void destroy_fn_http(struct flb_aws_provider *provider) {
@@ -173,6 +196,7 @@ void destroy_fn_http(struct flb_aws_provider *provider) {
 static struct flb_aws_provider_vtable http_provider_vtable = {
     .get_credentials = get_credentials_fn_http,
     .refresh = refresh_fn_http,
+    .init = init_fn_http,
     .destroy = destroy_fn_http,
 };
 
