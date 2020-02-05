@@ -400,10 +400,6 @@ static int get_profile(struct flb_aws_provider_profile *implementation)
     char* buf = NULL;
     size_t size;
 
-    /* unset and free existing credentials first */
-    flb_aws_credentials_destroy(implementation->creds);
-    implementation->creds = NULL;
-
     flb_debug("[aws_credentials] Reading shared credentials file..");
 
     creds = flb_calloc(1, sizeof(struct flb_aws_credentials));
@@ -428,6 +424,10 @@ static int get_profile(struct flb_aws_provider_profile *implementation)
                   implementation->profile);
         goto error;
     }
+
+    /* unset and free existing credentials */
+    flb_aws_credentials_destroy(implementation->creds);
+    implementation->creds = NULL;
 
     implementation->creds = creds;
     return 0;

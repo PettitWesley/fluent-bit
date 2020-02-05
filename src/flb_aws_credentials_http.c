@@ -69,7 +69,6 @@ struct flb_aws_credentials *get_credentials_fn_http(struct flb_aws_provider
                                                     *provider)
 {
     struct flb_aws_credentials *creds = NULL;
-    int ret;
     int refresh = FLB_FALSE;
     struct flb_aws_provider_http *implementation = provider->implementation;
 
@@ -82,10 +81,22 @@ struct flb_aws_credentials *get_credentials_fn_http(struct flb_aws_provider
         refresh = FLB_TRUE;
     }
     if (!implementation->creds || refresh == FLB_TRUE) {
-        ret = http_credentials_request(implementation);
-        if (ret < 0) {
-            return NULL;
+        if (try_lock_provider(provider)) {
+            http_credentials_request(implementation);
+            unlock_provider(provider);
         }
+    }
+
+    if (!implementation->creds) {
+        /*
+         * We failed to lock the provider and creds are unset. This means that
+         * another co-routine is performing the refresh.
+         */
+        flb_warn("[aws_credentials] No cached credentials are available and "
+                 "a credential refresh is already in progress. The current"
+                 "co-routine will retry.");
+
+        return NULL;
     }
 
     creds = flb_malloc(sizeof(struct flb_aws_credentials));
@@ -284,10 +295,6 @@ static int http_credentials_request(struct flb_aws_provider_http
     struct flb_aws_client *client = implementation->client;
     struct flb_http_client *c = NULL;
 
-    /* destroy existing credentials */
-    flb_aws_credentials_destroy(implementation->creds);
-    implementation->creds = NULL;
-
     c = client->client_vtable->request(client, FLB_HTTP_GET,
                                        implementation->path, NULL, 0,
                                        NULL, 0);
@@ -308,6 +315,10 @@ static int http_credentials_request(struct flb_aws_provider_http
         flb_http_client_destroy(c);
         return -1;
     }
+
+    /* destroy existing credentials */
+    flb_aws_credentials_destroy(implementation->creds);
+    implementation->creds = NULL;
 
     implementation->creds = creds;
     implementation->next_refresh = expiration - FLB_AWS_REFRESH_WINDOW;

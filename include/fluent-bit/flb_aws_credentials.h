@@ -79,7 +79,16 @@ struct flb_aws_provider_vtable {
  * A generic structure to represent all providers.
  */
 struct flb_aws_provider {
+    /*
+     * Fluent Bit is single-threaded but asynchonous. Co-routines are paused
+     * and resumed during blocking IO calls.
+     *
+     * When a refresh is needed, only one co-routine should refresh.
+     */
+    int locked;
+
     struct flb_aws_provider_vtable *provider_vtable;
+
     void *implementation;
 
     /* Standard credentials chain is a list of providers */
@@ -196,6 +205,20 @@ char *flb_sts_session_name();
 struct flb_aws_credentials *flb_parse_http_credentials(char *response,
                                                        size_t response_len,
                                                        time_t *expiration);
+
+/*
+ * Fluent Bit is single-threaded but asynchonous. Only one co-routine will
+ * be running at a time, and they only pause/resume for IO.
+ *
+ * Thus, while synchronization is needed (to prevent multiple co-routines
+ * from duplicating effort and performing the same work), it can be obtained
+ * using a simple integer flag on the provider.
+ */
+
+/* Like a traditional try lock- it does not block if the lock is not obtained */
+int try_lock_provider(struct flb_aws_provider *provider);
+
+void unlock_provider(struct flb_aws_provider *provider);
 
 
 #endif

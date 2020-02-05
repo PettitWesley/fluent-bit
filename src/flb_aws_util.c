@@ -87,10 +87,6 @@ struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client
     c = request_do(aws_client, method, uri, body, body_len,
                    dynamic_headers, dynamic_headers_len);
 
-    if (c && c->resp.status == 200) {
-        return c;
-    }
-
     /*
      * 400 or 403 could indicate an issue with credentials- so we force a
      * refresh on the provider. For safety a refresh can be performed only once
@@ -104,14 +100,7 @@ struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client
         }
     }
 
-    /* perform a single retry */
-    if (c) {
-        flb_http_client_destroy(c);
-        c = NULL;
-    }
-
-    return request_do(aws_client, method, uri, body, body_len,
-                      dynamic_headers, dynamic_headers_len);
+    return c;
 }
 
 static struct flb_aws_client_vtable client_vtable = {
@@ -221,7 +210,6 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
     if (ret != 0 || c->resp.status != 200) {
         flb_error("[aws_client] %s: http_do=%i, HTTP Status: %i",
                   aws_client->host, ret, c->resp.status);
-        goto error;
     }
 
     flb_upstream_conn_release(u_conn);
@@ -234,6 +222,9 @@ error:
     }
     if (signature) {
         flb_sds_destroy(signature);
+    }
+    if (c) {
+        flb_http_client_destroy(c);
     }
     return NULL;
 }
