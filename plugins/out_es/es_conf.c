@@ -244,6 +244,10 @@ int flb_es_conf_destroy(struct flb_elasticsearch *ctx)
     if (ctx->aws_tls.context) {
         flb_tls_context_destroy(ctx->aws_tls.context);
     }
+
+    if (ctx->aws_sts_tls.context) {
+        flb_tls_context_destroy(ctx->aws_sts_tls.context);
+    }
     #endif
 
     flb_free(ctx);
