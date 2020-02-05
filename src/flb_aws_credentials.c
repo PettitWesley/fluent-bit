@@ -110,7 +110,7 @@ struct flb_aws_credentials *get_credentials_fn_standard_chain(struct
      * another co-routine is selecting a provider from the chain.
      */
     flb_warn("[aws_credentials] No cached credentials are available and "
-             "a credential refresh is already in progress. The current"
+             "a credential refresh is already in progress. The current "
              "co-routine will retry.");
     return NULL;
 }
