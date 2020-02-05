@@ -275,35 +275,30 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
                                                   flb_aws_client_generator
                                                   *generator)
 {
-    char *host = NULL;
-    char *path = NULL;
+    flb_sds_t host = NULL;
+    flb_sds_t path = NULL;
     char *path_var = NULL;
 
-    host = flb_malloc((ECS_CREDENTIALS_HOST_LEN + 1) * sizeof(char));
+    host = flb_sds_create_len(ECS_CREDENTIALS_HOST, ECS_CREDENTIALS_HOST_LEN);
     if (!host) {
         flb_errno();
         return NULL;
     }
 
-    memcpy(host, ECS_CREDENTIALS_HOST, ECS_CREDENTIALS_HOST_LEN);
-    host[ECS_CREDENTIALS_HOST_LEN] = '\0';
-
     path_var = getenv(ECS_CREDENTIALS_PATH_ENV_VAR);
     if (path_var && strlen(path_var) > 0) {
-        path = flb_malloc((strlen(path_var) + 1) * sizeof(char));
+        path = flb_sds_create(path_var);
         if (!path) {
             flb_errno();
             flb_free(host);
             return NULL;
         }
-        memcpy(path, path_var, strlen(path_var));
-        path[strlen(path_var)] = '\0';
 
         return flb_http_provider_create(config, host, path, generator);
     } else {
         flb_debug("[aws_credentials] Not initializing ECS Provider because"
                   " %s is not set", ECS_CREDENTIALS_PATH_ENV_VAR);
-        flb_free(host);
+        flb_sds_destroy(host);
         return NULL;
     }
 
