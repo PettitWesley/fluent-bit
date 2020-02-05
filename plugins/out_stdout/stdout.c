@@ -94,6 +94,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     // }
 
     ctx->tls = &ins->tls;
+    ctx->tls2 = &ins->tls;
 
     /* Create TLS context */
     ctx->tls->context = flb_tls_context_new(FLB_TRUE,  /* verify */
