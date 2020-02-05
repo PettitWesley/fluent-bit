@@ -32,6 +32,7 @@ struct flb_stdout {
 
     struct flb_aws_provider *provider;
     struct flb_tls *tls;
+    struct flb_tls *tls2;
 };
 
 #endif

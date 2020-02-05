@@ -84,6 +84,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     struct flb_aws_provider *provider;
+    struct flb_aws_provider *base_provider;
     // struct flb_aws_provider *base_provider;
 
     // base_provider = flb_aws_env_provider_create();
@@ -104,18 +105,35 @@ static int cb_stdout_init(struct flb_output_instance *ins,
                                            NULL,      /* key_file */
                                            NULL);     /* key_passwd */
 
+    ctx->tls2->context = flb_tls_context_new(FLB_TRUE,  /* verify */
+                                           FLB_TRUE,        /* debug */
+                                           NULL,      /* vhost */
+                                           NULL,      /* ca_path */
+                                           NULL,      /* ca_file */
+                                           NULL,      /* crt_file */
+                                           NULL,      /* key_file */
+                                           NULL);     /* key_passwd */
+
     // provider = flb_eks_provider_create(config, ctx->tls, "us-west-2", NULL,
     //                                    flb_aws_client_generator());
 
     //provider = flb_ecs_provider_create(config, flb_aws_client_generator());
     //provider = flb_profile_provider_create();
-    provider = flb_standard_chain_provider_create(config, ctx->tls, "us-west-2",
+    base_provider = flb_standard_chain_provider_create(config, ctx->tls, "us-west-2",
                                                   NULL,
                                                   flb_aws_client_generator());
-    if (!provider) {
+    if (!base_provider) {
         flb_errno();
         return -1;
     }
+
+    provider = flb_sts_provider_create(config, ctx->tls2, base_provider,
+                                       NULL,
+                                       "arn:aws:iam::144718711470:role/provider-testing",
+                                       "session-name",
+                                       "us-west-2",
+                                       NULL,
+                                       flb_aws_client_generator());
 
     ctx->provider = provider;
 
