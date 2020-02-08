@@ -24,6 +24,13 @@
 #include <fluent-bit/flb_macros.h>
 #include <fluent-bit/flb_config.h>
 
+/* Holds mocked versions of network IO functions, used in runtime tests */
+struct flb_io_intercept {
+    flb_http_do_fn *flb_http_do,
+    flb_upstream_conn_get_fn flb_upstream_conn_get,
+    flb_upstream_create_fn flb_upstream_create,
+};
+
 /* Library mode context data */
 struct flb_lib_ctx {
     struct mk_event_loop *event_loop;
