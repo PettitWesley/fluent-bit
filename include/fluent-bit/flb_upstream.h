@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_socket.h>
 #include <fluent-bit/flb_config.h>
+#include <fluent-bit/flb_http_client.h>
 
 #ifdef FLB_HAVE_TLS
 #include <mbedtls/net.h>
@@ -42,6 +43,13 @@
  *   #define  FLB_IO_TCP_KA  16
  * ---
  */
+
+/* Holds mocked versions of network IO functions, used in runtime tests */
+struct flb_io_intercept {
+    flb_http_do_fn *flb_http_do;
+    flb_upstream_conn_get_fn *flb_upstream_conn_get;
+    flb_upstream_create_fn *flb_upstream_create;
+};
 
 /* Upstream handler */
 struct flb_upstream {
