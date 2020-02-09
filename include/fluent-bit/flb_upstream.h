@@ -26,7 +26,6 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_socket.h>
 #include <fluent-bit/flb_config.h>
-#include <fluent-bit/flb_http_client.h>
 
 #ifdef FLB_HAVE_TLS
 #include <mbedtls/net.h>
