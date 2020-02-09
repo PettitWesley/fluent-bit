@@ -23,6 +23,8 @@
 
 #include <fluent-bit/flb_macros.h>
 #include <fluent-bit/flb_config.h>
+#include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_upstream.h>
 
 /* Library mode context data */
 struct flb_lib_ctx {
