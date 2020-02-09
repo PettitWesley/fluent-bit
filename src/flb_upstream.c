@@ -37,7 +37,7 @@ struct flb_upstream *flb_upstream_create(struct flb_config *config,
     flb_upstream_create_fn mock;
 
     if (config->mock_io.flb_upstream_create != NULL) {
-        mock = (flb_upstream_create_fn) config->mock_io.flb_upstream_create;
+        mock = config->mock_io.flb_upstream_create;
         return mock(config, host, port, flags, tls);
     }
 
@@ -233,7 +233,7 @@ struct flb_upstream_conn *flb_upstream_conn_get(struct flb_upstream *u)
     flb_upstream_conn_get_fn mock;
 
     if (u->mock_io.flb_upstream_create != NULL) {
-        mock = (flb_upstream_conn_get_fn) u->mock_io.flb_upstream_create;
+        mock = u->mock_io.flb_upstream_create;
         return mock(u);
     }
 
