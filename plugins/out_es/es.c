@@ -594,7 +594,7 @@ void cb_es_flush(const void *data, size_t bytes,
         }
 
         signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
-                                  ctx->aws_region, "es",
+                                  ctx->aws_region, "es", 0,
                                   ctx->aws_provider);
         if (!signature) {
             flb_error("[out_es] could not sign request with sigv4");

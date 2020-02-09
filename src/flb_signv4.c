@@ -31,6 +31,7 @@
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_aws_credentials.h>
+#include <fluent-bit/flb_signv4.h>
 #include <mbedtls/sha256.h>
 
 #include <stdlib.h>
@@ -501,6 +502,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
                                               int amz_date_header,
                                               char *amzdate,
                                               char *security_token,
+                                              int s3_mode,
                                               flb_sds_t *signed_headers)
 {
     int i;
@@ -514,6 +516,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     flb_sds_t uri;
     flb_sds_t tmp = NULL;
     flb_sds_t params;
+    flb_sds_t payload_hash = NULL;
     struct flb_kv *kv;
     struct mk_list list_tmp;
     struct mk_list *head;
@@ -658,11 +661,46 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     tmp = flb_sds_cat(cr, "\n", 1);
     if (!tmp) {
         flb_error("[signv4] error concatenating newline for payload params");
-        flb_sds_destroy(params);
         flb_sds_destroy(cr);
         return NULL;
     }
     cr = tmp;
+
+    /*
+     * Calculate payload hash.
+     * This is added at the end of all canonical requests, unless
+     * S3_MODE_UNSIGNED_PAYLOAD is set.
+     * If we're using S3_MODE_SIGNED_PAYLOAD, then the hash is added to the
+     * canonical headers.
+     */
+    if (s3_mode == S3_MODE_UNSIGNED_PAYLOAD) {
+        payload_hash = flb_sds_create("UNSIGNED-PAYLOAD");
+    } else {
+        mbedtls_sha256_init(&sha256_ctx);
+        mbedtls_sha256_starts(&sha256_ctx, 0);
+        if (c->body_len > 0 && post_params == FLB_FALSE) {
+            mbedtls_sha256_update(&sha256_ctx, (const unsigned char *) c->body_buf,
+                                  c->body_len);
+        }
+        mbedtls_sha256_finish(&sha256_ctx, sha256_buf);
+
+        payload_hash = flb_sds_create_size(64);
+        if (!payload_hash) {
+            flb_error("[signv4] error formatting hashed payload");
+            flb_sds_destroy(cr);
+            return NULL;
+        }
+        for (i = 0; i < 32; i++) {
+            tmp = flb_sds_printf(&payload_hash, "%02x",
+                                 (unsigned char) sha256_buf[i]);
+            if (!tmp) {
+                flb_error("[signv4] error formatting hashed payload");
+                flb_sds_destroy(cr);
+                return NULL;
+            }
+            payload_hash = tmp;
+        }
+    }
 
     /*
      * Canonical Headers
@@ -671,6 +709,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
      *
      * - x-amz-date
      * - x-amz-security-token (if set)
+     * - x-amz-content-sha256 (if S3_MODE_SIGNED_PAYLOAD)
      */
     mk_list_init(&list_tmp);
 
@@ -684,6 +723,10 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     if (security_token) {
         len = strlen(security_token);
         flb_http_add_header(c, "x-amz-security-token", 20, security_token, len);
+    }
+
+    if (s3_mode == S3_MODE_SIGNED_PAYLOAD) {
+        flb_http_add_header(c, "x-amz-content-sha256", 20, payload_hash, 64);
     }
 
     headers_sanitize(&c->headers, &list_tmp);
@@ -782,24 +825,14 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     flb_free(arr);
     flb_kv_release(&list_tmp);
 
-    /* Hashed Payload */
-    mbedtls_sha256_init(&sha256_ctx);
-    mbedtls_sha256_starts(&sha256_ctx, 0);
-    if (c->body_len > 0 && post_params == FLB_FALSE) {
-        mbedtls_sha256_update(&sha256_ctx, (const unsigned char *) c->body_buf,
-                              c->body_len);
+    /* Add Payload Hash */
+    tmp = flb_sds_printf(&cr, "%s", payload_hash);
+    if (!tmp) {
+        flb_error("[signv4] error adding payload hash");
+        flb_sds_destroy(cr);
+        return NULL;
     }
-    mbedtls_sha256_finish(&sha256_ctx, sha256_buf);
-
-    for (i = 0; i < 32; i++) {
-        tmp = flb_sds_printf(&cr, "%02x", (unsigned char) sha256_buf[i]);
-        if (!tmp) {
-            flb_error("[signedv4] error formatting hashed payload");
-            flb_sds_destroy(cr);
-            return NULL;
-        }
-        cr = tmp;
-    }
+    cr = tmp;
 
     return cr;
 }
@@ -877,6 +910,8 @@ static flb_sds_t flb_signv4_string_to_sign(struct flb_http_client *c,
  * ======
  *
  * https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
+ *
+ * TODO: The signing key could be cached to improve performance
  */
 static flb_sds_t flb_signv4_calculate_signature(flb_sds_t string_to_sign,
                                                 char *datestamp, char *service,
@@ -986,6 +1021,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
                         int amz_date_header,
                         time_t t_now,
                         char *region, char *service,
+                        int s3_mode,
                         struct flb_aws_provider *provider)
 {
     char amzdate[32];
@@ -1033,13 +1069,15 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
 
     cr = flb_signv4_canonical_request(c, normalize_uri,
                                       amz_date_header, amzdate,
-                                      creds->session_token, &signed_headers);
+                                      creds->session_token, s3_mode,
+                                      &signed_headers);
     if (!cr) {
         flb_error("[signv4] failed canonical request");
         flb_sds_destroy(signed_headers);
         flb_aws_credentials_destroy(creds);
         return NULL;
     }
+    flb_debug("canonical request:\n%s\n--end--", cr);
 
     /* Task 2: string to sign */
     string_to_sign = flb_signv4_string_to_sign(c, cr, amzdate,
@@ -1052,6 +1090,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
     flb_sds_destroy(cr);
+    flb_debug("string to sign:\n%s\n--end--", string_to_sign);
 
     /* Task 3: calculate the signature */
     signature = flb_signv4_calculate_signature(string_to_sign, datestamp,

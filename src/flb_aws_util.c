@@ -219,7 +219,7 @@ int request_do(struct flb_aws_client *aws_client,
 
     if (aws_client->has_auth) {
         signature = flb_signv4_do(aws_client->c, FLB_TRUE, FLB_TRUE, time(NULL),
-                                  aws_client->region, aws_client->service,
+                                  aws_client->region, aws_client->service, 0,
                                   aws_client->provider);
         if (!signature) {
             flb_error("[aws_client] could not sign request");

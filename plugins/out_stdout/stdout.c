@@ -114,18 +114,18 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         return -1;
     }
 
-    ctx->base_provider = base_provider;
+    ctx->provider = base_provider;
 
-    sts_provider = flb_sts_provider_create(config, ctx->tls, base_provider, NULL,
-                                       "arn:aws:iam::144718711470:role/provider-testing",
-                                       "session_name", "us-west-2", NULL,
-                                       flb_aws_client_generator());
-    if (!sts_provider) {
-        flb_errno();
-        return -1;
-    }
-
-    ctx->sts_provider = sts_provider;
+    // sts_provider = flb_sts_provider_create(config, ctx->tls, base_provider, NULL,
+    //                                    "arn:aws:iam::144718711470:role/provider-testing",
+    //                                    "session_name", "us-west-2", NULL,
+    //                                    flb_aws_client_generator());
+    // if (!sts_provider) {
+    //     flb_errno();
+    //     return -1;
+    // }
+    //
+    // ctx->sts_provider = sts_provider;
 
     // provider = flb_eks_provider_create(config, ctx->tls, "us-west-2", NULL,
     //                                    flb_aws_client_generator());
@@ -137,11 +137,11 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     // ctx->provider = provider;
     // ctx->provider = flb_aws_env_provider_create();
     // if (!ctx->provider) {
-    //     flb_error("[out_es] Failed to create AWS Credential Provider");
+    //     flb_error("[out_s3] Failed to create AWS Credential Provider");
     //     return -1;
     // }
-    // ctx->u = flb_upstream_create(config, "vpc-test-domain-ke7thhzoo7jawrhmz6mb7ite7y.us-west-2.es.amazonaws.com",
-    //                              443, FLB_IO_TLS, ctx->tls);
+    ctx->u = flb_upstream_create(config, "firenosed-dolphin-bucket.s3.amazonaws.com",
+                                 443, FLB_IO_TLS, ctx->tls);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -164,26 +164,27 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     int ret;
     size_t b_sent;
     flb_sds_t signature = NULL;
-    char *body = "{\"index\":{\"_index\":\"my_index\",\"_type\":\"my_type\"}}\n"
-                 "{\"@timestamp\":\"2020-01-21T04:34:04.000Z\",\"cpu_p\":0.000000,\"user_p\":0.000000}\n";
+    // char *body = "{\"index\":{\"_index\":\"my_index\",\"_type\":\"my_type\"}}\n"
+    //              "{\"@timestamp\":\"2020-01-21T04:34:04.000Z\",\"cpu_p\":0.000000,\"user_p\":0.000000}\n";
+    char *body = "Hello S3 (from Fluent Bit!)";
     int len = strlen(body);
     flb_info("len: %d", len);
 
-    struct flb_aws_credentials *creds;
-
-    creds = ctx->sts_provider->provider_vtable->get_credentials(ctx->sts_provider);
-    if (!creds) {
-        flb_errno();
-        flb_debug("[test] no creds.");
-        FLB_OUTPUT_RETURN(FLB_OK);
-    }
-
-    flb_debug("[test] access: %s", creds->access_key_id);
-    flb_debug("[test] secret: %s", creds->secret_access_key);
-    flb_debug("[test] token: %s", creds->session_token);
-
-    flb_debug("exiting");
-    FLB_OUTPUT_RETURN(FLB_OK);
+    // struct flb_aws_credentials *creds;
+    //
+    // creds = ctx->sts_provider->provider_vtable->get_credentials(ctx->sts_provider);
+    // if (!creds) {
+    //     flb_errno();
+    //     flb_debug("[test] no creds.");
+    //     FLB_OUTPUT_RETURN(FLB_OK);
+    // }
+    //
+    // flb_debug("[test] access: %s", creds->access_key_id);
+    // flb_debug("[test] secret: %s", creds->secret_access_key);
+    // flb_debug("[test] token: %s", creds->session_token);
+    //
+    // flb_debug("exiting");
+    // FLB_OUTPUT_RETURN(FLB_OK);
 
     /* Get upstream connection */
     u_conn = flb_upstream_conn_get(ctx->u);
@@ -192,36 +193,65 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
+    char amzdate[50];
+    char datestamp[32];
+    struct tm *gmt;
+    time_t t_now = time(NULL);
+
+    gmt = flb_malloc(sizeof(struct tm));
+    if (!gmt) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    if (!gmtime_r(&t_now, gmt)) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    strftime(amzdate, sizeof(amzdate) - 1, "/from-fluent-bit-%Y%m%dT%H%M%SZ", gmt);
+    strftime(datestamp, sizeof(datestamp) - 1, "%Y%m%d", gmt);
+    flb_free(gmt);
+
     /* Compose HTTP Client request */
-    c = flb_http_client(u_conn, FLB_HTTP_POST, "/_bulk",
-                        NULL, 0, NULL, 0, NULL, 0);
+    c = flb_http_client(u_conn, FLB_HTTP_PUT, amzdate,
+                        body, len,
+                        "firenosed-dolphin-bucket.s3.amazonaws.com", 443,
+                        NULL, 0);
 
     //flb_http_buffer_size(c, ctx->buffer_size);
 
     //flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
-    flb_http_add_header(c, "Content-Type", 12, "application/x-ndjson", 20);
+    //flb_http_add_header(c, "Content-Type", 12, "application/x-ndjson", 20);
 
-    flb_debug("[out_es] Signing request with AWS Sigv4");
-    signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
-                              "us-west-2", "es",
+    ret = flb_http_strip_port_from_host(c);
+    if (ret < 0) {
+        flb_error("[out_s3] could not sign request with sigv4");
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    flb_debug("[out_s3] Signing request with AWS Sigv4");
+    signature = flb_signv4_do(c, FLB_FALSE, FLB_TRUE, time(NULL),
+                              "us-east-1", "s3", S3_MODE_SIGNED_PAYLOAD,
                               ctx->provider);
     if (!signature) {
-        flb_error("[out_es] could not sign request with sigv4");
+        flb_error("[out_s3] could not sign request with sigv4");
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     ret = flb_http_do(c, &b_sent);
     if (ret != 0) {
-        flb_warn("[out_es] http_do=%i URI=/_bulk", ret);
+        flb_warn("[out_s3] http_do=%i URI=/_bulk", ret);
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     flb_info("[out_es_test] Wat?? It worked?? ret=%s", ret);
-    flb_info("[out_es] HTTP Status=%i URI=/_bulk", c->resp.status);
+    flb_info("[out_s3] HTTP Status=%i URI=/file.txt", c->resp.status);
     if (c->resp.payload_size > 0) {
-        flb_info("[out_es] HTTP status=%i URI=/_bulk, response:\n%s\n",
+        flb_info("[out_s3] HTTP status=%i URI=/_bulk, response:\n%s\n",
                  c->resp.status, c->resp.payload);
     }
 
