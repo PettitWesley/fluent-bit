@@ -506,3 +506,18 @@ int flb_stop(flb_ctx_t *ctx)
 
     return ret;
 }
+
+void flb_mock_http_set(flb_ctx_t *ctx, flb_http_do_fn *flb_http_do)
+{
+    ctx->config->mock_io.flb_http_do = flb_http_do;
+}
+void flb_mock_upstream_set(flb_ctx_t *ctx,
+                           flb_upstream_create_fn *flb_upstream_create)
+{
+    ctx->config->mock_io.flb_upstream_create = flb_upstream_create;
+}
+void flb_mock_conn_set(flb_ctx_t *ctx,
+                       flb_upstream_conn_get_fn *flb_upstream_conn_get)
+{
+    ctx->config->mock_io.flb_upstream_conn_get = flb_upstream_conn_get;
+}

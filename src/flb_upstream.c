@@ -35,6 +35,11 @@ struct flb_upstream *flb_upstream_create(struct flb_config *config,
 {
     struct flb_upstream *u;
 
+    if (config->mock_io.flb_upstream_create != NULL) {
+        return config->mock_io.flb_upstream_create(config, host, port,
+                                                   flags, tls);
+    }
+
     u = flb_calloc(1, sizeof(struct flb_upstream));
     if (!u) {
         flb_errno();
@@ -47,6 +52,7 @@ struct flb_upstream *flb_upstream_create(struct flb_config *config,
     u->evl           = config->evl;
     u->n_connections = 0;
     u->flags |= FLB_IO_ASYNC;
+    u->mock_io = config->mock_io;
 
     mk_list_init(&u->av_queue);
     mk_list_init(&u->busy_queue);
@@ -223,6 +229,10 @@ struct flb_upstream_conn *flb_upstream_conn_get(struct flb_upstream *u)
     struct mk_list *tmp;
     struct mk_list *head;
     struct flb_upstream_conn *conn = NULL;
+
+    if (u->mock_io.flb_upstream_create != NULL) {
+        return u->mock_io.flb_upstream_create(u);
+    }
 
     /* On non Keepalive mode, always create a new TCP connection */
     if ((u->flags & FLB_IO_TCP_KA) == 0) {

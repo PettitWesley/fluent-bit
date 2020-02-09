@@ -28,6 +28,8 @@
 #include <fluent-bit/flb_pipe.h>
 #include <fluent-bit/flb_log.h>
 #include <fluent-bit/flb_task_map.h>
+#include <fluent-bit/flb_upstream.h>
+#include <fluent-bit/flb_http_client.h>
 
 #ifdef FLB_HAVE_TLS
 #include <fluent-bit/flb_io_tls.h>
@@ -37,6 +39,13 @@
 #define FLB_CONFIG_HTTP_LISTEN  "0.0.0.0"
 #define FLB_CONFIG_HTTP_PORT    "2020"
 #define FLB_CONFIG_DEFAULT_TAG  "fluent_bit"
+
+/* Holds mocked versions of network IO functions, used in runtime tests */
+struct flb_io_intercept {
+    flb_http_do_fn *flb_http_do,
+    flb_upstream_conn_get_fn *flb_upstream_conn_get,
+    flb_upstream_create_fn *flb_upstream_create,
+};
 
 /* Main struct to hold the configuration of the runtime service */
 struct flb_config {
@@ -178,6 +187,9 @@ struct flb_config {
     void *sched;
 
     struct flb_task_map tasks_map[2048];
+
+    /* mocks for runtime tests */
+    struct flb_io_intercept mock_io;
 };
 
 #define FLB_CONFIG_LOG_LEVEL(c) (c->log->level)

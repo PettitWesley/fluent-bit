@@ -24,13 +24,6 @@
 #include <fluent-bit/flb_macros.h>
 #include <fluent-bit/flb_config.h>
 
-/* Holds mocked versions of network IO functions, used in runtime tests */
-struct flb_io_intercept {
-    flb_http_do_fn *flb_http_do,
-    flb_upstream_conn_get_fn flb_upstream_conn_get,
-    flb_upstream_create_fn flb_upstream_create,
-};
-
 /* Library mode context data */
 struct flb_lib_ctx {
     struct mk_event_loop *event_loop;
@@ -57,6 +50,12 @@ FLB_EXPORT int flb_input_set(flb_ctx_t *ctx, int ffd, ...);
 FLB_EXPORT int flb_output_set(flb_ctx_t *ctx, int ffd, ...);
 FLB_EXPORT int flb_filter_set(flb_ctx_t *ctx, int ffd, ...);
 FLB_EXPORT int flb_service_set(flb_ctx_t *ctx, ...);
+FLB_EXPORT void flb_mock_http_set(flb_ctx_t *ctx,
+                                  flb_http_do_fn *flb_http_do);
+FLB_EXPORT void flb_mock_upstream_set(flb_ctx_t *ctx,
+                                      flb_upstream_create_fn *flb_upstream_create);
+FLB_EXPORT void flb_mock_conn_set(flb_ctx_t *ctx,
+                                  flb_upstream_conn_get_fn *flb_upstream_conn_get);
 FLB_EXPORT int  flb_lib_free(void *data);
 FLB_EXPORT double flb_time_now();
 
