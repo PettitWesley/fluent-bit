@@ -230,10 +230,10 @@ struct flb_upstream_conn *flb_upstream_conn_get(struct flb_upstream *u)
     struct mk_list *tmp;
     struct mk_list *head;
     struct flb_upstream_conn *conn = NULL;
-    flb_upstream_conn_get_fn mock;
+    struct flb_upstream_conn*(flb_upstream_conn_get_fn)(struct flb_upstream *u) mock;
 
     if (u->mock_io.flb_upstream_create != NULL) {
-        mock = u->mock_io.flb_upstream_create;
+        mock = (struct flb_upstream_conn*(flb_upstream_conn_get_fn)(struct flb_upstream *u)) u->mock_io.flb_upstream_create;
         return mock(u);
     }
 
