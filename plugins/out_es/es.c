@@ -23,6 +23,7 @@
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_network.h>
 #include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_signv4.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_signv4.h>
@@ -37,13 +38,11 @@
 
 struct flb_output_plugin out_es_plugin;
 
-#ifdef FLB_HAVE_SIGNV4
-static flb_sds_t add_aws_auth(struct flb_http_client *c, char *region)
+#ifdef FLB_HAVE_AWS
+static flb_sds_t add_aws_auth(struct flb_http_client *c,
+                              struct flb_elasticsearch *ctx)
 {
     flb_sds_t signature = NULL;
-    char *access_key = NULL;
-    char *secret_key = NULL;
-    char *session_token = NULL;
     int ret;
 
     flb_debug("[out_es] Signing request with AWS Sigv4");
@@ -55,31 +54,16 @@ static flb_sds_t add_aws_auth(struct flb_http_client *c, char *region)
         return NULL;
     }
 
-    /* AWS credentials */
-    access_key = getenv("AWS_ACCESS_KEY_ID");
-    if (!access_key || strlen(access_key) < 1) {
-        flb_error("[out_es] 'AWS_ACCESS_KEY_ID' not set");
-        return NULL;
-    }
-
-    secret_key = getenv("AWS_SECRET_ACCESS_KEY");
-    if (!access_key || strlen(access_key) < 1) {
-        flb_error("[out_es] 'AWS_SECRET_ACCESS_KEY' not set");
-        return NULL;
-    }
-
-    session_token = getenv("AWS_SESSION_TOKEN");
-
     signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
-                              access_key, region, "es",
-                              secret_key, session_token);
+                              ctx->aws_region, "es",
+                              ctx->aws_provider);
     if (!signature) {
         flb_error("[out_es] could not sign request with sigv4");
         return NULL;
     }
     return signature;
 }
-#endif /* FLB_HAVE_SIGNV4 */
+#endif /* FLB_HAVE_AWS */
 
 static inline int es_pack_map_content(msgpack_packer *tmp_pck,
                                       msgpack_object map,
@@ -591,10 +575,10 @@ void cb_es_flush(const void *data, size_t bytes,
     int bytes_out;
     char *pack;
     size_t b_sent;
+    flb_sds_t signature = NULL;
     struct flb_elasticsearch *ctx = out_context;
     struct flb_upstream_conn *u_conn;
     struct flb_http_client *c;
-    flb_sds_t signature = NULL;
     (void) i_ins;
     (void) tag;
     (void) tag_len;
@@ -618,7 +602,7 @@ void cb_es_flush(const void *data, size_t bytes,
 
     flb_http_buffer_size(c, ctx->buffer_size);
 
-#ifndef FLB_HAVE_SIGNV4
+#ifndef FLB_HAVE_AWS
     flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
 #endif
 
@@ -628,11 +612,9 @@ void cb_es_flush(const void *data, size_t bytes,
         flb_http_basic_auth(c, ctx->http_user, ctx->http_passwd);
     }
 
-#ifdef FLB_HAVE_SIGNV4
+#ifdef FLB_HAVE_AWS
     if (ctx->has_aws_auth == FLB_TRUE) {
-        /* User agent for AWS tools must start with "aws-" */
-        flb_http_add_header(c, "User-Agent", 10, "aws-fluent-bit-plugin", 21);
-        signature = add_aws_auth(c, ctx->aws_region);
+        signature = add_aws_auth(c, ctx);
         if (!signature) {
             goto retry;
         }
@@ -741,7 +723,8 @@ static struct flb_config_map config_map[] = {
     },
 
     /* AWS Authentication */
-#ifdef FLB_HAVE_SIGNV4
+
+#ifdef FLB_HAVE_AWS
     {
      FLB_CONFIG_MAP_BOOL, "aws_auth", "false",
      0, FLB_TRUE, offsetof(struct flb_elasticsearch, has_aws_auth),
@@ -750,6 +733,16 @@ static struct flb_config_map config_map[] = {
     {
      FLB_CONFIG_MAP_STR, "aws_region", "",
      0, FLB_TRUE, offsetof(struct flb_elasticsearch, aws_region),
+     NULL
+    },
+    {
+     FLB_CONFIG_MAP_STR, "aws_role_arn", "",
+     0, FLB_FALSE, 0,
+     NULL
+    },
+    {
+     FLB_CONFIG_MAP_STR, "aws_external_id", "",
+     0, FLB_FALSE, 0,
      NULL
     },
 #endif
