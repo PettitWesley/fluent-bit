@@ -30,14 +30,15 @@ struct flb_s3 {
     char *bucket;
     char *region;
     char *prefix;
+    char *endpoint;
+    int free_endpoint;
 
     struct flb_aws_provider *provider;
     struct flb_aws_provider *base_provider;
     /* tls instances can't be re-used; aws provider requires a separate one */
     struct flb_tls provider_tls;
     /* one for the standard chain provider, one for sts assume role */
-    struct flb_tls base_provider_tls;
-    char *aws_session_name;
+    struct flb_tls sts_provider_tls;
 
     struct flb_aws_client *s3_client;
 };

@@ -33,8 +33,10 @@ static int cb_s3_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
 {
     int ret;
-    const char *tmp;
+    const char *tmp = NULL;
     struct flb_s3 *ctx = NULL;
+    const char *role_arn = NULL;
+    const char *external_id = NULL;
     (void) data;
 
     ctx = flb_calloc(1, sizeof(struct flb_s3));
@@ -48,7 +50,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->bucket = tmp;
     } else {
         flb_error("[out_s3] 'bucket' is a required parameter");
-        return -1;
+        goto error;
     }
 
     tmp = flb_output_get_property("prefix", ins);
@@ -56,7 +58,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->prefix = tmp;
     } else {
         flb_error("[out_s3] 'prefix' is a required parameter");
-        return -1;
+        goto error;
     }
 
     tmp = flb_output_get_property("region", ins);
@@ -64,47 +66,177 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->region = tmp;
     } else {
         flb_error("[out_s3] 'region' is a required parameter");
-        return -1;
+        goto error;
     }
 
-    ctx->out_format = FLB_PACK_JSON_FORMAT_NONE;
-    tmp = flb_output_get_property("format", ins);
+    tmp = flb_output_get_property("endpoint", ins);
     if (tmp) {
-        ret = flb_pack_to_json_format_type(tmp);
-        if (ret == -1) {
-            flb_error("[out_stdout] unrecognized 'format' option. "
-                      "Using 'msgpack'");
-        }
-        else {
-            ctx->out_format = ret;
+        ctx->endpoint = tmp;
+        ctx->free_endpoint = FLB_FALSE;
+    } else {
+        /* default endpoint for the given region */
+        ctx->endpoint = flb_aws_endpoint("s3", ctx->region);
+        ctx->free_endpoint = FLB_TRUE;
+        if (!ctx->endpoint) {
+            flb_error("[out_s3] Could not construct S3 endpoint");
+            goto error;
         }
     }
 
-    /* Date format for JSON output */
-    ctx->json_date_format = FLB_PACK_JSON_DATE_DOUBLE;
-    tmp = flb_output_get_property("json_date_format", ins);
-    if (tmp) {
-        ret = flb_pack_to_json_date_type(tmp);
-        if (ret == -1) {
-            flb_error("[out_stdout] invalid json_date_format '%s'. "
-                      "Using 'double' type", tmp);
-        }
-        else {
-            ctx->json_date_format = ret;
-        }
+    /* AWS provider needs a separate TLS instance */
+    ctx->provider_tls.context = flb_tls_context_new(FLB_TRUE,
+                                                    ins->tls_debug,
+                                                    ins->tls_vhost,
+                                                    ins->tls_ca_path,
+                                                    ins->tls_ca_file,
+                                                    ins->tls_crt_file,
+                                                    ins->tls_key_file,
+                                                    ins->tls_key_passwd);
+    if (!ctx->provider_tls.context) {
+        flb_errno();
+        goto error;
     }
+
+    ctx->provider = flb_standard_chain_provider_create(config,
+                                                       &ctx->provider_tls,
+                                                       ctx->aws_region,
+                                                       NULL,
+                                                       flb_aws_client_generator());
+
+    if (!ctx->provider) {
+        flb_error("[out_s3] Failed to create AWS Credential Provider");
+        goto error;
+    }
+
+    /*
+     * Session name is used as a uuid for uploads; to prevent conflicts when
+     * a large cluster of nodes is uploading to a single S3 bucket.
+     * If STS assume role is used, it is also used as the STS session name.
+     */
+    ctx->session_name = flb_sts_session_name();
+    if (!ctx->session_name) {
+        flb_error("[out_s3] Failed to create aws iam role "
+                  "session name");
+        goto error;
+    }
+
+    tmp = flb_output_get_property("role_arn", ins);
+    if (tmp) {
+        /* Use the STS Provider */
+        ctx->base_provider = ctx->provider;
+        role_arn = tmp;
+        tmp = flb_output_get_property("external_id", ins);
+        if (tmp) {
+            external_id = tmp;
+        }
+
+        /* STS provider needs yet another separate TLS instance */
+        ctx->sts_provider_tls.context = flb_tls_context_new(FLB_TRUE,
+                                                            ins->tls_debug,
+                                                            ins->tls_vhost,
+                                                            ins->tls_ca_path,
+                                                            ins->tls_ca_file,
+                                                            ins->tls_crt_file,
+                                                            ins->tls_key_file,
+                                                            ins->tls_key_passwd);
+
+        ctx->provider = flb_sts_provider_create(config,
+                                                &ctx->sts_provider_tls,
+                                                ctx->base_provider,
+                                                external_id,
+                                                role_arn,
+                                                ctx->session_name,
+                                                ctx->region,
+                                                NULL,
+                                                flb_aws_client_generator());
+        if (!ctx->provider) {
+            flb_error("[out_s3] Failed to create AWS STS Credential "
+                      "Provider");
+            goto error;
+        }
+
+    }
+
+    /* create S3 client */
+    ctx->s3_client = generator->create();
+    if (!ctx->s3_client) {
+        goto error;
+    }
+    ctx->s3_client->name = "s3_client";
+    ctx->s3_client->has_auth = FLB_TRUE;
+    ctx->s3_client->provider = ctx->provider;
+    ctx->s3_client->region = ctx->region;
+    ctx->s3_client->service = "s3";
+    ctx->s3_client->port = 443;
+    ctx->s3_client->flags = 0;
+    ctx->s3_client->proxy = NULL;
+    ctx->s3_client->s3_mode = S3_MODE_SIGNED_PAYLOAD;
+
+    ctx->s3_client->upstream = flb_upstream_create(config, ctx->endpoint, 443,
+                                                   FLB_IO_TLS, &ins->tls);
+    if (!ctx->s3_client->upstream) {
+        flb_error("[out_s3] Connection initialization error");
+        goto error;
+    }
+
+    ctx->s3_client->host = ctx->endpoint;
+
+    /* initialize credentials */
+    ctx->provider->provider_vtable->init(ctx->provider);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
 
     return 0;
+
+error:
+    //TODO: s3_conf_destroy
+    if (session_name) {
+        flb_free(session_name);
+    }
+    return -1;
+}
+
+static void s3_conf_destroy(struct flb_s3 *ctx)
+{
+    if (!ctx) {
+        return;
+    }
+
+    if (ctx->free_endpoint == FLB_TRUE) {
+        flb_free(ctx->endpoint);
+    }
+
+    if (ctx->base_provider) {
+        flb_aws_provider_destroy(ctx->base_provider);
+    }
+
+    if (ctx->provider) {
+        flb_aws_provider_destroy(ctx->provider);
+    }
+
+    if (ctx->provider_tls.context) {
+        flb_tls_context_destroy(ctx->provider_tls.context);
+    }
+
+    if (ctx->sts_provider_tls.context) {
+        flb_tls_context_destroy(ctx->sts_provider_tls.context);
+    }
+
+    if (ctx->session_name) {
+        flb_free(session_name);
+    }
+
+    if (ctx->s3_client) {
+
+    }
 }
 
 static void cb_s3_flush(const void *data, size_t bytes,
-                            const char *tag, int tag_len,
-                            struct flb_input_instance *i_ins,
-                            void *out_context,
-                            struct flb_config *config)
+                        const char *tag, int tag_len,
+                        struct flb_input_instance *i_ins,
+                        void *out_context,
+                        struct flb_config *config)
 {
     msgpack_unpacked result;
     size_t off = 0, cnt = 0;
