@@ -69,6 +69,14 @@ static int cb_s3_init(struct flb_output_instance *ins,
         goto error;
     }
 
+    tmp = flb_output_get_property("time_key", ins);
+    if (tmp) {
+        ctx->time_key = tmp;
+    } else {
+        flb_error("[out_s3] 'time_key' is a required parameter");
+        goto error;
+    }
+
     tmp = flb_output_get_property("endpoint", ins);
     if (tmp) {
         ctx->endpoint = tmp;
@@ -190,10 +198,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     return 0;
 
 error:
-    //TODO: s3_conf_destroy
-    if (session_name) {
-        flb_free(session_name);
-    }
+    s3_conf_destroy(ctx);
     return -1;
 }
 
@@ -228,8 +233,42 @@ static void s3_conf_destroy(struct flb_s3 *ctx)
     }
 
     if (ctx->s3_client) {
-
+        flb_aws_client_destroy(ctx->s3_client);
     }
+}
+
+/*
+ * The S3 file name is
+ * <prefix>-<datestamp>-<5 chars of session name><random char>
+ * The datestamp includes seconds. Just in case there are multiple flushes
+ * per second, random letter is appended (computed from the nanosecond time)
+ *
+ * 5 chars from the session name is included because user might be running
+ * a giant cluster with hundreds of nodes, all uploading to one s3 bucket.
+ */
+static flb_sds_t construct_uri(struct flb_s3 *ctx)
+{
+    flb_sds_t uri;
+    char datestamp[40];
+    struct tm *gmt;
+    time_t t_now = time(NULL);
+
+    if (!gmtime_r(&t_now, gmt)) {
+        flb_errno();
+        return NULL;
+    }
+
+    strftime(datestamp, sizeof(datestamp) - 1, "%Y%m%dT%H%M%SZ", gmt);
+
+    uri = flb_sds_create_size(strlen(ctx->prefix) + 50);
+
+    uri = flb_sds_cat(uri, "/", 1);
+    if (!uri) {
+        flb_error("[out_s3] Failed to construct request URI");
+        flb_sds_destroy(uri);
+    }
+
+    uri = flb_sds_cat(uri, ctx->prefix, strlen(ctx->prefix));
 }
 
 static void cb_s3_flush(const void *data, size_t bytes,
@@ -238,15 +277,16 @@ static void cb_s3_flush(const void *data, size_t bytes,
                         void *out_context,
                         struct flb_config *config)
 {
-    msgpack_unpacked result;
-    size_t off = 0, cnt = 0;
-    struct flb_stdout *ctx = out_context;
+    struct flb_s3 *ctx = out_context;
     flb_sds_t json;
-    char *buf = NULL;
+    flb_sds_t uri;
     (void) i_ins;
     (void) config;
-    struct flb_time tmp;
-    msgpack_object *p;
+
+    json = flb_pack_msgpack_to_json_format(data, bytes,
+                                           FLB_PACK_JSON_FORMAT_LINES,
+                                           FLB_PACK_JSON_DATE_ISO8601,
+                                           ctx->time_key);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,

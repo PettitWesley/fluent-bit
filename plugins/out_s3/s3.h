@@ -30,6 +30,7 @@ struct flb_s3 {
     char *bucket;
     char *region;
     char *prefix;
+    char *time_key;
     char *endpoint;
     int free_endpoint;
 
