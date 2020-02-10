@@ -68,6 +68,7 @@ struct flb_aws_client {
 
     /* Sigv4 */
     int has_auth;
+    int s3_mode;
     struct flb_aws_provider *provider;
     char *region;
     char *service;
