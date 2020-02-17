@@ -596,6 +596,7 @@ void cb_es_flush(const void *data, size_t bytes,
     }
 
     /* Compose HTTP Client request */
+    flb_debug("[out_es] Payload: %s", pack);
     c = flb_http_client(u_conn, FLB_HTTP_POST, ctx->uri,
                         pack, bytes_out, NULL, 0, NULL, 0);
 
