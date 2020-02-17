@@ -202,10 +202,15 @@ static void flb_version()
 
 static void flb_banner()
 {
-    fprintf(stderr, "%sFluent Bit v%s%s\n",
-            ANSI_BOLD, FLB_VERSION_STR, ANSI_RESET);
-    fprintf(stderr, "%sCopyright (C) Treasure Data%s\n\n",
+    fprintf(stderr, "%sFluent Bit v%s%s\n", ANSI_BOLD, FLB_VERSION_STR,
+            ANSI_RESET);
+    fprintf(stderr, "* %sCopyright (C) 2019-2020 The Fluent Bit Authors%s\n",
             ANSI_BOLD ANSI_YELLOW, ANSI_RESET);
+    fprintf(stderr, "* %sCopyright (C) 2015-2018 Treasure Data%s\n",
+            ANSI_BOLD ANSI_YELLOW, ANSI_RESET);
+    fprintf(stderr, "* Fluent Bit is a CNCF sub-project under the "
+            "umbrella of Fluentd\n");
+    fprintf(stderr, "* https://fluentbit.io\n\n");
 }
 
 #define flb_print_signal(X) case X:                       \
