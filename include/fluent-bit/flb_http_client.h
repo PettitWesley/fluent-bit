@@ -135,4 +135,7 @@ size_t flb_http_buffer_available(struct flb_http_client *c);
 int flb_http_buffer_increase(struct flb_http_client *c, size_t size,
                              size_t *out_size);
 
+/* Allows http_do to be mocked in runtime tests */
+typedef int (flb_http_do_fn)(struct flb_http_client *c, size_t *bytes);
+
 #endif

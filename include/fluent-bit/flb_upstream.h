@@ -82,6 +82,9 @@ struct flb_upstream {
     /* context with mbedTLS data to handle certificates and keys */
     struct flb_tls *tls;
 #endif
+
+    /* mocks for runtime tests */
+    struct flb_io_intercept mock_io;
 };
 
 /* Upstream TCP connection */
@@ -127,5 +130,12 @@ int flb_upstream_destroy(struct flb_upstream *u);
 
 struct flb_upstream_conn *flb_upstream_conn_get(struct flb_upstream *u);
 int flb_upstream_conn_release(struct flb_upstream_conn *u_conn);
+
+/* Allows key network IO functions to be mocked in runtime tests */
+typedef struct flb_upstream_conn *(flb_upstream_conn_get_fn)(struct flb_upstream *u);
+
+typedef struct flb_upstream *(flb_upstream_create_fn)(struct flb_config *config,
+                                                      const char *host, int port,
+                                                      int flags, void *tls);
 
 #endif

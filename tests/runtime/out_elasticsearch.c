@@ -15,6 +15,11 @@ TEST_LIST = {
     {NULL, NULL}
 };
 
+// int flb_http_do_es_test(struct flb_http_client *c, size_t *bytes)
+// {
+//
+// }
+
 void flb_test_es_json_es(void)
 {
     int ret;

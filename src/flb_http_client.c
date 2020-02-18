@@ -917,6 +917,11 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     size_t bytes_header = 0;
     size_t bytes_body = 0;
     char *tmp;
+    struct flb_upstream *u = c->u_conn->u;
+
+    if (u->mock_io.flb_http_do != NULL) {
+        return u->mock_io.flb_http_do(c, bytes);
+    }
 
     /* Append pending headers */
     ret = http_headers_compose(c);
