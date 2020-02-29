@@ -144,10 +144,13 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 /*
  * Parses all incoming msgpack records to events and stores them in the ctx
  * events pointer. Uses the ctx tmp_buf to store the JSON strings.
+ *
+ * Return value is number of bytes written, or -1 on error.
  */
 int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
 {
     size_t off = 0;
+    size_t size;
     int i = 0;
     size_t tmp_buf_offset = 0;
     size_t written;
@@ -168,22 +171,35 @@ int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
      * just to be super safe.
      * Re-allocs are extremely expensive, having a bit of extra memory is not.
      */
+    size = 3 * bytes + 100;
     if (ctx->tmp_buf == NULL) {
-        ctx->tmp_buf = flb_malloc(sizeof(char) * (3 * bytes) + 100);
+        flb_trace("Increasing tmp_buf to %zu", size);
+        ctx->tmp_buf = flb_malloc(sizeof(char) * size);
         if (!ctx->tmp_buf) {
             flb_errno();
             return -1;
         }
         ctx->tmp_buf_size = (3 * bytes + 100);
     }
-    else if (ctx->tmp_buf_size < (3 * bytes + 100)) {
+    else if (ctx->tmp_buf_size < size) {
+        flb_trace("Increasing tmp_buf to %zu", size);
         flb_free(ctx->tmp_buf);
-        ctx->tmp_buf = flb_malloc(sizeof(char) * (3 * bytes) + 100);
+        ctx->tmp_buf = flb_malloc(sizeof(char) * size);
         if (!ctx->tmp_buf) {
             flb_errno();
             return -1;
         }
-        ctx->tmp_buf_size = (3 * bytes);
+        ctx->tmp_buf_size = size;
+    }
+
+    /* initialize events if needed */
+    if (ctx->events == NULL) {
+        ctx->events = flb_malloc(sizeof(struct event) * 1000);
+        if (!ctx->events) {
+            flb_errno();
+            return -1;
+        }
+        ctx->events_size = 1000;
     }
 
     /* unpack msgpack */
@@ -206,15 +222,28 @@ int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
         map = root.via.array.ptr[1];
         map_size = map.via.map.size;
 
+        /* re-alloc event buffer if needed */
+        if (i > ctx->events_size) {
+            size = ctx->events_size * 1.5;
+            flb_trace("Increasing event buffer to %zu", size);
+            ctx->events = flb_realloc(ctx->events, size);
+            if (!ctx->events) {
+                flb_errno();
+                goto error;
+            }
+            ctx->events_size = size;
+        }
+
         /* lack of space during iteration is unlikely; but check to be safe */
-        if ((tmp_buf_offset + 3 * map_size) > ctx->tmp_buf_size) {
-            ctx->tmp_buf = flb_realloc(ctx->tmp_buf,
-                                       ctx->tmp_buf_size + 3 * map_size);
+        size = tmp_buf_offset + 3 * map_size;
+        if (size > ctx->tmp_buf_size) {
+            flb_trace("In loop re-allocation of tmp_buf to %zu", size);
+            ctx->tmp_buf = flb_realloc(ctx->tmp_buf, size);
             if (!ctx->tmp_buf) {
                 flb_errno();
                 goto error;
             }
-            ctx->tmp_buf_size += 3 * map_size;
+            ctx->tmp_buf_size = size;
         }
 
         /* set tmp_buf_ptr before using it */
@@ -237,6 +266,12 @@ int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
     }
     msgpack_unpacked_destroy(&result);
 
+    // for debug; todo: Remove
+    ctx->tmp_buf[tmp_buf_offset] = '\0';
+    flb_debug("tmp_buf: %s", ctx->tmp_buf);
+
+    return tmp_buf_offset;
+
 error:
     msgpack_unpacked_destroy(&result);
     return -1;
@@ -258,7 +293,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_time tmp;
     msgpack_object *p;
 
-    playground(data, bytes);
+    msg_pack_to_events(ctx, data, bytes);
 
     // struct aws_credentials *creds;
     //
