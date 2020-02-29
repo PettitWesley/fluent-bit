@@ -318,9 +318,16 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
+    struct event *event;
+    flb_debug("before:");
+    for (int i=0; i<total_events; i++) {
+        event = &ctx->events[i];
+        flb_debug("%llu", event->timestamp);
+    }
+
     qsort(ctx->events, total_events, sizeof(struct event), compare_events);
 
-    struct event *event;
+    flb_debug("after:");
     for (int i=0; i<total_events; i++) {
         event = &ctx->events[i];
         flb_debug("%llu", event->timestamp);
