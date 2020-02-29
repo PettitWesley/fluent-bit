@@ -271,7 +271,7 @@ int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
     flb_debug("tmp_buf: %s", ctx->tmp_buf);
 
     for (int l=0; l < ctx->events_size; l++) {
-        event = ctx->events[l];
+        event = &ctx->events[l];
         flb_debug("event %d: %llu, %10s", l, event->timestamp, event->json);
     }
 
