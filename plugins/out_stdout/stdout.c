@@ -327,7 +327,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     flb_debug("before:");
     for (int i=0; i<total_events; i++) {
         event = &ctx->events[i];
-        flb_debug("%llu", event->timestamp);
+        flb_debug("%s", event->json);
     }
 
     qsort(ctx->events, total_events, sizeof(struct event), compare_events);
@@ -335,7 +335,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     flb_debug("after:");
     for (int i=0; i<total_events; i++) {
         event = &ctx->events[i];
-        flb_debug("%llu", event->timestamp);
+        flb_debug("%s", event->json);
     }
 
     flb_debug("____________");
