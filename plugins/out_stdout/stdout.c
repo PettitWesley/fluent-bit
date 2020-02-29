@@ -333,6 +333,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         flb_debug("%llu", event->timestamp);
     }
 
+    flb_debug("____________");
     FLB_OUTPUT_RETURN(FLB_OK);
 
     // struct aws_credentials *creds;
