@@ -279,7 +279,15 @@ static int compare_events(const void *a_arg, const void *b_arg)
     struct event *r_a = *(struct event **) a_arg;
     struct event *r_b = *(struct event **) b_arg;
 
-    return r_a->timestamp < r_b->timestamp;
+    if (r_a->timestamp == r_b->timestamp) {
+        return 0;
+    }
+    else if (r_a->timestamp < r_b->timestamp) {
+        return -1;
+    }
+    else {
+        return 1;
+    }
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
