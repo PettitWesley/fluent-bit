@@ -28,6 +28,7 @@
 struct event {
     char *json;
     size_t len;
+    // TODO: re-usable in kinesis streams plugin if we make it timespec instead
     unsigned long long timestamp;
 };
 
