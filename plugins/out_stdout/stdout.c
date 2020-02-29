@@ -276,8 +276,8 @@ error:
 
 static int compare_events(const void *a_arg, const void *b_arg)
 {
-    struct record *r_a = *(struct record **) a_arg;
-    struct record *r_b = *(struct record **) b_arg;
+    struct event *r_a = *(struct event **) a_arg;
+    struct event *r_b = *(struct event **) b_arg;
 
     if (r_a->timestamp == r_b->timestamp) {
         return 0;
