@@ -270,6 +270,11 @@ int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
     ctx->tmp_buf[tmp_buf_offset] = '\0';
     flb_debug("tmp_buf: %s", ctx->tmp_buf);
 
+    for (int l=0; l < ctx->events_size; l++) {
+        event = ctx->events[l];
+        flb_debug("event %d: %llu, %10s", l, event->timestamp, event->json);
+    }
+
     return tmp_buf_offset;
 
 error:
