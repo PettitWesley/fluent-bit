@@ -25,10 +25,28 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_sds.h>
 
+struct event {
+    char *json;
+    size_t len;
+    unsigned long long timestamp;
+};
+
 struct flb_stdout {
     int out_format;
     int json_date_format;
     flb_sds_t json_date_key;
+
+    struct event *events;
+    size_t events_size;
+
+    /*
+     * for performance, allocate large buffers at first flush and then re-use
+     * till the plugin exits
+     */
+    char *tmp_buf;
+    size_t tmp_buf_size;
+    char *out_buf;
+    size_t out_buf_size;
 };
 
 #endif

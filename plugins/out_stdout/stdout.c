@@ -106,91 +106,140 @@ static int cb_stdout_init(struct flb_output_instance *ins,
  * Returns an SDS string with the JSON representation of obj
  * 'estimate' is used to initialize the SDS buffer
  */
-flb_sds_t msgpack_to_json_sds(const msgpack_object *obj, size_t estimate)
-{
-    int ret;
-    flb_sds_t out_buf;
-    flb_sds_t tmp_buf;
-    //TODO: is there a way to find or better guess the size?
-    size_t out_size = estimate * 1.5;
+// flb_sds_t msgpack_to_json_sds(const msgpack_object *obj, size_t estimate)
+// {
+//     int ret;
+//     flb_sds_t out_buf;
+//     flb_sds_t tmp_buf;
+//     //TODO: is there a way to find or better guess the size?
+//     size_t out_size = estimate * 1.5;
+//
+//     out_buf = flb_sds_create_size(out_size);
+//     if (!out_buf) {
+//         flb_errno();
+//         return NULL;
+//     }
+//
+//     while (1) {
+//         ret = flb_msgpack_to_json(out_buf, out_size, obj);
+//         if (ret <= 0) {
+//             tmp_buf = flb_sds_increase(out_buf, new_size - out_size);
+//             if (tmp_buf) {
+//                 out_buf = tmp_buf;
+//                 out_size = out_size + 256;
+//             } else {
+//                 flb_errno();
+//                 flb_error("[aws_pack] Buffer memory alloc failed, skipping record");
+//                 flb_sds_destroy(out_buf);
+//                 return NULL;
+//             }
+//         } else {
+//             break;
+//         }
+//     }
+//
+//     return out_buf;
+//
 
-    out_buf = flb_sds_create_size(out_size);
-    if (!out_buf) {
-        flb_errno();
-        return NULL;
-    }
-
-    while (1) {
-        ret = flb_msgpack_to_json(out_buf, out_size, obj);
-        if (ret <= 0) {
-            tmp_buf = flb_sds_increase(out_buf, new_size - out_size);
-            if (tmp_buf) {
-                out_buf = tmp_buf;
-                out_size = out_size + 256;
-            } else {
-                flb_errno();
-                flb_error("[aws_pack] Buffer memory alloc failed, skipping record");
-                flb_sds_destroy(out_buf);
-                return NULL;
-            }
-        } else {
-            break;
-        }
-    }
-
-    return out_buf;
-}
-
-struct record {
-    flb_sds_t json;
-    time_t timestamp;
-}
-
-struct record *msg_pack_to_records(const void *data, size_t bytes,
-                                   int *num_records)
+/*
+ * Parses all incoming msgpack records to events and stores them in the ctx
+ * events pointer. Uses the ctx tmp_buf to store the JSON strings.
+ */
+int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
 {
     size_t off = 0;
     int i = 0;
+    size_t tmp_buf_offset = 0;
+    size_t written;
+    size_t map_size;
     int ret;
-    int total_records = 0;
+    char *tmp_buf_ptr = NULL;
     struct flb_time tms;
     msgpack_unpacked result;
     msgpack_object  *obj;
-    flb_sds_t json;
-    struct record *record;
+    msgpack_object  map;
+    msgpack_object root;
+    struct event *event;
+
+    /*
+     * Check if tmp_buf is big enough.
+     * Realistically, msgpack is never less than half the size of JSON
+     * We allocate 3 times as much memory (plus a small constant)
+     * just to be super safe.
+     * Re-allocs are extremely expensive, having a bit of extra memory is not.
+     */
+    if (ctx->tmp_buf == NULL) {
+        ctx->tmp_buf = flb_malloc(sizeof(char) * (3 * bytes) + 100);
+        if (!ctx->tmp_buf) {
+            flb_errno();
+            return -1;
+        }
+        ctx->tmp_buf_size = (3 * bytes + 100);
+    }
+    else if (ctx->tmp_buf_size < (3 * bytes + 100)) {
+        flb_free(ctx->tmp_buf);
+        ctx->tmp_buf = flb_malloc(sizeof(char) * (3 * bytes) + 100);
+        if (!ctx->tmp_buf) {
+            flb_errno();
+            return -1;
+        }
+        ctx->tmp_buf_size = (3 * bytes);
+    }
+
+    /* unpack msgpack */
 
     msgpack_unpacked_init(&result);
-
-    //TODO: can we find out the number of records ahead of time?
-    // if not, then iterate once and find number of them, and alloc that much
-    // memory
-
     while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
         /*
          * Each record is a msgpack array [timestamp, map] of the
          * timestamp and record map.
          */
-
-        if (result.data.type != MSGPACK_OBJECT_ARRAY) {
-            continue;
-        }
+         root = result.data;
+         if (root.via.array.size != 2) {
+             continue;
+         }
 
         /* unpack the array of [timestamp, map] */
         flb_time_pop_from_msgpack(&tms, &result, &obj);
 
-        /* obj should now be the record map */
-        if (obj->type != MSGPACK_OBJECT_MAP) {
-            continue;
+        /* Get the record/map */
+        map = root.via.array.ptr[1];
+        map_size = map.via.map.size;
+
+        /* lack of space during iteration is unlikely; but check to be safe */
+        if ((tmp_buf_offset + 3 * map_size) > ctx->tmp_buf_size) {
+            ctx->tmp_buf = flb_realloc(ctx->tmp_buf,
+                                       ctx->tmp_buf_size + 3 * map_size);
+            if (!ctx->tmp_buf) {
+                flb_errno();
+                goto error;
+            }
+            ctx->tmp_buf_size += 3 * map_size;
         }
 
-        json = msgpack_to_json_sds(obj);
-        if (!json) {
-
+        /* set tmp_buf_ptr before using it */
+        tmp_buf_ptr = ctx->tmp_buf + tmp_buf_offset;
+        written = flb_msgpack_to_json(tmp_buf_ptr,
+                                      ctx->tmp_buf_size - tmp_buf_offset,
+                                      &map);
+        if (written < 0) {
+            flb_error("Failed to convert msgpack record to JSON");
+            goto error;
         }
+        tmp_buf_offset += written;
+        event = ctx->events + i;
+        event->json = tmp_buf_ptr;
+        event->len = written;
+        event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
+                                                 tms.tm.tv_nsec/1000000);
 
-
+        i++;
     }
     msgpack_unpacked_destroy(&result);
+
+error:
+    msgpack_unpacked_destroy(&result);
+    return -1;
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
