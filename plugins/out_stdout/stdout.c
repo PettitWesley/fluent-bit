@@ -318,7 +318,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    qsort(ctx->events, total_events, sizeof(struct record), compare_events);
+    qsort(ctx->events, total_events, sizeof(struct event), compare_events);
 
     struct event *event;
     for (int i=0; i<total_events; i++) {
