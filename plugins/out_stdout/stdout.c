@@ -279,13 +279,18 @@ static int compare_events(const void *a_arg, const void *b_arg)
     struct event *r_a = *(struct event **) a_arg;
     struct event *r_b = *(struct event **) b_arg;
 
+    flb_debug("comparing %llu and %llu ", r_a->timestamp, r_b->timestamp);
+
     if (r_a->timestamp < r_b->timestamp) {
+        flb_debug("<");
         return -1;
     }
     else if (r_a->timestamp == r_b->timestamp) {
+        flb_debug("=");
         return 0;
     }
     else {
+        flb_debug(">");
         return 1;
     }
 }
