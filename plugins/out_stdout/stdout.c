@@ -145,7 +145,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
  * Parses all incoming msgpack records to events and stores them in the ctx
  * events pointer. Uses the ctx tmp_buf to store the JSON strings.
  *
- * Return value is number of bytes written, or -1 on error.
+ * Return value is number of events created, or -1 on error.
  */
 int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
 {
@@ -270,12 +270,13 @@ int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
     ctx->tmp_buf[tmp_buf_offset] = '\0';
     flb_debug("tmp_buf: %s", ctx->tmp_buf);
 
-    for (int l=0; l < ctx->events_size; l++) {
+    for (int l=0; l < i; l++) {
         event = &ctx->events[l];
         flb_debug("event %d: %llu, %10s", l, event->timestamp, event->json);
     }
 
-    return tmp_buf_offset;
+    /* return number of events */
+    return i;
 
 error:
     msgpack_unpacked_destroy(&result);
