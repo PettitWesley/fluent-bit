@@ -41,6 +41,8 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#define PUT_LOG_EVENTS_PAYLOAD_SIZE 1048576
+
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
 {
@@ -256,7 +258,7 @@ int msg_pack_to_events(struct flb_stdout *ctx, const char *data, size_t bytes)
             goto error;
         }
         tmp_buf_offset += written;
-        event = ctx->events + i;
+        event = &ctx->events[i];
         event->json = tmp_buf_ptr;
         event->len = written;
         event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
@@ -279,20 +281,69 @@ static int compare_events(const void *a_arg, const void *b_arg)
     struct event *r_a = *(struct event **) a_arg;
     struct event *r_b = *(struct event **) b_arg;
 
-    flb_debug("comparing %llu and %llu ", r_a->timestamp, r_b->timestamp);
-
     if (r_a->timestamp < r_b->timestamp) {
-        flb_debug("<");
         return -1;
     }
     else if (r_a->timestamp == r_b->timestamp) {
-        flb_debug("=");
         return 0;
     }
     else {
-        flb_debug(">");
         return 1;
     }
+}
+
+static inline int try_to_write(char *buf, int *off, size_t left,
+                               const char *str, size_t str_len)
+{
+    if (str_len <= 0){
+        str_len = strlen(str);
+    }
+    if (left <= *off+str_len) {
+        return FLB_FALSE;
+    }
+    memcpy(buf+*off, str, str_len);
+    *off += str_len;
+    return FLB_TRUE;
+}
+
+/*
+ * Writes the "header" for a put log events payload
+ *
+ * Returns the number of bytes written, or -1 on error
+ */
+static int init_put_payload(struct flb_stdout *ctx,
+                            char *log_group, char *log_stream,
+                            char *sequenceToken)
+{
+    int offset = 0;
+
+    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                      "{\"logGroupName\":\"", 17)) {
+        goto error;
+    }
+
+    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                      log_group, 0)) {
+        goto error;
+    }
+
+    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                      "\",\"logStreamName\": \"", 20)) {
+        goto error;
+    }
+
+    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                      log_stream, 0)) {
+        goto error;
+    }
+
+    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                      "\",\"logStreamName\": \"", 20)) {
+        goto error;
+    }
+
+error:
+    return -1;
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
@@ -323,20 +374,13 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    struct event *event;
-    flb_debug("before:");
-    for (int i=0; i<total_events; i++) {
-        event = &ctx->events[i];
-        flb_debug("%s", event->json);
-    }
-
     qsort(ctx->events, total_events, sizeof(struct event), compare_events);
 
-    flb_debug("after:");
-    for (int i=0; i<total_events; i++) {
-        event = &ctx->events[i];
-        flb_debug("%s", event->json);
-    }
+    // flb_debug("after:");
+    // for (int i=0; i<total_events; i++) {
+    //     event = &ctx->events[i];
+    //     flb_debug("%s", event->json);
+    // }
 
     flb_debug("____________");
     FLB_OUTPUT_RETURN(FLB_OK);
