@@ -395,7 +395,7 @@ static int add_event(struct flb_stdout *ctx, struct event *event, int *offset)
     }
 
     if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
-                      event->timestamp, 0)) {
+                      buf, 0)) {
         goto error;
     }
 
