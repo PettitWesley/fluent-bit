@@ -491,7 +491,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    printf("Payload: \n%s", ctx->out_buf);
+    flb_debug("Payload: \n%s", ctx->out_buf);
 
     // flb_debug("after:");
     // for (int i=0; i<total_events; i++) {
