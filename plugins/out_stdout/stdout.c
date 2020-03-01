@@ -108,6 +108,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         flb_free(ctx);
         return -1;
     }
+    ctx->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
 
     /* Export context */
     flb_output_set_context(ins, ctx);
