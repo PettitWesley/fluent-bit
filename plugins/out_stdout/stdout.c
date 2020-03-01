@@ -325,49 +325,49 @@ static int init_put_payload(struct flb_stdout *ctx,
                             char *sequenceToken,
                             int *offset)
 {
-    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                       "{\"logGroupName\":\"", 17)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                       log_group, 0)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                       "\",\"logStreamName\":\"", 19)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                       log_stream, 0)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                       "\",", 2)) {
         goto error;
     }
 
     if (sequenceToken) {
-        if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+        if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                           "\"sequenceToken\":\"", 17)) {
             goto error;
         }
 
-        if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+        if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                           sequenceToken, 0)) {
             goto error;
         }
 
-        if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+        if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                           "\",", 2)) {
             goto error;
         }
     }
 
-    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                       "\"logEvents\":[", 13)) {
         goto error;
     }
