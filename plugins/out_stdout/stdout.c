@@ -383,6 +383,12 @@ error:
  */
 static int add_event(struct flb_stdout *ctx, struct event *event, int *offset)
 {
+    char buf[50];
+
+    if (!sprintf(buf, "%llu", event->timestamp)) {
+        goto error;
+    }
+
     if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                       "{\"timestamp\":", 13)) {
         goto error;
