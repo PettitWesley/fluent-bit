@@ -412,7 +412,7 @@ static int add_event(struct flb_stdout *ctx, struct event *event, int *offset)
     }
 
     if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
-                      "\",}", 3)) {
+                      "\"}", 2)) {
         goto error;
     }
 
@@ -482,6 +482,13 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         if (ret < 0) {
             flb_debug("Could not add event");
             FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        if (i != (total_events - 1)) {
+            if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                              ",", 1)) {
+                flb_debug("Could not terminate event with ','");
+                FLB_OUTPUT_RETURN(FLB_RETRY);
+            }
         }
     }
 
