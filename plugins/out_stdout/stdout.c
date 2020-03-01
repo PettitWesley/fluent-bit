@@ -311,10 +311,6 @@ static inline int try_to_write(char *buf, int *off, size_t left,
         str_len = strlen(str);
     }
     if (left <= *off+str_len) {
-        flb_debug("left: %d", left);
-        flb_debug("*off: %d", *off);
-        flb_debug("str_len: %d", str_len);
-        flb_debug("not enough space left");
         return FLB_FALSE;
     }
     memcpy(buf+*off, str, str_len);
