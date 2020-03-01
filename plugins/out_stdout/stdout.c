@@ -100,7 +100,14 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     /* initialize out_buf */
+
+    //TODO: should intelligently increase it's size as needed instead of
+    // initing to max payloadd value
     ctx->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    if (!ctx->out_buf) {
+        flb_free(ctx);
+        return -1;
+    }
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -456,10 +463,24 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     qsort(ctx->events, total_events, sizeof(struct event), compare_events);
 
     ret = init_put_payload(ctx, "fluent", "stream", NULL, &offset);
+    if (ret < 0) {
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
 
     for (i = 0; i < total_events; i++) {
         event = &ctx->events[i];
+        ret = add_event(ctx, event, &offset);
+        if (ret < 0) {
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
     }
+
+    ret = end_put_payload(ctx, &offset);
+    if (ret < 0) {
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    printf("Payload: \n%s", ctx->out_buf);
 
     // flb_debug("after:");
     // for (int i=0; i<total_events; i++) {
