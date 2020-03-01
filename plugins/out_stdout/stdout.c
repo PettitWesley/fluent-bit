@@ -463,6 +463,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
      */
     total_events = msg_pack_to_events(ctx, data, bytes);
     if (total_events < 0) {
+        flb_debug("Could not convert message pack to events");
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
@@ -470,6 +471,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     ret = init_put_payload(ctx, "fluent", "stream", NULL, &offset);
     if (ret < 0) {
+        flb_debug("Could not init put payload");
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
@@ -477,12 +479,14 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         event = &ctx->events[i];
         ret = add_event(ctx, event, &offset);
         if (ret < 0) {
+            flb_debug("Could not add event");
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
     }
 
     ret = end_put_payload(ctx, &offset);
     if (ret < 0) {
+        flb_debug("Could not complete put payload");
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
