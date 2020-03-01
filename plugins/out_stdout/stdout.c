@@ -27,19 +27,20 @@
 #include <fluent-bit/flb_config_map.h>
 #include <msgpack.h>
 
-#include "stdout.h"
-
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_mem.h>
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_http_client.h>
+#include <fluent-bit/flb_utils.h>
 
 #include <monkey/mk_core.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+
+#include "stdout.h"
 
 #define PUT_LOG_EVENTS_PAYLOAD_SIZE 1048576
 
@@ -97,6 +98,9 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             ctx->json_date_format = ret;
         }
     }
+
+    /* initialize out_buf */
+    ctx->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -308,15 +312,12 @@ static inline int try_to_write(char *buf, int *off, size_t left,
 
 /*
  * Writes the "header" for a put log events payload
- *
- * Returns the number of bytes written, or -1 on error
  */
 static int init_put_payload(struct flb_stdout *ctx,
                             char *log_group, char *log_stream,
-                            char *sequenceToken)
+                            char *sequenceToken,
+                            int *offset)
 {
-    int offset = 0;
-
     if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
                       "{\"logGroupName\":\"", 17)) {
         goto error;
@@ -328,7 +329,7 @@ static int init_put_payload(struct flb_stdout *ctx,
     }
 
     if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
-                      "\",\"logStreamName\": \"", 20)) {
+                      "\",\"logStreamName\":\"", 19)) {
         goto error;
     }
 
@@ -338,12 +339,86 @@ static int init_put_payload(struct flb_stdout *ctx,
     }
 
     if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
-                      "\",\"logStreamName\": \"", 20)) {
+                      "\",", 2)) {
         goto error;
     }
 
+    if (sequenceToken) {
+        if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                          "\"sequenceToken\":\"", 17)) {
+            goto error;
+        }
+
+        if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                          sequenceToken, 0)) {
+            goto error;
+        }
+
+        if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                          "\",", 2)) {
+            goto error;
+        }
+    }
+
+    if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+                      "\"logEvents\":[", 13)) {
+        goto error;
+    }
+
+    return 0;
+
 error:
     return -1;
+}
+
+/*
+ * Writes a log event to the output buffer
+ */
+static int add_event(struct flb_stdout *ctx, struct event *event, int *offset)
+{
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+                      "{\"timestamp\":", 13)) {
+        goto error;
+    }
+
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+                      event->timestamp, 0)) {
+        goto error;
+    }
+
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+                      ",\"message\":\"", 12)) {
+        goto error;
+    }
+
+    /* flb_utils_write_str will escape the JSON in event->json */
+    if (!flb_utils_write_str(ctx->out_buf, offset, ctx->out_buf_size,
+                             event->json, strlen(event->json))) {
+        goto error;
+    }
+
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+                      "\",}", 3)) {
+        goto error;
+    }
+
+    return 0;
+
+error:
+    return -1;
+}
+
+/* Terminates a PutLogEvents payload */
+static int end_put_payload(struct flb_stdout *ctx, int *offset)
+{
+    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+                      "]}", 2)) {
+        return -1;
+    }
+    ctx->out_buf[*offset] = '\0';
+    *offset += 1;
+
+    return 0;
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
@@ -363,6 +438,10 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     msgpack_object *p;
 
     int total_events;
+    int offset = 0;
+    int ret;
+    int i;
+    struct event *event;
 
     /*
      *  1. Parse msg to events
@@ -375,6 +454,12 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     qsort(ctx->events, total_events, sizeof(struct event), compare_events);
+
+    ret = init_put_payload(ctx, "fluent", "stream", NULL, &offset);
+
+    for (i = 0; i < total_events; i++) {
+        event = &ctx->events[i];
+    }
 
     // flb_debug("after:");
     // for (int i=0; i<total_events; i++) {
