@@ -234,7 +234,14 @@ error:
 }
 
 /* parses AWS API error responses and returns the value of the __type field */
-flb_sds_t flb_aws_error(char *response, size_t response_len) {
+flb_sds_t flb_aws_error(char *response, size_t response_len)
+{
+    return flb_json_get_val(response, response_len, "__type");
+}
+
+/* gets the value of a key in a json string */
+flb_sds_t flb_json_get_val(char *response, size_t response_len, char *key)
+{
     jsmntok_t *tokens = NULL;
     const jsmntok_t *t = NULL;
     char *current_token = NULL;
@@ -282,7 +289,7 @@ flb_sds_t flb_aws_error(char *response, size_t response_len) {
         if (t->type == JSMN_STRING) {
             current_token = &response[t->start];
 
-            if (strncmp(current_token, "__type", 6) == 0) {
+            if (strncmp(current_token, key, strlen(key)) == 0) {
                 i++;
                 t = &tokens[i];
                 current_token = &response[t->start];

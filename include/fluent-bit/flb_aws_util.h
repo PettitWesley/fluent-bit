@@ -128,5 +128,10 @@ char *flb_aws_endpoint(char* service, char* region);
  */
 flb_sds_t flb_aws_error(char *response, size_t response_len);
 
+/*
+ * Parses the JSON and gets the value for 'key'
+ */
+flb_sds_t flb_json_get_val(char *response, size_t response_len, char *key);
+
 #endif
 #endif /* FLB_HAVE_AWS */
