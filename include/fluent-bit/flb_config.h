@@ -27,6 +27,7 @@
 #include <fluent-bit/flb_pipe.h>
 #include <fluent-bit/flb_log.h>
 #include <fluent-bit/flb_sds.h>
+#include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_task_map.h>
 
 #include <monkey/mk_core.h>
