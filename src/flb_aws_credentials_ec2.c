@@ -56,7 +56,6 @@ struct flb_aws_credentials *get_credentials_fn_ec2(struct flb_aws_provider
                                                    *provider)
 {
     struct flb_aws_credentials *creds;
-    int ret;
     int refresh = FLB_FALSE;
     struct flb_aws_provider_ec2 *implementation = provider->implementation;
 
@@ -69,10 +68,22 @@ struct flb_aws_credentials *get_credentials_fn_ec2(struct flb_aws_provider
         refresh = FLB_TRUE;
     }
     if (!implementation->creds || refresh == FLB_TRUE) {
-        ret = get_creds_ec2(implementation);
-        if (ret < 0) {
-            return NULL;
+        if (try_lock_provider(provider)) {
+            get_creds_ec2(implementation);
+            unlock_provider(provider);
         }
+    }
+
+    if (!implementation->creds) {
+        /*
+         * We failed to lock the provider and creds are unset. This means that
+         * another co-routine is performing the refresh.
+         */
+        flb_warn("[aws_credentials] No cached credentials are available and "
+                 "a credential refresh is already in progress. The current "
+                 "co-routine will retry.");
+
+        return NULL;
     }
 
     creds = flb_malloc(sizeof(struct flb_aws_credentials));
@@ -113,10 +124,15 @@ struct flb_aws_credentials *get_credentials_fn_ec2(struct flb_aws_provider
 }
 
 int refresh_fn_ec2(struct flb_aws_provider *provider) {
-    struct flb_aws_provider_ec2 *implementation = provider->
-                                                          implementation;
+    struct flb_aws_provider_ec2 *implementation = provider->implementation;
+    int ret = -1;
+
     flb_debug("[aws_credentials] Refresh called on the EC2 IMDS provider");
-    return get_creds_ec2(implementation);
+    if (try_lock_provider(provider)) {
+        ret = get_creds_ec2(implementation);
+        unlock_provider(provider);
+    }
+    return ret;
 }
 
 void destroy_fn_ec2(struct flb_aws_provider *provider) {
