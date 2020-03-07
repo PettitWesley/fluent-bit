@@ -130,6 +130,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     flb_info("secret: %s", creds->secret_access_key);
     flb_info("token: %s", creds->session_token);
 
+    FLB_OUTPUT_RETURN(FLB_OK);
+
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
                                                ctx->out_format,
