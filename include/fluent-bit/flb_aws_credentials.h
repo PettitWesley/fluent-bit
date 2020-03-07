@@ -70,7 +70,7 @@ typedef int(flb_aws_provider_init_fn)(struct flb_aws_provider *provider);
  * Clean up the underlying provider implementation.
  * Called by flb_aws_provider_destroy.
  */
-typedef void(flb_flb_aws_provider_destroy_fn)(struct flb_aws_provider *provider);
+typedef void(flb_aws_provider_destroy_fn)(struct flb_aws_provider *provider);
 
 /*
  * This structure is a virtual table that allows the client to get credentials.
@@ -80,7 +80,7 @@ struct flb_aws_provider_vtable {
     flb_aws_provider_get_credentials_fn *get_credentials;
     flb_aws_provider_refresh_fn *refresh;
     flb_aws_provider_init_fn *init;
-    flb_flb_aws_provider_destroy_fn *destroy;
+    flb_aws_provider_destroy_fn *destroy;
 };
 
 /*
@@ -184,8 +184,15 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
  * The ECS Provider is just a wrapper around the HTTP Provider
  * with the ECS credentials endpoint.
  */
-
 struct flb_aws_provider *flb_ecs_provider_create(struct flb_config *config,
+                                                 struct
+                                                 flb_aws_client_generator
+                                                 *generator);
+
+/*
+ * EC2 IMDS Provider
+ */
+struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
                                                  struct
                                                  flb_aws_client_generator
                                                  *generator);
@@ -195,6 +202,8 @@ struct flb_aws_provider *flb_ecs_provider_create(struct flb_config *config,
  * New AWS Profile provider, reads from the shared credentials file
  */
 struct flb_aws_provider *flb_profile_provider_create();
+
+
 
 /*
  * Helper functions

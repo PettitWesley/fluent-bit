@@ -234,7 +234,14 @@ error:
 }
 
 /* parses AWS API error responses and returns the value of the __type field */
-flb_sds_t flb_aws_error(char *response, size_t response_len) {
+flb_sds_t flb_aws_error(char *response, size_t response_len)
+{
+    return flb_json_get_val(response, response_len, "__type");
+}
+
+/* gets the value of a key in a json string */
+flb_sds_t flb_json_get_val(char *response, size_t response_len, char *key)
+{
     jsmntok_t *tokens = NULL;
     const jsmntok_t *t = NULL;
     char *current_token = NULL;
@@ -282,7 +289,7 @@ flb_sds_t flb_aws_error(char *response, size_t response_len) {
         if (t->type == JSMN_STRING) {
             current_token = &response[t->start];
 
-            if (strncmp(current_token, "__type", 6) == 0) {
+            if (strncmp(current_token, key, strlen(key)) == 0) {
                 i++;
                 t = &tokens[i];
                 current_token = &response[t->start];
@@ -301,4 +308,42 @@ flb_sds_t flb_aws_error(char *response, size_t response_len) {
     }
     flb_free(tokens);
     return error_type;
+}
+
+int flb_imds_request(struct flb_aws_client *client, char *metadata_path,
+                     flb_sds_t *metadata, size_t *metadata_len)
+{
+    int ret;
+    flb_sds_t ec2_metadata;
+
+    flb_debug("[imds] Using instance metadata V1");
+    ret = client->client_vtable->request(client, FLB_HTTP_GET,
+                                         metadata_path, NULL, 0,
+                                         NULL, 0);
+
+    if (ret != 0 || client->c->resp.status != 200) {
+        if (client->c->resp.payload_size > 0) {
+            flb_debug("[ecs_imds] IMDS metadata response\n%s",
+                      client->c->resp.payload);
+        }
+        return -1;
+    }
+
+    if (client->c->resp.payload_size > 0) {
+        ec2_metadata = flb_sds_create_len(client->c->resp.payload,
+                                          client->c->resp.payload_size);
+
+        if (!ec2_metadata) {
+            flb_errno();
+            return -1;
+        }
+        *metadata = ec2_metadata;
+        *metadata_len = client->c->resp.payload_size;
+
+        return 0;
+    }
+    else {
+        flb_debug("[ecs_imds] IMDS metadata response was empty");
+        return -1;
+    }
 }

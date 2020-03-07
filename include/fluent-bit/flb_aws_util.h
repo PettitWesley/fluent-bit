@@ -128,5 +128,16 @@ char *flb_aws_endpoint(char* service, char* region);
  */
 flb_sds_t flb_aws_error(char *response, size_t response_len);
 
+/*
+ * Parses the JSON and gets the value for 'key'
+ */
+flb_sds_t flb_json_get_val(char *response, size_t response_len, char *key);
+
+/*
+ * Request data from an IMDS path.
+ */
+int flb_imds_request(struct flb_aws_client *client, char *metadata_path,
+                     flb_sds_t *metadata, size_t *metadata_len);
+
 #endif
 #endif /* FLB_HAVE_AWS */
