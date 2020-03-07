@@ -27,6 +27,8 @@
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
 
+#define AWS_IMDS_HOST
+
 struct flb_http_client *request_do(struct flb_aws_client *aws_client,
                                    int method, const char *uri,
                                    const char *body, size_t body_len,
@@ -330,7 +332,7 @@ int flb_imds_request(struct flb_aws_client *client, char *metadata_path,
             flb_debug("[ecs_imds] IMDS metadata response\n%s",
                       c->resp.payload);
         }
-        
+
         flb_http_client_destroy(c);
         return -1;
     }
