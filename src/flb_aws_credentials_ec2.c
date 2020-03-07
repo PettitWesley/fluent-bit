@@ -136,7 +136,7 @@ int refresh_fn_ec2(struct flb_aws_provider *provider) {
 }
 
 void sync_fn_ec2(struct flb_aws_provider *provider) {
-    struct flb_aws_provider_http *implementation = provider->implementation;
+    struct flb_aws_provider_ec2 *implementation = provider->implementation;
 
     flb_debug("[aws_credentials] Sync called on the EC2 provider");
     /* remove async flag */
@@ -144,7 +144,7 @@ void sync_fn_ec2(struct flb_aws_provider *provider) {
 }
 
 void async_fn_ec2(struct flb_aws_provider *provider) {
-    struct flb_aws_provider_http *implementation = provider->implementation;
+    struct flb_aws_provider_ec2 *implementation = provider->implementation;
 
     flb_debug("[aws_credentials] Async called on the EC2 provider");
     /* add async flag */
