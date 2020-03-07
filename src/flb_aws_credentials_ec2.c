@@ -145,7 +145,7 @@ static struct flb_aws_provider_vtable ec2_provider_vtable = {
 struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
                                                  struct
                                                  flb_aws_client_generator
-                                                 *generator);
+                                                 *generator)
 {
     struct flb_aws_provider_ec2 *implementation;
     struct flb_aws_provider *provider;
@@ -210,10 +210,8 @@ static int get_creds_ec2(struct flb_aws_provider_ec2 *implementation)
     flb_debug("[aws_credentials] requesting credentials from EC2 IMDS");
 
     /* Get the name of the instance role */
-    ret = get_metadata(implementation->client, AWS_IMDS_ROLE_PATH,
-                       &instance_role, &instance_role_len,
-                       implementation->imds_v2_token,
-                       implementation->imds_v2_token_len);
+    ret = flb_imds_request(implementation->client, AWS_IMDS_ROLE_PATH,
+                           &instance_role, &instance_role_len);
 
     if (ret < 0) {
         return -1;
