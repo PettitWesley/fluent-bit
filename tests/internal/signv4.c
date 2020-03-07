@@ -623,6 +623,7 @@ static void aws_test_suite()
     }
 
     aws_tests_destroy(tests);
+    flb_aws_provider_destroy(provider);
     flb_free(config);
 }
 
