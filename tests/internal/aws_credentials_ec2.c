@@ -191,7 +191,7 @@ struct flb_aws_client *malformed_http_client_create()
 
 /* Generator that returns clients with the test vtable */
 static struct flb_aws_client_generator malformed_generator = {
-    .new = malformed_http_client_create,
+    .create = malformed_http_client_create,
 };
 
 struct flb_aws_client_generator *generator_malformed()
@@ -344,7 +344,7 @@ static void test_ec2_provider_error_case()
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret < 0);
 
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(provider);
     flb_free(config);
 }
 
@@ -380,7 +380,7 @@ static void test_ec2_provider_malformed_case()
     ret = provider->provider_vtable->refresh(provider);
     TEST_CHECK(ret < 0);
 
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(provider);
     flb_free(config);
 }
 
