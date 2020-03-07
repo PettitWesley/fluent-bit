@@ -97,6 +97,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     /* set sync mode */
     ctx->provider->provider_vtable->sync(ctx->provider);
 
+    ctx->provider->provider_vtable->async(ctx->provider);
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
