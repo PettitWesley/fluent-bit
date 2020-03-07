@@ -372,11 +372,18 @@ int refresh_fn_environment(struct flb_aws_provider *provider)
     return refresh_env(provider);
 }
 
-int init_fn_environment(struct flb_aws_provider *provider)
+/*
+ * sync and async are no-ops for the env provider because it does not make
+ * network IO calls
+ */
+void sync_fn_environment(struct flb_aws_provider *provider)
 {
-    flb_debug("[aws_credentials] Init called on the env provider");
+    return;
+}
 
-    return refresh_env(provider);
+void async_fn_environment(struct flb_aws_provider *provider)
+{
+    return;
 }
 
 /* Destroy is a no-op for the env provider */
@@ -387,8 +394,9 @@ void destroy_fn_environment(struct flb_aws_provider *provider) {
 static struct flb_aws_provider_vtable environment_provider_vtable = {
     .get_credentials = get_credentials_fn_environment,
     .refresh = refresh_fn_environment,
-    .init = init_fn_environment,
     .destroy = destroy_fn_environment,
+    .sync = sync_fn_environment,
+    .async = async_fn_environment,
 };
 
 struct flb_aws_provider *flb_aws_env_provider_create() {
