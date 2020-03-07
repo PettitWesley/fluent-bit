@@ -109,6 +109,7 @@ if(FLB_AWS)
     ${src}
     "flb_aws_credentials.c"
     "flb_aws_credentials_sts.c"
+    "flb_aws_credentials_ec2.c"
     "flb_aws_credentials_http.c"
     "flb_aws_credentials_profile.c"
     "flb_aws_util.c"
