@@ -61,7 +61,6 @@ struct flb_http_client * ec2_role_name_response(struct flb_aws_client *aws_clien
     c->resp.status = 200;
     c->resp.payload = EC2_ROLE_NAME_RESPONSE;
     c->resp.payload_size = strlen(EC2_ROLE_NAME_RESPONSE);
-    aws_client->error_type = NULL;
 
     return c;
 }
@@ -86,7 +85,6 @@ struct flb_http_client *ec2_credentials_response(struct flb_aws_client *aws_clie
     c->resp.status = 200;
     c->resp.payload = EC2_CREDENTIALS_RESPONSE;
     c->resp.payload_size = strlen(EC2_CREDENTIALS_RESPONSE);
-    aws_client->error_type = NULL;
 
     return c;
 }
@@ -170,7 +168,6 @@ struct flb_http_client *malformed_http_client_request(struct flb_aws_client
     c->resp.status = 200;
     c->resp.payload = MALFORMED_RESPONSE;
     c->resp.payload_size = strlen(MALFORMED_RESPONSE);
-    aws_client->error_type = NULL;
 
     return c;
 
@@ -224,7 +221,6 @@ struct flb_http_client *test_http_client_error_case(struct flb_aws_client
     c->resp.status = 500;
     c->resp.payload = "error";
     c->resp.payload_size = 5;
-    aws_client->error_type = NULL;
 
     return c;
 
@@ -249,7 +245,7 @@ struct flb_aws_client *test_http_client_create_error_case()
 
 /* Generator that returns clients with the test vtable */
 static struct flb_aws_client_generator error_case_generator = {
-    .new = test_http_client_create_error_case,
+    .create = test_http_client_create_error_case,
 };
 
 struct flb_aws_client_generator *generator_in_test_error_case()
@@ -259,8 +255,8 @@ struct flb_aws_client_generator *generator_in_test_error_case()
 
 static void test_ec2_provider_v1()
 {
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
     int ret;
     struct flb_config *config;
 
@@ -319,8 +315,8 @@ static void test_ec2_provider_v1()
 
 static void test_ec2_provider_error_case()
 {
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
     int ret;
     struct flb_config *config;
 
@@ -355,8 +351,8 @@ static void test_ec2_provider_error_case()
 /* unexpected output test- see description for MALFORMED_RESPONSE */
 static void test_ec2_provider_malformed_case()
 {
-    struct aws_credentials_provider *provider;
-    struct aws_credentials *creds;
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
     int ret;
     struct flb_config *config;
 
