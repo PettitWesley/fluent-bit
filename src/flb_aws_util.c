@@ -27,8 +27,6 @@
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
 
-#define AWS_IMDS_HOST
-
 struct flb_http_client *request_do(struct flb_aws_client *aws_client,
                                    int method, const char *uri,
                                    const char *body, size_t body_len,
@@ -174,6 +172,14 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
 
     if (!c) {
         flb_error("[aws_client] could not initialize request");
+        goto error;
+    }
+
+    /* Add AWS Fluent Bit user agent */
+    ret = flb_http_add_header(c, "User-Agent", 10,
+                              "aws-fluent-bit-plugin", 21);
+    if (ret < 0) {
+        flb_error("[aws_client] failed to add header to request");
         goto error;
     }
 
