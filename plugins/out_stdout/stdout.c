@@ -81,7 +81,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
-    ctx->provider = flb_ec2_provider_create(config, generator());
+    ctx->provider = flb_ec2_provider_create(config, flb_aws_client_generator());
     if (!ctx->provider) {
         flb_errno();
         return -1;
