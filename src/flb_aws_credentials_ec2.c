@@ -142,7 +142,7 @@ static struct flb_aws_provider_vtable ec2_provider_vtable = {
     .destroy = destroy_fn_ec2,
 };
 
-struct flb_aws_provider *flb_ecs_provider_create(struct flb_config *config,
+struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
                                                  struct
                                                  flb_aws_client_generator
                                                  *generator);
