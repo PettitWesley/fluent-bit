@@ -25,6 +25,9 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
+#include <fluent-bit/flb_aws_credentials.h>
+#include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_http_client.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -78,6 +81,12 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    ctx->provider = flb_ec2_provider_create(config, generator());
+    if (!ctx->provider) {
+        flb_errno();
+        return -1;
+    }
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -99,6 +108,20 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+
+    provider = ctx->provider;
+
+    creds = provider->provider_vtable->get_credentials(provider);
+    if (!creds) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+    flb_info("access: %s", creds->access_key_id);
+    flb_info("secret: %s", creds->secret_access_key);
+    flb_info("token: %s", creds->session_token);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
