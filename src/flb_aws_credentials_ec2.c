@@ -274,6 +274,11 @@ static int ec2_credentials_request(struct flb_aws_provider_ec2
         flb_sds_destroy(credentials_response);
         return -1;
     }
+
+    /* destroy existing credentials first */
+    flb_aws_credentials_destroy(implementation->creds);
+    implementation->creds = NULL;
+    /* set new creds */
     implementation->creds = creds;
     implementation->next_refresh = expiration - FLB_AWS_REFRESH_WINDOW;
 
