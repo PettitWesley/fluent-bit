@@ -41,9 +41,6 @@
 #define FLB_CONFIG_HTTP_PORT    "2020"
 #define FLB_CONFIG_DEFAULT_TAG  "fluent_bit"
 
-/* Function types for mocking network IO functions */
-typedef int(flb_http_do_fn)(struct flb_http_client *c, size_t *bytes);
-
 /* Main struct to hold the configuration of the runtime service */
 struct flb_config {
     struct mk_event ch_event;

@@ -117,6 +117,9 @@ struct flb_http_client {
     struct flb_http_response resp;
 };
 
+/* Function types for mocking network IO functions */
+typedef int(flb_http_do_fn)(struct flb_http_client *c, size_t *bytes)
+
 struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
                                         int method, const char *uri,
                                         const char *body, size_t body_len,
