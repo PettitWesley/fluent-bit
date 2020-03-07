@@ -313,37 +313,45 @@ flb_sds_t flb_json_get_val(char *response, size_t response_len, char *key)
 int flb_imds_request(struct flb_aws_client *client, char *metadata_path,
                      flb_sds_t *metadata, size_t *metadata_len)
 {
-    int ret;
+    struct flb_http_client *c = NULL;
     flb_sds_t ec2_metadata;
 
     flb_debug("[imds] Using instance metadata V1");
-    ret = client->client_vtable->request(client, FLB_HTTP_GET,
-                                         metadata_path, NULL, 0,
-                                         NULL, 0);
+    c = client->client_vtable->request(client, FLB_HTTP_GET,
+                                       metadata_path, NULL, 0,
+                                       NULL, 0);
 
-    if (ret != 0 || client->c->resp.status != 200) {
-        if (client->c->resp.payload_size > 0) {
-            flb_debug("[ecs_imds] IMDS metadata response\n%s",
-                      client->c->resp.payload);
-        }
+    if (!c) {
         return -1;
     }
 
-    if (client->c->resp.payload_size > 0) {
-        ec2_metadata = flb_sds_create_len(client->c->resp.payload,
-                                          client->c->resp.payload_size);
+    if (c->resp.status != 200) {
+        if (c->resp.payload_size > 0) {
+            flb_debug("[ecs_imds] IMDS metadata response\n%s",
+                      c->resp.payload);
+        }
+        
+        flb_http_client_destroy(c);
+        return -1;
+    }
+
+    if (c->resp.payload_size > 0) {
+        ec2_metadata = flb_sds_create_len(c->resp.payload,
+                                          c->resp.payload_size);
 
         if (!ec2_metadata) {
             flb_errno();
             return -1;
         }
         *metadata = ec2_metadata;
-        *metadata_len = client->c->resp.payload_size;
+        *metadata_len = c->resp.payload_size;
 
+        flb_http_client_destroy(c);
         return 0;
     }
     else {
         flb_debug("[ecs_imds] IMDS metadata response was empty");
+        flb_http_client_destroy(c);
         return -1;
     }
 }

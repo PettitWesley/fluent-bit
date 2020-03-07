@@ -259,10 +259,8 @@ static int ec2_credentials_request(struct flb_aws_provider_ec2
     struct flb_aws_credentials *creds;
     time_t expiration;
 
-    ret = get_metadata(implementation->client, cred_path,
-                       &credentials_response, &credentials_response_len,
-                       implementation->imds_v2_token,
-                       implementation->imds_v2_token_len);
+    ret = flb_imds_request(implementation->client, cred_path,
+                           &credentials_response, &credentials_response_len);
 
     if (ret < 0) {
         return -1;
