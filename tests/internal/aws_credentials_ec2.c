@@ -309,7 +309,7 @@ static void test_ec2_provider_v1()
      */
     TEST_CHECK(g_request_count == 4);
 
-    aws_provider_destroy(provider);
+    flb_aws_provider_destroy(provider);
     flb_free(config);
 }
 
