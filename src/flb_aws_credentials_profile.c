@@ -124,11 +124,18 @@ int refresh_fn_profile(struct flb_aws_provider *provider)
     return get_profile(implementation);
 }
 
-int init_fn_profile(struct flb_aws_provider *provider)
+/*
+ * Sync and Async are no-ops for the profile provider because it does not
+ * make network IO calls
+ */
+void sync_fn_profile(struct flb_aws_provider *provider)
 {
-    struct flb_aws_provider_profile *implementation = provider->implementation;
-    flb_debug("[aws_credentials] Init called on the profile provider");
-    return get_profile(implementation);
+    return;
+}
+
+void async_fn_profile(struct flb_aws_provider *provider)
+{
+    return;
 }
 
 void destroy_fn_profile(struct flb_aws_provider *provider)
@@ -158,8 +165,9 @@ void destroy_fn_profile(struct flb_aws_provider *provider)
 static struct flb_aws_provider_vtable profile_provider_vtable = {
     .get_credentials = get_credentials_fn_profile,
     .refresh = refresh_fn_profile,
-    .init = init_fn_profile,
     .destroy = destroy_fn_profile,
+    .sync = sync_fn_profile,
+    .async = async_fn_profile,
 };
 
 struct flb_aws_provider *flb_profile_provider_create()

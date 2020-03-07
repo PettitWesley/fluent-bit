@@ -146,27 +146,36 @@ int refresh_fn_standard_chain(struct flb_aws_provider *provider)
     return ret;
 }
 
-int init_fn_standard_chain(struct flb_aws_provider *provider)
+void sync_fn_standard_chain(struct flb_aws_provider *provider)
 {
     struct flb_aws_provider_chain *implementation = provider->implementation;
     struct flb_aws_provider *sub_provider = NULL;
     struct mk_list *tmp;
     struct mk_list *head;
-    int ret = -1;
 
-    /* find the first provider that indicates successful initialization */
+    /* set all providers to sync mode */
     mk_list_foreach_safe(head, tmp, &implementation->sub_providers) {
         sub_provider = mk_list_entry(head,
                                      struct flb_aws_provider,
                                      _head);
-        ret = sub_provider->provider_vtable->init(sub_provider);
-        if (ret >= 0) {
-            implementation->sub_provider = sub_provider;
-            break;
-        }
+        sub_provider->provider_vtable->sync(sub_provider);
     }
+}
 
-    return ret;
+void async_fn_standard_chain(struct flb_aws_provider *provider)
+{
+    struct flb_aws_provider_chain *implementation = provider->implementation;
+    struct flb_aws_provider *sub_provider = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
+
+    /* set all providers to async mode */
+    mk_list_foreach_safe(head, tmp, &implementation->sub_providers) {
+        sub_provider = mk_list_entry(head,
+                                     struct flb_aws_provider,
+                                     _head);
+        sub_provider->provider_vtable->async(sub_provider);
+    }
 }
 
 void destroy_fn_standard_chain(struct flb_aws_provider *provider) {
@@ -192,8 +201,9 @@ void destroy_fn_standard_chain(struct flb_aws_provider *provider) {
 static struct flb_aws_provider_vtable standard_chain_provider_vtable = {
     .get_credentials = get_credentials_fn_standard_chain,
     .refresh = refresh_fn_standard_chain,
-    .init = init_fn_standard_chain,
     .destroy = destroy_fn_standard_chain,
+    .sync = sync_fn_standard_chain,
+    .async = async_fn_standard_chain,
 };
 
 struct flb_aws_provider *flb_standard_chain_provider_create(struct flb_config

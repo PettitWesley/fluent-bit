@@ -59,28 +59,36 @@ typedef struct flb_aws_credentials*(flb_aws_provider_get_credentials_fn)
 typedef int(flb_aws_provider_refresh_fn)(struct flb_aws_provider *provider);
 
 /*
- * Initialize the provider- make an initial request to obtain credentials and
- * fill the providers credential cache. This is equivalent to refresh() in,
- * except that it can be called outside of a co-routine context (during plugin
- * initialization).
- */
-typedef int(flb_aws_provider_init_fn)(struct flb_aws_provider *provider);
-
-/*
  * Clean up the underlying provider implementation.
  * Called by flb_aws_provider_destroy.
  */
 typedef void(flb_aws_provider_destroy_fn)(struct flb_aws_provider *provider);
 
 /*
- * This structure is a virtual table that allows the client to get credentials.
- * And clean up all memory from the underlying implementation.
+ * Set provider to 'sync' mode; all network IO operations will be performed
+ * synchronously. This must be set if the provider is called when co-routines
+ * are not available (ex: during plugin initialization).
+ */
+typedef void(flb_aws_provider_sync_fn)(struct flb_aws_provider *provider);
+
+/*
+ * Set provider to 'async' mode; all network IO operations will be performed
+ * asynchronously.
+ *
+ * All providers are created in 'async' mode by default.
+ */
+typedef void(flb_aws_provider_async_fn)(struct flb_aws_provider *provider);
+
+/*
+ * This structure is a virtual table for the functions implemented by each
+ * provider
  */
 struct flb_aws_provider_vtable {
     flb_aws_provider_get_credentials_fn *get_credentials;
     flb_aws_provider_refresh_fn *refresh;
-    flb_aws_provider_init_fn *init;
     flb_aws_provider_destroy_fn *destroy;
+    flb_aws_provider_sync_fn *sync;
+    flb_aws_provider_async_fn *async;
 };
 
 /*

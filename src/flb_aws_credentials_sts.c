@@ -171,26 +171,20 @@ int refresh_fn_sts(struct flb_aws_provider *provider) {
     return ret;
 }
 
-int init_fn_sts(struct flb_aws_provider *provider) {
-    int ret = -1;
+void sync_fn_sts(struct flb_aws_provider *provider) {
     struct flb_aws_provider_sts *implementation = provider->implementation;
 
-    flb_debug("[aws_credentials] Init called on the STS provider");
-    /* init can be run outside of a co-routine context, async must be disabled*/
+    flb_debug("[aws_credentials] Sync called on the STS provider");
+    /* Remove async flag */
     implementation->sts_client->upstream->flags &= ~(FLB_IO_ASYNC);
+}
 
-    /* the base_provider must be initilized so we can sign the request to STS */
-    implementation->base_provider->provider_vtable->init(implementation->
-                                                         base_provider);
+void async_fn_sts(struct flb_aws_provider *provider) {
+    struct flb_aws_provider_sts *implementation = provider->implementation;
 
-    ret = sts_assume_role_request(implementation->sts_client,
-                                  &implementation->creds, implementation->uri,
-                                  &implementation->next_refresh);
-
-    /* re-enable async for future calls */
+    flb_debug("[aws_credentials] Async called on the STS provider");
+    /* Add async flag */
     implementation->sts_client->upstream->flags |= FLB_IO_ASYNC;
-
-    return ret;
 }
 
 void destroy_fn_sts(struct flb_aws_provider *provider) {
@@ -223,8 +217,9 @@ void destroy_fn_sts(struct flb_aws_provider *provider) {
 static struct flb_aws_provider_vtable sts_provider_vtable = {
     .get_credentials = get_credentials_fn_sts,
     .refresh = refresh_fn_sts,
-    .init = init_fn_sts,
     .destroy = destroy_fn_sts,
+    .sync = sync_fn_sts,
+    .async = async_fn_sts,
 };
 
 struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
@@ -417,20 +412,18 @@ int refresh_fn_eks(struct flb_aws_provider *provider) {
     return ret;
 }
 
-int init_fn_eks(struct flb_aws_provider *provider) {
-    int ret = -1;
+void sync_fn_eks(struct flb_aws_provider *provider) {
     struct flb_aws_provider_eks *implementation = provider->implementation;
-
-    flb_debug("[aws_credentials] Init called on the EKS provider");
-    /* init can be run outside of a co-routine context, async must be disabled*/
+    flb_debug("[aws_credentials] Sync called on the EKS provider");
+    /* remove async flag */
     implementation->sts_client->upstream->flags &= ~(FLB_IO_ASYNC);
+}
 
-    ret = assume_with_web_identity(implementation);
-
-    /* re-enable async for future calls */
+void sync_fn_eks(struct flb_aws_provider *provider) {
+    struct flb_aws_provider_eks *implementation = provider->implementation;
+    flb_debug("[aws_credentials] Async called on the EKS provider");
+    /* add async flag */
     implementation->sts_client->upstream->flags |= FLB_IO_ASYNC;
-
-    return ret;
 }
 
 void destroy_fn_eks(struct flb_aws_provider *provider) {
@@ -462,8 +455,9 @@ void destroy_fn_eks(struct flb_aws_provider *provider) {
 static struct flb_aws_provider_vtable eks_provider_vtable = {
     .get_credentials = get_credentials_fn_eks,
     .refresh = refresh_fn_eks,
-    .init = init_fn_eks,
     .destroy = destroy_fn_eks,
+    .sync = sync_fn_eks,
+    .async = async_fn_sts,
 };
 
 struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,

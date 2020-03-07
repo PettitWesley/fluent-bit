@@ -135,6 +135,22 @@ int refresh_fn_ec2(struct flb_aws_provider *provider) {
     return ret;
 }
 
+void sync_fn_ec2(struct flb_aws_provider *provider) {
+    struct flb_aws_provider_http *implementation = provider->implementation;
+
+    flb_debug("[aws_credentials] Sync called on the EC2 provider");
+    /* remove async flag */
+    implementation->client->upstream->flags &= ~(FLB_IO_ASYNC);
+}
+
+void async_fn_ec2(struct flb_aws_provider *provider) {
+    struct flb_aws_provider_http *implementation = provider->implementation;
+
+    flb_debug("[aws_credentials] Async called on the EC2 provider");
+    /* add async flag */
+    implementation->client->upstream->flags |= FLB_IO_ASYNC;
+}
+
 void destroy_fn_ec2(struct flb_aws_provider *provider) {
     struct flb_aws_provider_ec2 *implementation = provider->implementation;
 
@@ -158,6 +174,8 @@ static struct flb_aws_provider_vtable ec2_provider_vtable = {
     .get_credentials = get_credentials_fn_ec2,
     .refresh = refresh_fn_ec2,
     .destroy = destroy_fn_ec2,
+    .sync = sync_fn_ec2,
+    .async = async_fn_ec2,
 };
 
 struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
