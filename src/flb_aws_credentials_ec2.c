@@ -182,7 +182,7 @@ struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
 
     implementation->client = generator->create();
     if (!implementation->client) {
-        aws_provider_destroy(provider);
+        flb_aws_provider_destroy(provider);
         flb_upstream_destroy(upstream);
         flb_error("[aws_credentials] EC2 IMDS: client creation error");
         return NULL;
