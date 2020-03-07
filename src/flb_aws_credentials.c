@@ -255,7 +255,7 @@ struct flb_aws_provider *flb_standard_chain_provider_create(struct flb_config
         flb_debug("[aws_credentials] Initialized EKS Provider in standard chain");
     }
 
-    sub_provider = flb_ec2_provider_create();
+    sub_provider = flb_ec2_provider_create(config, generator);
     if (!sub_provider) {
         /* EC2 provider will only fail creation if a memory alloc failed */
         flb_aws_provider_destroy(provider);
