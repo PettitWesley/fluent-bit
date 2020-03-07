@@ -81,7 +81,14 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
-    ctx->provider = flb_ec2_provider_create(config, flb_aws_client_generator());
+    // ctx->provider = flb_ec2_provider_create(config, flb_aws_client_generator());
+    // if (!ctx->provider) {
+    //     flb_errno();
+    //     return -1;
+    // }
+
+    ctx->provider = flb_standard_chain_provider_create(config, NULL, "us-west-2", NULL
+                                                       flb_aws_client_generator());
     if (!ctx->provider) {
         flb_errno();
         return -1;
