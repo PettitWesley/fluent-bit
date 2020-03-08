@@ -42,6 +42,13 @@
 
 #include "cloudwatch_api.h"
 
+static struct flb_aws_header create_group_header = {
+    .key = "X-Amz-Target",
+    .key_len = 12,
+    .val = "Logs_20140328.CreateLogGroup",
+    .val_len = 28,
+};
+
 static struct flb_aws_header create_stream_header = {
     .key = "X-Amz-Target",
     .key_len = 12,
@@ -386,7 +393,64 @@ int send_in_batches(struct flb_cloudwatch *ctx, int event_count)
 
 int create_log_group(struct flb_cloudwatch *ctx)
 {
-    return 0;
+    struct flb_http_client *c = NULL;
+    struct flb_aws_client *cw_client;
+    flb_sds_t body;
+    flb_sds_t tmp;
+    flb_sds_t error;
+
+    flb_info("[out_cloudwatch] Creating log group %s", ctx->log_group);
+
+    body = flb_sds_create_size(25 + strlen(ctx->log_group));
+    if (!body) {
+        flb_sds_destroy(body);
+        flb_errno();
+        return -1;
+    }
+
+    /* construct CreateLogGroup request body */
+    tmp = flb_sds_printf(&body, "{\"logGroupName\":\"%s\"}", ctx->log_group);
+    if (!tmp) {
+        flb_sds_destroy(body);
+        flb_errno();
+        return -1;
+    }
+    body = tmp;
+
+    cw_client = ctx->cw_client;
+    c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
+                                          "/", body, strlen(body),
+                                          &create_group_header, 1);
+
+    if (c) {
+        flb_debug("[out_cloudwatch] CreateLogGroup http status=%d",
+                 c->resp.status);
+
+        if (c->resp.status == 200) {
+            /* success */
+            flb_info("[out_cloudwatch] Created log group %s", ctx->log_group);
+            ctx->stream_created = FLB_TRUE;
+            flb_sds_destroy(body);
+            flb_http_client_destroy(c);
+            return 0;
+        }
+
+        /* Check error */
+        if (c->resp.payload_size > 0) {
+            flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
+            error = flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+                                        "CreateLogGroup", ctx->ins);
+            //TODO: use error message to determine if stream already exists
+            flb_sds_destroy(error);
+        }
+    }
+
+    flb_error("[out_cloudwatch] Failed to create log group");
+    if (c) {
+        flb_http_client_destroy(c);
+        flb_sds_destroy(body);
+    }
+    return -1;
 }
 
 int create_log_stream(struct flb_cloudwatch *ctx)
@@ -497,16 +561,12 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
         }
 
         /* Check error */
+        //TODO: process error code and get sequence token if needed
         if (c->resp.payload_size > 0) {
-            tmp = flb_aws_error(c->resp.payload, c->resp.payload_size);
-            if (tmp) {
-                flb_error("[out_cloudwatch] PutLogEvents API responded with"
-                          " error='%s'", tmp);
-                // TODO: error responses generally have a message field
-                /* for debug, print entire payload */
-                flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
-                flb_sds_destroy(tmp);
-            }
+            flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
+            error = flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+                                        "PutLogEvents", ctx->ins);
+            flb_sds_destroy(error);
         }
     }
 

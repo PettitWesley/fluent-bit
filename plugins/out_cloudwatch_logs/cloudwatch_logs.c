@@ -209,6 +209,11 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
+    ret = create_log_group(ctx);
+    if (ret < 0) {
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
     if (ctx->stream_created == FLB_FALSE) {
         ret = create_log_stream(ctx);
         if (ret < 0) {
