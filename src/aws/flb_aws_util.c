@@ -23,6 +23,7 @@
 #include <fluent-bit/flb_signv4.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_aws_credentials.h>
+#include <fluent-bit/flb_output_plugin.h>
 
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
