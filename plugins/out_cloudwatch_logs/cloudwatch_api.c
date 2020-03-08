@@ -391,6 +391,7 @@ int create_log_stream(struct flb_cloudwatch *ctx)
     struct flb_aws_client *cw_client;
     flb_sds_t body;
     flb_sds_t tmp;
+    flb_sds_t error;
 
     flb_info("[out_cloudwatch] Creating log stream %s in log group %s",
              ctx->log_stream, ctx->log_group);
@@ -434,14 +435,22 @@ int create_log_stream(struct flb_cloudwatch *ctx)
 
         /* Check error */
         if (c->resp.payload_size > 0) {
-            tmp = flb_aws_error(c->resp.payload, c->resp.payload_size);
-            if (tmp) {
-                flb_error("[out_cloudwatch] CreateLogStream API responded with"
-                          " error='%s'", tmp);
-                // TODO: error responses generally have a message field
+            error = flb_aws_error(c->resp.payload, c->resp.payload_size);
+            if (error) {
+                tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
+                                       "message");
+                if (tmp) {
+                    flb_error("[out_cloudwatch] CreateLogStream API responded with"
+                              " error='%s', message='%s'", error, tmp);
+                    flb_sds_destroy(tmp);
+                }
+                else {
+                    flb_error("[out_cloudwatch] CreateLogStream API responded with"
+                              " error='%s'", error);
+                }
                 /* for debug, print entire payload */
                 flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
-                flb_sds_destroy(tmp);
+                flb_sds_destroy(error);
             }
         }
     }
