@@ -18,10 +18,9 @@
  *  limitations under the License.
  */
 
-#ifndef FLB_OUT_STDOUT
-#define FLB_OUT_STDOUT
+#ifndef FLB_OUT_CLOUDWATCH_LOGS_H
+#define FLB_OUT_CLOUDWATCH_LOGS_H
 
-#include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_aws_credentials.h>
@@ -29,21 +28,39 @@
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
 
-struct flb_stdout {
-    int out_format;
-    int json_date_format;
-    flb_sds_t json_date_key;
-    struct flb_output_instance *ins;
+struct event {
+    char *json;
+    size_t len;
+    // TODO: re-usable in kinesis streams plugin if we make it timespec instead
+    // uint64_t?
+    unsigned long long timestamp;
+};
 
+struct flb_cloudwatch {
     struct flb_tls cred_tls;
     struct flb_tls client_tls;
     struct flb_aws_provider *aws_provider;
     struct flb_aws_client *cw_client;
 
+    const char *log_stream;
+    const char *log_group;
+    const char *region;
+
     char *endpoint;
-    char *log_stream;
     int stream_created;
     flb_sds_t sequence_token;
+
+    struct event *events;
+    size_t events_size;
+
+    /*
+     * for performance, allocate large buffers at first flush and then re-use
+     * till the plugin exits
+     */
+    char *tmp_buf;
+    size_t tmp_buf_size;
+    char *out_buf;
+    size_t out_buf_size;
 };
 
 #endif

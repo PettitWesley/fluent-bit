@@ -18,32 +18,17 @@
  *  limitations under the License.
  */
 
-#ifndef FLB_OUT_STDOUT
-#define FLB_OUT_STDOUT
+#ifndef FLB_OUT_CLOUDWATCH_API
+#define FLB_OUT_CLOUDWATCH_API
 
-#include <fluent-bit/flb_output_plugin.h>
-#include <fluent-bit/flb_info.h>
-#include <fluent-bit/flb_sds.h>
-#include <fluent-bit/flb_aws_credentials.h>
-#include <fluent-bit/flb_http_client.h>
-#include <fluent-bit/flb_aws_util.h>
-#include <fluent-bit/flb_signv4.h>
+#define PUT_LOG_EVENTS_PAYLOAD_SIZE 1048576
 
-struct flb_stdout {
-    int out_format;
-    int json_date_format;
-    flb_sds_t json_date_key;
-    struct flb_output_instance *ins;
+#include "cloudwatch_logs.h"
 
-    struct flb_tls cred_tls;
-    struct flb_tls client_tls;
-    struct flb_aws_provider *aws_provider;
-    struct flb_aws_client *cw_client;
-
-    char *endpoint;
-    char *log_stream;
-    int stream_created;
-    flb_sds_t sequence_token;
-};
+int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t bytes);
+int send_in_batches(struct flb_cloudwatch *ctx, int event_count);
+int create_log_stream(struct flb_cloudwatch *ctx);
+int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size);
+int compare_events(const void *a_arg, const void *b_arg);
 
 #endif

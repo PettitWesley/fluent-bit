@@ -23,10 +23,32 @@
 #include <fluent-bit/flb_slist.h>
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
+#include <sys/time.h>
 #include <fluent-bit/flb_config_map.h>
 #include <msgpack.h>
 
 #include "stdout.h"
+
+static struct flb_aws_header content_type_header = {
+    .key = "Content-Type",
+    .key_len = 12,
+    .val = "application/x-amz-json-1.1",
+    .val_len = 26,
+};
+
+static struct flb_aws_header create_stream_header = {
+    .key = "X-Amz-Target",
+    .key_len = 12,
+    .val = "Logs_20140328.CreateLogStream",
+    .val_len = 29,
+};
+
+static struct flb_aws_header put_log_events_header = {
+    .key = "X-Amz-Target",
+    .key_len = 12,
+    .val = "Logs_20140328.PutLogEvents",
+    .val_len = 26,
+};
 
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
@@ -78,10 +100,102 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    /* one tls instance for provider, one for cw client */
+    ctx->cred_tls.context = flb_tls_context_new(FLB_TRUE,
+                                               ins->tls_debug,
+                                               ins->tls_vhost,
+                                               ins->tls_ca_path,
+                                               ins->tls_ca_file,
+                                               ins->tls_crt_file,
+                                               ins->tls_key_file,
+                                               ins->tls_key_passwd);
+
+    if (!ctx->cred_tls.context) {
+        flb_error("[out_cloudwatch] Failed to create AWS Credential Provider");
+        return -1;
+    }
+
+    ctx->client_tls.context = flb_tls_context_new(FLB_TRUE,
+                                               ins->tls_debug,
+                                               ins->tls_vhost,
+                                               ins->tls_ca_path,
+                                               ins->tls_ca_file,
+                                               ins->tls_crt_file,
+                                               ins->tls_key_file,
+                                               ins->tls_key_passwd);
+    if (!ctx->client_tls.context) {
+        flb_error("[out_cloudwatch] Failed to create AWS Credential Provider");
+        return -1;
+    }
+
+    ctx->aws_provider = flb_standard_chain_provider_create(config,
+                                                           &ctx->cred_tls,
+                                                           "us-west-2",
+                                                           NULL,
+                                                           flb_aws_client_generator());
+    if (!ctx->aws_provider) {
+        flb_error("[out_cloudwatch] Failed to create AWS Credential Provider");
+        return -1;
+    }
+
+    /* initialize credentials */
+    ctx->aws_provider->provider_vtable->init(ctx->aws_provider);
+
+    ctx->endpoint = flb_aws_endpoint("logs", "us-west-2");
+    if (!ctx->endpoint) {
+        goto error;
+    }
+
+    struct flb_aws_client_generator *generator = flb_aws_client_generator();
+    ctx->cw_client = generator->create();
+    if (!ctx->cw_client) {
+        goto error;
+    }
+    ctx->cw_client->name = "cw_client";
+    ctx->cw_client->has_auth = FLB_TRUE;
+    ctx->cw_client->provider = ctx->aws_provider;
+    ctx->cw_client->region = "us-west-2";
+    ctx->cw_client->service = "logs";
+    ctx->cw_client->port = 443;
+    ctx->cw_client->flags = 0;
+    ctx->cw_client->proxy = NULL;
+    ctx->cw_client->static_headers = &content_type_header;
+    ctx->cw_client->static_headers_len = 1;
+
+    struct flb_upstream *upstream = flb_upstream_create(config, ctx->endpoint, 443,
+                                   FLB_IO_TLS, &ctx->client_tls);
+    if (!upstream) {
+        flb_error("[aws_credentials] Connection initialization error");
+        goto error;
+    }
+
+    /* Remove async flag from upstream */
+    upstream->flags &= ~(FLB_IO_ASYNC);
+
+    ctx->cw_client->upstream = upstream;
+    ctx->cw_client->host = ctx->endpoint;
+
+    /* for the prototype, just randomly generate a log stream name */
+    ctx->log_stream = flb_sts_session_name();
+    if (!ctx->log_stream) {
+        goto error;
+    }
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
     return 0;
+
+error:
+    flb_error("[out_cloudwatch] Initialization failed");
+    return -1;
+}
+
+static int create_log_stream(struct flb_stdout *ctx,
+                             char *log_group, char *log_stream)
+{
+    flb_info("[out_cloudwatch] Creating log stream %s in log group %s",
+             log_stream, log_group);
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
@@ -99,6 +213,107 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+
+    /* this works */
+    if (ctx->stream_created == 0) {
+        flb_info("creating stream..");
+        struct flb_aws_header *create_stream_headers = flb_malloc(sizeof(struct flb_aws_header) * 2);
+        if (!create_stream_headers) {
+            flb_errno();
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        struct flb_http_client *c = NULL;
+        flb_sds_t body = flb_sds_create_size(100);
+        if (!body) {
+            flb_errno();
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+
+        create_stream_headers[0].key = "Content-Type";
+        create_stream_headers[0].key_len = 12;
+        create_stream_headers[0].val = "application/x-amz-json-1.1";
+        create_stream_headers[0].val_len = 26;
+        create_stream_headers[1].key = "X-Amz-Target";
+        create_stream_headers[1].key_len = 12;
+        create_stream_headers[1].val = "Logs_20140328.CreateLogStream";
+        create_stream_headers[1].val_len = 29;
+
+        /* create log stream */
+        body = flb_sds_printf(&body, "{\"logGroupName\": \"fluent\",\"logStreamName\": \"%s\"}", ctx->log_stream);
+        if (!body) {
+            flb_errno();
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+
+        struct flb_aws_client *cw_client = ctx->cw_client;
+        c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
+                                              "/", body, strlen(body), create_stream_headers, 2);
+        if (c) {
+            flb_info("[out_cloudwatch] response status=%d", c->resp.status);
+        }
+        if (c->resp.status == 200) {
+            ctx->stream_created = FLB_TRUE;
+        }
+        if (c && c->resp.payload_size > 0) {
+            flb_info("resp: \n%s", c->resp.payload);
+        }
+    } else {
+        flb_info("putting log events..");
+        struct flb_aws_header *put_events_headers = flb_malloc(sizeof(struct flb_aws_header) * 2);
+        if (!put_events_headers) {
+            flb_errno();
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        struct flb_http_client *c = NULL;
+        flb_sds_t body = flb_sds_create_size(100);
+        if (!body) {
+            flb_errno();
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        // TODO: a single static header and single dynamic header
+        put_events_headers[0].key = "Content-Type";
+        put_events_headers[0].key_len = 12;
+        put_events_headers[0].val = "application/x-amz-json-1.1";
+        put_events_headers[0].val_len = 26;
+        put_events_headers[1].key = "X-Amz-Target";
+        put_events_headers[1].key_len = 12;
+        put_events_headers[1].val = "Logs_20140328.PutLogEvents";
+        put_events_headers[1].val_len = 26;
+
+        char *format = "{\"logGroupName\": \"fluent\",\"logStreamName\": \"%s\",\"logEvents\": [{\"timestamp\": %lld, \"message\": \"Example event 1\"},{\"timestamp\": %lld, \"message\": \"Example event 2\"},{\"timestamp\": %lld,\"message\": \"Example event 3\"}]}";
+        char *format_token = "{\"sequenceToken\": \"%s\",\"logGroupName\": \"fluent\",\"logStreamName\": \"%s\",\"logEvents\": [{\"timestamp\": %lld, \"message\": \"Example event 1\"},{\"timestamp\": %lld, \"message\": \"Example event 2\"},{\"timestamp\": %lld,\"message\": \"Example event 3\"}]}";
+
+        struct timeval tp;
+        gettimeofday(&tp, NULL);
+        long int ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+        flb_warn("time: %lld", ms);
+        if (ctx->sequence_token == NULL) {
+            body = flb_sds_printf(&body, format, ctx->log_stream, ms, ms, ms);
+        } else {
+            body = flb_sds_printf(&body, format_token, ctx->sequence_token, ctx->log_stream, ms, ms, ms);
+        }
+        if (!body) {
+            flb_errno();
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+
+        struct flb_aws_client *cw_client = ctx->cw_client;
+        c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
+                                              "/", body, strlen(body), put_events_headers, 2);
+        if (c) {
+            flb_info("[out_cloudwatch] response status=%d", c->resp.status);
+        }
+        if (c && c->resp.payload_size > 0) {
+            flb_info("resp: \n%s", c->resp.payload);
+            if (c->resp.status == 200) {
+                ctx->sequence_token = flb_json_get_val(c->resp.payload, c->resp.payload_size, "nextSequenceToken");
+                flb_info("next token: \n%s", ctx->sequence_token);
+            }
+        }
+    }
+
+    flb_warn("original code after this...");
+    FLB_OUTPUT_RETURN(FLB_OK);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,

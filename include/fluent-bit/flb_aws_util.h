@@ -139,5 +139,6 @@ flb_sds_t flb_json_get_val(char *response, size_t response_len, char *key);
 int flb_imds_request(struct flb_aws_client *client, char *metadata_path,
                      flb_sds_t *metadata, size_t *metadata_len);
 
+
 #endif
 #endif /* FLB_HAVE_AWS */
