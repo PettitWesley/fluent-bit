@@ -241,6 +241,30 @@ error:
     return NULL;
 }
 
+flb_sds_t flb_aws_print_error(char *response, size_t response_len,
+                              char *api, struct flb_output_instance *ins);
+{
+    flb_sds_t error;
+    flb_sds_t message;
+
+    error = flb_json_get_val(response, response_len, "__type");
+    if (!error) {
+        return NULL;
+    }
+
+    message = flb_json_get_val(response, response_len, "message");
+    if (!message) {
+        /* just print the error */
+        flb_plg_error(ins, "%s API responded with error='%s'", api, error);
+        return error;
+    }
+
+    flb_plg_error(ins, "%s API responded with error='%s', message='%s'",
+                  api, error, message);
+    flb_sds_destroy(message);
+    return error;
+}
+
 /* parses AWS API error responses and returns the value of the __type field */
 flb_sds_t flb_aws_error(char *response, size_t response_len)
 {

@@ -384,6 +384,11 @@ int send_in_batches(struct flb_cloudwatch *ctx, int event_count)
     return 0;
 }
 
+int create_log_group(struct flb_cloudwatch *ctx)
+{
+    return 0;
+}
+
 int create_log_stream(struct flb_cloudwatch *ctx)
 {
 
@@ -435,23 +440,11 @@ int create_log_stream(struct flb_cloudwatch *ctx)
 
         /* Check error */
         if (c->resp.payload_size > 0) {
-            error = flb_aws_error(c->resp.payload, c->resp.payload_size);
-            if (error) {
-                tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
-                                       "message");
-                if (tmp) {
-                    flb_error("[out_cloudwatch] CreateLogStream API responded with"
-                              " error='%s', message='%s'", error, tmp);
-                    flb_sds_destroy(tmp);
-                }
-                else {
-                    flb_error("[out_cloudwatch] CreateLogStream API responded with"
-                              " error='%s'", error);
-                }
-                /* for debug, print entire payload */
-                flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
-                flb_sds_destroy(error);
-            }
+            flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
+            error = flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+                                        'CreateLogStream', ctx->ins);
+            //TODO: use error message to determine if stream already exists
+            flb_sds_destroy(error);
         }
     }
 

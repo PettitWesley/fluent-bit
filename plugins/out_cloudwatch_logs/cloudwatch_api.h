@@ -29,6 +29,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
 int send_in_batches(struct flb_cloudwatch *ctx, int event_count);
 int create_log_stream(struct flb_cloudwatch *ctx);
 int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size);
+int create_log_group(struct flb_cloudwatch *ctx);
 int compare_events(const void *a_arg, const void *b_arg);
 
 #endif

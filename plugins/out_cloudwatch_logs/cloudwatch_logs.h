@@ -45,9 +45,13 @@ struct flb_cloudwatch {
     const char *log_stream;
     const char *log_group;
     const char *region;
+    /* Should the plugin create the log group */
+    int create_group;
 
     char *endpoint;
     int stream_created;
+    /* has the log group successfully been created */
+    int group_created;
     flb_sds_t sequence_token;
 
     struct event *events;
