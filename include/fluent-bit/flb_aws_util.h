@@ -20,6 +20,9 @@
 #ifdef FLB_HAVE_AWS
 
 #ifndef FLB_AWS_UTIL_H
+
+#include <fluent-bit/flb_output.h>
+
 #define FLB_AWS_UTIL_H
 
 #define AWS_SERVICE_ENDPOINT_FORMAT            "%s.%s.amazonaws.com"
