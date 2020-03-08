@@ -128,8 +128,9 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         goto error;
     }
 
-    /* initialize credentials */
-    ctx->aws_provider->provider_vtable->init(ctx->aws_provider);
+    /* initialize credentials and set to sync mode */
+    ctx->aws_provider->provider_vtable->sync(ctx->aws_provider);
+    ctx->aws_provider->provider_vtable->get_credentials(ctx->aws_provider);
 
     ctx->endpoint = flb_aws_endpoint("logs", (char *) ctx->region);
     if (!ctx->endpoint) {
@@ -160,7 +161,11 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         goto error;
     }
 
-    /* Remove async flag from upstream */
+    /*
+     * Remove async flag from upstream
+     * CW output runs in sync mode; because the CW API currently requires
+     * PutLogEvents requests to a log stream to be made serially
+     */
     upstream->flags &= ~(FLB_IO_ASYNC);
 
     ctx->cw_client->upstream = upstream;
