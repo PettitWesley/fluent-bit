@@ -242,7 +242,7 @@ error:
 }
 
 flb_sds_t flb_aws_print_error(char *response, size_t response_len,
-                              char *api, struct flb_output_instance *ins);
+                              char *api, struct flb_output_instance *ins)
 {
     flb_sds_t error;
     flb_sds_t message;
