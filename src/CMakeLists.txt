@@ -96,10 +96,23 @@ if(FLB_METRICS)
     )
 endif()
 
+
 if(FLB_SIGNV4 AND FLB_TLS)
   set(src
     ${src}
     "flb_signv4.c"
+    )
+endif()
+
+if(FLB_AWS)
+  set(src
+    ${src}
+    "aws/flb_aws_credentials.c"
+    "aws/flb_aws_credentials_sts.c"
+    "aws/flb_aws_credentials_ec2.c"
+    "aws/flb_aws_credentials_http.c"
+    "aws/flb_aws_credentials_profile.c"
+    "aws/flb_aws_util.c"
     )
 endif()
 
