@@ -442,7 +442,7 @@ int create_log_stream(struct flb_cloudwatch *ctx)
         if (c->resp.payload_size > 0) {
             flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
             error = flb_aws_print_error(c->resp.payload, c->resp.payload_size,
-                                        'CreateLogStream', ctx->ins);
+                                        "CreateLogStream", ctx->ins);
             //TODO: use error message to determine if stream already exists
             flb_sds_destroy(error);
         }

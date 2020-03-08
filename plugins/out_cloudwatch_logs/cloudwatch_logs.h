@@ -65,6 +65,9 @@ struct flb_cloudwatch {
     size_t tmp_buf_size;
     char *out_buf;
     size_t out_buf_size;
+
+    /* Plugin output instance reference */
+    struct flb_output_instance *ins;
 };
 
 #endif
