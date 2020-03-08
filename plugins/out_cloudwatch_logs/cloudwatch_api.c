@@ -526,6 +526,7 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
     struct flb_http_client *c = NULL;
     struct flb_aws_client *cw_client;
     flb_sds_t tmp;
+    flb_sds_t error;
 
     flb_debug("[out_cloudwatch] Sending log events to log stream %s",
               ctx->log_stream);
