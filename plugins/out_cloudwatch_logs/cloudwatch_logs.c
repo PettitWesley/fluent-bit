@@ -93,6 +93,16 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         goto error;
     }
 
+    ctx->create_group = FLB_FALSE;
+    tmp = flb_output_get_property("auto_create_group", ins);
+    /* native plugins use On/Off as bool, the old Go plugin used true/false */
+    if (tmp && (strcasecmp(tmp, "On") == 0 || strcasecmp(tmp, "true"))) {
+        ctx->create_group = FLB_TRUE;
+    }
+
+
+    ctx->group_created = FLB_FALSE;
+
     /* one tls instance for provider, one for cw client */
     ctx->cred_tls.context = flb_tls_context_new(FLB_TRUE,
                                                 ins->tls_debug,
@@ -210,9 +220,11 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
-    ret = create_log_group(ctx);
-    if (ret < 0) {
-        FLB_OUTPUT_RETURN(FLB_RETRY);
+    if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
+        ret = create_log_group(ctx);
+        if (ret < 0) {
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
     }
 
     if (ctx->stream_created == FLB_FALSE) {
