@@ -25,6 +25,7 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
+#include <fluent-bit/flb_output_plugin.h>
 
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_aws_credentials.h>

@@ -250,7 +250,7 @@ void flb_aws_print_error(char *response, size_t response_len,
 
     error = flb_json_get_val(response, response_len, "__type");
     if (!error) {
-        return NULL;
+        return;
     }
 
     message = flb_json_get_val(response, response_len, "message");
