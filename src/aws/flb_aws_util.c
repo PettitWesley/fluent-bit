@@ -221,7 +221,7 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
     ret = flb_http_do(c, &b_sent);
 
     if (ret != 0 || c->resp.status != 200) {
-        flb_error("[aws_client] %s: http_do=%i, HTTP Status: %i",
+        flb_debug("[aws_client] %s: http_do=%i, HTTP Status: %i",
                   aws_client->host, ret, c->resp.status);
     }
 
