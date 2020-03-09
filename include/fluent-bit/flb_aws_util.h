@@ -132,12 +132,12 @@ char *flb_aws_endpoint(char* service, char* region);
 flb_sds_t flb_aws_error(char *response, size_t response_len);
 
 /*
- * Same as 'flb_aws_error', except it also prints the error type and message
+ * Similar to 'flb_aws_error', except it prints the error type and message
  * to the user in a error log.
  * 'api' is the name of the API that was called; this is used in the error log.
  */
-flb_sds_t flb_aws_print_error(char *response, size_t response_len,
-                              char *api, struct flb_output_instance *ins);
+void flb_aws_print_error(char *response, size_t response_len,
+                         char *api, struct flb_output_instance *ins);
 
 /*
  * Parses the JSON and gets the value for 'key'

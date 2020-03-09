@@ -42,6 +42,8 @@
 
 #include "cloudwatch_api.h"
 
+#define ERR_CODE_ALREADY_EXISTS     "ResourceAlreadyExistsException"
+
 static struct flb_aws_header create_group_header = {
     .key = "X-Amz-Target",
     .key_len = 12,
@@ -429,7 +431,7 @@ int create_log_group(struct flb_cloudwatch *ctx)
         if (c->resp.status == 200) {
             /* success */
             flb_info("[out_cloudwatch] Created log group %s", ctx->log_group);
-            ctx->stream_created = FLB_TRUE;
+            ctx->group_created = FLB_TRUE;
             flb_sds_destroy(body);
             flb_http_client_destroy(c);
             return 0;
@@ -437,19 +439,36 @@ int create_log_group(struct flb_cloudwatch *ctx)
 
         /* Check error */
         if (c->resp.payload_size > 0) {
-            flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
-            error = flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+            error = flb_aws_error(c->resp.payload, c->resp.payload_size);
+            if (error != NULL) {
+                if (strcmp(error, ERR_CODE_ALREADY_EXISTS) == 0) {
+                    flb_plg_info(ctx->ins, "Log Group %s already exists",
+                                  ctx->log_group);
+                    ctx->group_created = FLB_TRUE;
+                    flb_sds_destroy(body);
+                    flb_sds_destroy(error);
+                    flb_http_client_destroy(c);
+                    return 0;
+                }
+                else {
+                    /* some other error occurred; notify user */
+                    flb_aws_print_error(c->resp.payload, c->resp.payload_size,
                                         "CreateLogGroup", ctx->ins);
-            //TODO: use error message to determine if stream already exists
-            flb_sds_destroy(error);
+                }
+                flb_sds_destroy(error);
+            }
+            else {
+                /* error could not be parsed, print raw response to debug */
+                flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
+            }
         }
     }
 
     flb_error("[out_cloudwatch] Failed to create log group");
     if (c) {
         flb_http_client_destroy(c);
-        flb_sds_destroy(body);
     }
+    flb_sds_destroy(body);
     return -1;
 }
 
@@ -460,7 +479,6 @@ int create_log_stream(struct flb_cloudwatch *ctx)
     struct flb_aws_client *cw_client;
     flb_sds_t body;
     flb_sds_t tmp;
-    flb_sds_t error;
 
     flb_info("[out_cloudwatch] Creating log stream %s in log group %s",
              ctx->log_stream, ctx->log_group);
@@ -505,18 +523,17 @@ int create_log_stream(struct flb_cloudwatch *ctx)
         /* Check error */
         if (c->resp.payload_size > 0) {
             flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
-            error = flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+            flb_aws_print_error(c->resp.payload, c->resp.payload_size,
                                         "CreateLogStream", ctx->ins);
-            //TODO: use error message to determine if stream already exists
-            flb_sds_destroy(error);
+            //TODO: use error type to determine if stream already exists
         }
     }
 
     flb_error("[out_cloudwatch] Failed to create log stream");
     if (c) {
         flb_http_client_destroy(c);
-        flb_sds_destroy(body);
     }
+    flb_sds_destroy(body);
     return -1;
 }
 
@@ -526,7 +543,6 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
     struct flb_http_client *c = NULL;
     struct flb_aws_client *cw_client;
     flb_sds_t tmp;
-    flb_sds_t error;
 
     flb_debug("[out_cloudwatch] Sending log events to log stream %s",
               ctx->log_stream);
@@ -565,9 +581,8 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
         //TODO: process error code and get sequence token if needed
         if (c->resp.payload_size > 0) {
             flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
-            error = flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+            flb_aws_print_error(c->resp.payload, c->resp.payload_size,
                                         "PutLogEvents", ctx->ins);
-            flb_sds_destroy(error);
         }
     }
 
