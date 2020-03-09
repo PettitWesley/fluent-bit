@@ -523,10 +523,28 @@ int create_log_stream(struct flb_cloudwatch *ctx)
 
         /* Check error */
         if (c->resp.payload_size > 0) {
-            flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
-            flb_aws_print_error(c->resp.payload, c->resp.payload_size,
-                                        "CreateLogStream", ctx->ins);
-            //TODO: use error type to determine if stream already exists
+            error = flb_aws_error(c->resp.payload, c->resp.payload_size);
+            if (error != NULL) {
+                if (strcmp(error, ERR_CODE_ALREADY_EXISTS) == 0) {
+                    flb_plg_info(ctx->ins, "Log Stream %s already exists",
+                                  ctx->log_stream);
+                    ctx->stream_created = FLB_TRUE;
+                    flb_sds_destroy(body);
+                    flb_sds_destroy(error);
+                    flb_http_client_destroy(c);
+                    return 0;
+                }
+                else {
+                    /* some other error occurred; notify user */
+                    flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+                                        "CreateLogGroup", ctx->ins);
+                }
+                flb_sds_destroy(error);
+            }
+            else {
+                /* error could not be parsed, print raw response to debug */
+                flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
+            }
         }
     }
 
