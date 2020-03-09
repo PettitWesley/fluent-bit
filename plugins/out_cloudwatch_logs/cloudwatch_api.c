@@ -480,6 +480,7 @@ int create_log_stream(struct flb_cloudwatch *ctx)
     struct flb_aws_client *cw_client;
     flb_sds_t body;
     flb_sds_t tmp;
+    flb_sds_t error;
 
     flb_info("[out_cloudwatch] Creating log stream %s in log group %s",
              ctx->log_stream, ctx->log_group);
