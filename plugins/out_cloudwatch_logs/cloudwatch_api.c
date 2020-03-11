@@ -233,7 +233,7 @@ static inline int try_to_write(char *buf, int *off, size_t left,
  * Writes the "header" for a put log events payload
  */
 static int init_put_payload(struct flb_cloudwatch *ctx,
-                            int *offset)
+                            struct log_stream *stream, int *offset)
 {
     if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                       "{\"logGroupName\":\"", 17)) {
@@ -251,7 +251,7 @@ static int init_put_payload(struct flb_cloudwatch *ctx,
     }
 
     if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
-                      ctx->log_stream, 0)) {
+                      stream->name, 0)) {
         goto error;
     }
 
@@ -260,14 +260,14 @@ static int init_put_payload(struct flb_cloudwatch *ctx,
         goto error;
     }
 
-    if (ctx->sequence_token) {
+    if (stream->sequence_token) {
         if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
                           "\"sequenceToken\":\"", 17)) {
             goto error;
         }
 
         if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
-                          ctx->sequence_token, 0)) {
+                          stream->sequence_token, 0)) {
             goto error;
         }
 
@@ -344,18 +344,73 @@ static int end_put_payload(struct flb_cloudwatch *ctx, int *offset)
     return 0;
 }
 
+struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
+                                  const char *tag, int tag_len)
+{
+    struct log_stream *new_stream;
+    struct log_stream *stream;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    flb_sds_t name = NULL;
+    flb_sds_t tmp = NULL;
+    int ret;
+
+    //TODO: add case for static log stream name
+
+    name = flb_sds_create(ctx->log_stream_prefix);
+    if (!name) {
+        flb_errno();
+        return NULL;
+    }
+
+    tmp = flb_sds_cat(name, tag, tag_len);
+    if (!tmp) {
+        flb_errno();
+        flb_sds_destroy(name);
+        return NULL;
+    }
+    name = tmp;
+
+    /* check if the stream already exists */
+    mk_list_foreach_safe(head, tmp, &ctx->streams) {
+        stream = mk_list_entry(head, struct log_stream, _head);
+        if (strcmp(name, stream->name) == 0) {
+            return stream;
+        }
+    }
+
+    /* create the new stream */
+    new_stream = flb_calloc(1, sizeof(struct log_stream));
+    if (!new_stream) {
+        flb_errno();
+        flb_sds_destroy(name);
+        return NULL;
+    }
+    new_stream->name = name;
+
+    ret = create_log_stream(ctx, new_stream);
+    if (ret < 0) {
+        log_stream_destroy(new_stream);
+        return NULL;
+    }
+
+    mk_list_add(&new_stream->_head, &ctx->streams);
+    return new_stream;
+}
+
 /*
  * Send to CW in batches of 10,000 events or 1 MB
  * TODO: actually implement batching..
  */
-int send_in_batches(struct flb_cloudwatch *ctx, int event_count)
+int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
+                    int event_count)
 {
     int ret;
     int offset = 0;
     int i;
     struct event *event;
 
-    ret = init_put_payload(ctx, &offset);
+    ret = init_put_payload(ctx, stream, &offset);
     if (ret < 0) {
         flb_error("Failed to initialize PutLogEvents payload");
         return -1;
@@ -472,7 +527,7 @@ int create_log_group(struct flb_cloudwatch *ctx)
     return -1;
 }
 
-int create_log_stream(struct flb_cloudwatch *ctx)
+int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream)
 {
 
     struct flb_http_client *c = NULL;
@@ -482,10 +537,10 @@ int create_log_stream(struct flb_cloudwatch *ctx)
     flb_sds_t error;
 
     flb_info("[out_cloudwatch] Creating log stream %s in log group %s",
-             ctx->log_stream, ctx->log_group);
+             stream->name, ctx->log_group);
 
     body = flb_sds_create_size(50 + strlen(ctx->log_group) +
-                               strlen(ctx->log_stream));
+                               strlen(stream->name));
     if (!body) {
         flb_sds_destroy(body);
         flb_errno();
@@ -496,7 +551,7 @@ int create_log_stream(struct flb_cloudwatch *ctx)
     tmp = flb_sds_printf(&body,
                          "{\"logGroupName\":\"%s\",\"logStreamName\":\"%s\"}",
                          ctx->log_group,
-                         ctx->log_stream);
+                         stream->name);
     if (!tmp) {
         flb_sds_destroy(body);
         flb_errno();
@@ -514,8 +569,7 @@ int create_log_stream(struct flb_cloudwatch *ctx)
 
         if (c->resp.status == 200) {
             /* success */
-            flb_info("[out_cloudwatch] Created log stream %s", ctx->log_stream);
-            ctx->stream_created = FLB_TRUE;
+            flb_info("[out_cloudwatch] Created log stream %s", stream->name);
             flb_sds_destroy(body);
             flb_http_client_destroy(c);
             return 0;
@@ -527,8 +581,7 @@ int create_log_stream(struct flb_cloudwatch *ctx)
             if (error != NULL) {
                 if (strcmp(error, ERR_CODE_ALREADY_EXISTS) == 0) {
                     flb_plg_info(ctx->ins, "Log Stream %s already exists",
-                                  ctx->log_stream);
-                    ctx->stream_created = FLB_TRUE;
+                                 stream->name);
                     flb_sds_destroy(body);
                     flb_sds_destroy(error);
                     flb_http_client_destroy(c);
@@ -555,7 +608,8 @@ int create_log_stream(struct flb_cloudwatch *ctx)
 }
 
 //TODO: this method could be cleaned up and made more readable
-int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
+int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
+                   size_t payload_size)
 {
 
     struct flb_http_client *c = NULL;
@@ -564,7 +618,7 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
     flb_sds_t error;
 
     flb_debug("[out_cloudwatch] Sending log events to log stream %s",
-              ctx->log_stream);
+              stream->name);
 
     cw_client = ctx->cw_client;
     c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
@@ -576,15 +630,15 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
 
         if (c->resp.status == 200) {
             /* success */
-            flb_debug("[out_cloudwatch] Sent events to %s", ctx->log_stream);
+            flb_debug("[out_cloudwatch] Sent events to %s", stream->name);
             if (c->resp.payload_size > 0) {
                 tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
                                        "nextSequenceToken");
                 if (tmp) {
-                    if (ctx->sequence_token != NULL) {
-                        flb_sds_destroy(ctx->sequence_token);
+                    if (stream->sequence_token != NULL) {
+                        flb_sds_destroy(stream->sequence_token);
                     }
-                    ctx->sequence_token = tmp;
+                    stream->sequence_token = tmp;
                 }
                 else {
                     flb_error("Could not find sequence token in response: %s",
@@ -614,10 +668,10 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
                     tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
                                            "expectedSequenceToken");
                     if (tmp) {
-                        if (ctx->sequence_token != NULL) {
-                            flb_sds_destroy(ctx->sequence_token);
+                        if (stream->sequence_token != NULL) {
+                            flb_sds_destroy(stream->sequence_token);
                         }
-                        ctx->sequence_token = tmp;
+                        stream->sequence_token = tmp;
                         flb_sds_destroy(error);
                         flb_http_client_destroy(c);
                         /*
@@ -639,7 +693,6 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
         }
     }
 
-error:
     flb_error("[out_cloudwatch] Failed to send log events");
     if (c) {
         flb_http_client_destroy(c);

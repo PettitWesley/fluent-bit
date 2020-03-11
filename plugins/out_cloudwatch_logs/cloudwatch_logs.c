@@ -79,9 +79,17 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
     tmp = flb_output_get_property("log_stream_name", ins);
     if (tmp) {
-        ctx->log_stream = tmp;
-    } else {
-        flb_error("[out_cloudwatch] 'log_stream_name' is a required field");
+        ctx->log_stream_name = tmp;
+    }
+
+    tmp = flb_output_get_property("log_stream_prefix", ins);
+    if (tmp) {
+        ctx->log_stream_prefix = tmp;
+    }
+
+    if (!ctx->log_stream_name && !ctx->log_stream_prefix) {
+        flb_error("[out_cloudwatch] 'log_stream_name' or 'log_stream_prefix' "
+                  "is required");
         goto error;
     }
 
@@ -102,6 +110,17 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
 
     ctx->group_created = FLB_FALSE;
+
+    /* init log streams */
+    if (ctx->log_stream_name) {
+        ctx->stream.name = flb_sds_create(ctx->log_stream_name);
+        if (!ctx->stream.name) {
+            flb_errno();
+            goto error;
+        }
+    } else {
+        mk_list_init(&ctx->streams);
+    }
 
     /* one tls instance for provider, one for cw client */
     ctx->cred_tls.context = flb_tls_context_new(FLB_TRUE,
@@ -204,7 +223,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
 error:
     flb_error("[out_cloudwatch] Initialization failed");
-    flb_free(ctx);
+    //TODO: clean up context function
     return -1;
 }
 
@@ -217,6 +236,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     struct flb_cloudwatch *ctx = out_context;
     int ret;
     int event_count;
+    struct log_stream *stream = NULL;
     (void) i_ins;
     (void) config;
 
@@ -227,12 +247,17 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         }
     }
 
-    if (ctx->stream_created == FLB_FALSE) {
-        ret = create_log_stream(ctx);
-        if (ret < 0) {
-            FLB_OUTPUT_RETURN(FLB_RETRY);
-        }
+    stream = get_log_stream(ctx, tag, tag_len);
+    if (!stream) {
+        FLB_OUTPUT_RETURN(FLB_RETRY);
     }
+
+    // if (ctx->stream_created == FLB_FALSE) {
+    //     ret = create_log_stream(ctx);
+    //     if (ret < 0) {
+    //         FLB_OUTPUT_RETURN(FLB_RETRY);
+    //     }
+    // }
 
     /*
      *  1. Parse msgpack to events
@@ -249,7 +274,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     // Also sort an array of pointers to this list, not the actual data
     qsort(ctx->events, event_count, sizeof(struct event), compare_events);
 
-    ret = send_in_batches(ctx, event_count);
+    ret = send_in_batches(ctx, stream, event_count);
     if (ret < 0) {
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
