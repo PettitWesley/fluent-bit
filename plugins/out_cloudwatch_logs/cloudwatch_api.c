@@ -562,13 +562,10 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
     struct flb_aws_client *cw_client;
     flb_sds_t tmp;
     flb_sds_t error;
-    int ret;
-    int offset = 0;
 
     flb_debug("[out_cloudwatch] Sending log events to log stream %s",
               ctx->log_stream);
 
-retry:
     cw_client = ctx->cw_client;
     c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
                                           "/", ctx->out_buf, payload_size,
@@ -612,7 +609,7 @@ retry:
                      * sequence token; we can find it in the error response
                      * and retry.
                      */
-                    flb_plg_debug(ctx->ins, "Sequence token was invalid, "
+                    flb_plg_warn(ctx->ins, "Sequence token was invalid, "
                                   "will retry");
                     tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
                                            "expectedSequenceToken");
@@ -621,16 +618,13 @@ retry:
                             flb_sds_destroy(ctx->sequence_token);
                         }
                         ctx->sequence_token = tmp;
-                        /* over-write head of body with new token */
-                        offset = 0;
-                        ret = init_put_payload(ctx, &offset);
-                        if (ret < 0) {
-                            goto error;
-                        }
                         flb_sds_destroy(error);
                         flb_http_client_destroy(c);
-                        c = NULL;
-                        goto retry;
+                        /*
+                         * TODO: it is better if we perform the retry in the
+                         * plugin instead of leaving it to FB.
+                         */
+                        return -1;
                     }
                 }
                 /* some other error occurred; notify user */
