@@ -617,9 +617,12 @@ retry:
                         if (ctx->sequence_token != NULL) {
                             flb_sds_destroy(ctx->sequence_token);
                         }
+                        flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
+                        flb_plg_debug(ctx->ins, "Token: %s", ctx->sequence_token);
                         ctx->sequence_token = tmp;
                         flb_sds_destroy(error);
                         flb_http_client_destroy(c);
+                        c = NULL;
                         goto retry;
                     }
                 }
