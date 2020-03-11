@@ -43,7 +43,8 @@
 
 #include "cloudwatch_api.h"
 
-#define ERR_CODE_ALREADY_EXISTS     "ResourceAlreadyExistsException"
+#define ERR_CODE_ALREADY_EXISTS         "ResourceAlreadyExistsException"
+#define ERR_CODE_INVALID_SEQUENCE_TOKEN "InvalidSequenceTokenException"
 
 static struct flb_aws_header create_group_header = {
     .key = "X-Amz-Target",
@@ -451,15 +452,13 @@ int create_log_group(struct flb_cloudwatch *ctx)
                     flb_http_client_destroy(c);
                     return 0;
                 }
-                else {
-                    /* some other error occurred; notify user */
-                    flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+                /* some other error occurred; notify user */
+                flb_aws_print_error(c->resp.payload, c->resp.payload_size,
                                         "CreateLogGroup", ctx->ins);
-                }
                 flb_sds_destroy(error);
             }
             else {
-                /* error could not be parsed, print raw response to debug */
+                /* error can not be parsed, print raw response to debug */
                 flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
             }
         }
@@ -535,15 +534,13 @@ int create_log_stream(struct flb_cloudwatch *ctx)
                     flb_http_client_destroy(c);
                     return 0;
                 }
-                else {
-                    /* some other error occurred; notify user */
-                    flb_aws_print_error(c->resp.payload, c->resp.payload_size,
-                                        "CreateLogGroup", ctx->ins);
-                }
+                /* some other error occurred; notify user */
+                flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+                                    "CreateLogStream", ctx->ins);
                 flb_sds_destroy(error);
             }
             else {
-                /* error could not be parsed, print raw response to debug */
+                /* error can not be parsed, print raw response to debug */
                 flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
             }
         }
@@ -563,10 +560,12 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
     struct flb_http_client *c = NULL;
     struct flb_aws_client *cw_client;
     flb_sds_t tmp;
+    flb_sds_t error;
 
     flb_debug("[out_cloudwatch] Sending log events to log stream %s",
               ctx->log_stream);
 
+retry:
     cw_client = ctx->cw_client;
     c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
                                           "/", ctx->out_buf, payload_size,
@@ -582,6 +581,9 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
                 tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
                                        "nextSequenceToken");
                 if (tmp) {
+                    if (ctx->sequence_token != NULL) {
+                        flb_sds_destroy(ctx->sequence_token);
+                    }
                     ctx->sequence_token = tmp;
                 }
                 else {
@@ -598,11 +600,38 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
         }
 
         /* Check error */
-        //TODO: process error code and get sequence token if needed
         if (c->resp.payload_size > 0) {
-            flb_debug("[out_cloudwatch] Raw response: %s", c->resp.payload);
-            flb_aws_print_error(c->resp.payload, c->resp.payload_size,
-                                        "PutLogEvents", ctx->ins);
+            error = flb_aws_error(c->resp.payload, c->resp.payload_size);
+            if (error != NULL) {
+                if (strcmp(error, ERR_CODE_INVALID_SEQUENCE_TOKEN) == 0) {
+                    /*
+                     * This case will happen when we do not know the correct
+                     * sequence token; we can find it in the error response
+                     * and retry.
+                     */
+                    flb_plg_debug(ctx->ins, "Sequence token was invalid, "
+                                  "will retry");
+                    tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
+                                           "expectedSequenceToken");
+                    if (tmp) {
+                        if (ctx->sequence_token != NULL) {
+                            flb_sds_destroy(ctx->sequence_token);
+                        }
+                        ctx->sequence_token = tmp;
+                        flb_sds_destroy(error);
+                        flb_http_client_destroy(c);
+                        goto retry;
+                    }
+                }
+                /* some other error occurred; notify user */
+                flb_aws_print_error(c->resp.payload, c->resp.payload_size,
+                                    "PutLogEvents", ctx->ins);
+                flb_sds_destroy(error);
+            }
+            else {
+                /* error could not be parsed, print raw response to debug */
+                flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
+            }
         }
     }
 
