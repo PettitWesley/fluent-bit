@@ -554,6 +554,7 @@ int create_log_stream(struct flb_cloudwatch *ctx)
     return -1;
 }
 
+//TODO: this method could be cleaned up and made more readable
 int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
 {
 
@@ -561,6 +562,8 @@ int put_log_events(struct flb_cloudwatch *ctx, size_t payload_size)
     struct flb_aws_client *cw_client;
     flb_sds_t tmp;
     flb_sds_t error;
+    int ret;
+    int offset = 0;
 
     flb_debug("[out_cloudwatch] Sending log events to log stream %s",
               ctx->log_stream);
@@ -617,9 +620,13 @@ retry:
                         if (ctx->sequence_token != NULL) {
                             flb_sds_destroy(ctx->sequence_token);
                         }
-                        flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
-                        flb_plg_debug(ctx->ins, "Token: %s", ctx->sequence_token);
                         ctx->sequence_token = tmp;
+                        /* over-write head of body with new token */
+                        offset = 0;
+                        ret = init_put_payload(ctx, &offset);
+                        if (ret < 0) {
+                            goto error;
+                        }
                         flb_sds_destroy(error);
                         flb_http_client_destroy(c);
                         c = NULL;
@@ -638,6 +645,7 @@ retry:
         }
     }
 
+error:
     flb_error("[out_cloudwatch] Failed to send log events");
     if (c) {
         flb_http_client_destroy(c);
