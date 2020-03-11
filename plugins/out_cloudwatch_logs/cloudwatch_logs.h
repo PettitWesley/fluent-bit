@@ -58,18 +58,7 @@ struct log_stream {
     struct mk_list _head;
 };
 
-void log_stream_destroy(struct log_stream *stream)
-{
-    if (stream) {
-        if (stream->name) {
-            flb_sds_destroy(stream->name);
-        }
-        if (stream->sequence_token) {
-            flb_sds_destroy(stream->sequence_token);
-        }
-        flb_free(stream);
-    }
-}
+void log_stream_destroy(struct log_stream *stream);
 
 struct flb_cloudwatch {
     struct flb_tls cred_tls;

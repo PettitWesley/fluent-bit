@@ -294,6 +294,19 @@ static int cb_cloudwatch_exit(void *data, struct flb_config *config)
     return 0;
 }
 
+void log_stream_destroy(struct log_stream *stream)
+{
+    if (stream) {
+        if (stream->name) {
+            flb_sds_destroy(stream->name);
+        }
+        if (stream->sequence_token) {
+            flb_sds_destroy(stream->sequence_token);
+        }
+        flb_free(stream);
+    }
+}
+
 /* Plugin registration */
 struct flb_output_plugin out_cloudwatch_logs_plugin = {
     .name         = "cloudwatch_logs",
