@@ -67,8 +67,6 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
     ctx->ins = ins;
 
-    ctx->stream_created = FLB_FALSE;
-
     tmp = flb_output_get_property("log_group_name", ins);
     if (tmp) {
         ctx->log_group = tmp;
