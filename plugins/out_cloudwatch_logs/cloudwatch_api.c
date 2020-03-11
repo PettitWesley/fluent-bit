@@ -352,7 +352,7 @@ struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
     struct mk_list *tmp;
     struct mk_list *head;
     flb_sds_t name = NULL;
-    flb_sds_t tmp = NULL;
+    flb_sds_t tmp_s = NULL;
     int ret;
 
     //TODO: add case for static log stream name
@@ -363,13 +363,13 @@ struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
         return NULL;
     }
 
-    tmp = flb_sds_cat(name, tag, tag_len);
-    if (!tmp) {
+    tmp_s = flb_sds_cat(name, tag, tag_len);
+    if (!tmp_s) {
         flb_errno();
         flb_sds_destroy(name);
         return NULL;
     }
-    name = tmp;
+    name = tmp_s;
 
     /* check if the stream already exists */
     mk_list_foreach_safe(head, tmp, &ctx->streams) {
@@ -441,7 +441,7 @@ int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
     //printf("\n\nraw payload:\n%s\n", ctx->out_buf);
 
     flb_debug("[cloudwatch] Sending %d events", event_count);
-    ret = put_log_events(ctx, (size_t) offset);
+    ret = put_log_events(ctx, stream, (size_t) offset);
     if (ret < 0) {
         flb_error("[cloudwatch] Failed to send log events");
         return -1;
