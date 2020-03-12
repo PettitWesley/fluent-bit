@@ -406,10 +406,12 @@ int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
                     int event_count)
 {
     int ret;
-    int offset = 0;
+    int offset;
     int i;
     struct event *event;
 
+retry:
+    offset = 0;
     ret = init_put_payload(ctx, stream, &offset);
     if (ret < 0) {
         flb_error("Failed to initialize PutLogEvents payload");
@@ -445,6 +447,8 @@ int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
     if (ret < 0) {
         flb_error("[cloudwatch] Failed to send log events");
         return -1;
+    } else if (ret > 0) {
+        goto retry;
     }
 
     return 0;
@@ -608,6 +612,10 @@ int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream)
 }
 
 //TODO: this method could be cleaned up and made more readable
+/*
+ * Returns -1 on failure, 0 on success, and 1 for a sequence token error,
+ * which means the caller can retry.
+ */
 int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
                    size_t payload_size)
 {
@@ -674,11 +682,8 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
                         stream->sequence_token = tmp;
                         flb_sds_destroy(error);
                         flb_http_client_destroy(c);
-                        /*
-                         * TODO: it is better if we perform the retry in the
-                         * plugin instead of leaving it to FB.
-                         */
-                        return -1;
+                        /* tell the caller to retry */
+                        return 1;
                     }
                 }
                 /* some other error occurred; notify user */
