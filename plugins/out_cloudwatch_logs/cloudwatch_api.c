@@ -319,7 +319,7 @@ static int add_event(struct flb_cloudwatch *ctx, struct event *event,
 
     /* flb_utils_write_str will escape the JSON in event->json */
     if (!flb_utils_write_str(ctx->out_buf, offset, ctx->out_buf_size,
-                             event->json, strlen(event->json))) {
+                             event->json, event->len)) {
         goto error;
     }
 
