@@ -638,7 +638,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
               stream->name);
 
     if (ctx->log_format != NULL) {
-        put_log_events_header[1].val = ctx->log_format;
+        put_log_events_header[1].val = (char *) ctx->log_format;
         put_log_events_header[1].val_len = strlen(ctx->log_format);
         num_headers = 2;
     }
