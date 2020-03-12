@@ -974,7 +974,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     /* Append the ending header CRLF */
     c->header_buf[c->header_len++] = '\r';
     c->header_buf[c->header_len++] = '\n';
-    c->header_buf[c->header_len++] = '\0';
+    c->header_buf[c->header_len] = '\0';
 
     flb_warn("headers:\n%s\n", c->header_buf);
 
