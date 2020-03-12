@@ -60,7 +60,7 @@ static struct flb_aws_header create_stream_header = {
     .val_len = 29,
 };
 
-static struct flb_aws_header *put_log_events_header = {
+static struct flb_aws_header put_log_events_header[] = {
     {
         .key = "X-Amz-Target",
         .key_len = 12,
@@ -639,7 +639,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
     cw_client = ctx->cw_client;
     c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
                                           "/", ctx->out_buf, payload_size,
-                                          &put_log_events_header, 1);
+                                          put_log_events_header, 1);
     if (c) {
         flb_debug("[out_cloudwatch] PutLogEvents http status=%d",
                  c->resp.status);
