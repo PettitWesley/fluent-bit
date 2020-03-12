@@ -60,11 +60,19 @@ static struct flb_aws_header create_stream_header = {
     .val_len = 29,
 };
 
-static struct flb_aws_header put_log_events_header = {
-    .key = "X-Amz-Target",
-    .key_len = 12,
-    .val = "Logs_20140328.PutLogEvents",
-    .val_len = 26,
+static struct flb_aws_header put_log_events_header[] = {
+    {
+        .key = "X-Amz-Target",
+        .key_len = 12,
+        .val = "Logs_20140328.PutLogEvents",
+        .val_len = 26,
+    },
+    {
+        .key = "x-amzn-logs-format",
+        .key_len = 18,
+        .val = "",
+        .val_len = 0,
+    },
 };
 
 /*
