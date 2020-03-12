@@ -189,7 +189,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
 
         i++;
         flb_sds_t current_json = flb_sds_create_len(event->json, event->len);
-        flb_debug("current event: %s", current_json);
+        flb_debug("current event: %llu, %s", event->timestamp, current_json);
     }
     msgpack_unpacked_destroy(&result);
 
