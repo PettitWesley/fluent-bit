@@ -440,7 +440,7 @@ int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
         return -1;
     }
 
-    //printf("\n\nraw payload:\n%s\n", ctx->out_buf);
+    printf("\n\nraw payload:\n%s\n", ctx->out_buf);
 
     flb_debug("[cloudwatch] Sending %d events", event_count);
     ret = put_log_events(ctx, stream, (size_t) offset);
