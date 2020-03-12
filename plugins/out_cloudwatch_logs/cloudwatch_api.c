@@ -641,6 +641,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
         put_log_events_header[1].val = (char *) ctx->log_format;
         put_log_events_header[1].val_len = strlen(ctx->log_format);
         num_headers = 2;
+        flb_error("enabling log format header");
     }
 
     cw_client = ctx->cw_client;

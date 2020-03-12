@@ -94,6 +94,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     tmp = flb_output_get_property("log_format", ins);
     if (tmp) {
         ctx->log_format = tmp;
+        flb_error("[cw] Log format: %s", ctx->log_format); // remove
     }
 
     tmp = flb_output_get_property("region", ins);
