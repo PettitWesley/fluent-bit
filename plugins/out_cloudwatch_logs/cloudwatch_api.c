@@ -671,7 +671,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
                      * sequence token; we can find it in the error response
                      * and retry.
                      */
-                    flb_plg_warn(ctx->ins, "Sequence token was invalid, "
+                    flb_plg_debug(ctx->ins, "Sequence token was invalid, "
                                   "will retry");
                     tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
                                            "expectedSequenceToken");
