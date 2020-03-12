@@ -66,10 +66,12 @@ struct flb_cloudwatch {
     struct flb_aws_provider *aws_provider;
     struct flb_aws_client *cw_client;
 
+    /* configuration options */
     const char *log_stream_name;
     const char *log_stream_prefix;
     const char *log_group;
     const char *region;
+    const char *log_format;
     /* Should the plugin create the log group */
     int create_group;
 

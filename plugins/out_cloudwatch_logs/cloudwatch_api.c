@@ -632,14 +632,21 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
     struct flb_aws_client *cw_client;
     flb_sds_t tmp;
     flb_sds_t error;
+    int num_headers = 1;
 
     flb_debug("[out_cloudwatch] Sending log events to log stream %s",
               stream->name);
 
+    if (ctx->log_format != NULL) {
+        put_log_events_header[1].val = ctx->log_format;
+        put_log_events_header[1].val_len = strlen(ctx->log_format);
+        num_headers = 2;
+    }
+
     cw_client = ctx->cw_client;
     c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
                                           "/", ctx->out_buf, payload_size,
-                                          put_log_events_header, 1);
+                                          put_log_events_header, num_headers);
     if (c) {
         flb_debug("[out_cloudwatch] PutLogEvents http status=%d",
                  c->resp.status);
