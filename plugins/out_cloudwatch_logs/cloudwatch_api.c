@@ -188,8 +188,6 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                                                  tms.tm.tv_nsec/1000000);
 
         i++;
-        flb_sds_t current_json = flb_sds_create_len(event->json, event->len);
-        flb_debug("current event: %llu, %s", event->timestamp, current_json);
     }
     msgpack_unpacked_destroy(&result);
 
@@ -440,7 +438,7 @@ int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
         return -1;
     }
 
-    printf("\n\nraw payload:\n%s\n", ctx->out_buf);
+    //printf("\n\nraw payload:\n%s\n", ctx->out_buf);
 
     flb_debug("[cloudwatch] Sending %d events", event_count);
     ret = put_log_events(ctx, stream, (size_t) offset);
