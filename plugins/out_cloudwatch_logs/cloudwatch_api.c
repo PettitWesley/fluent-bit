@@ -94,7 +94,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
      * Realistically, msgpack is never less than half the size of JSON
      * We allocate 3 times as much memory (plus a small constant)
      * just to be super safe.
-     * Re-allocs are extremely expensive, having a bit of extra memory is not.
+     * Re-allocs are expensive, having a bit of extra memory is not.
      */
     size = 3 * bytes + 100;
     if (ctx->tmp_buf == NULL) {
@@ -188,6 +188,8 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                                                  tms.tm.tv_nsec/1000000);
 
         i++;
+        flb_sds_t current_json = flb_sds_create_len(event->json, event->len);
+        flb_debug("current event: %s", current_json);
     }
     msgpack_unpacked_destroy(&result);
 
