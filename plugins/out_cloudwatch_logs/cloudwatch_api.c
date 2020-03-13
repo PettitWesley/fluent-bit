@@ -353,16 +353,6 @@ static int end_put_payload(struct flb_cloudwatch *ctx, int *offset)
     return 0;
 }
 
-struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
-                                  const char *tag, int tag_len)
-{
-     if (ctx->log_stream_name) {
-         return &ctx->stream;
-     }
-
-     return get_dynamic_log_stream(ctx, tag, tag_len);
-}
-
 struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
                                           const char *tag, int tag_len)
 {
@@ -413,6 +403,16 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
 
     mk_list_add(&new_stream->_head, &ctx->streams);
     return new_stream;
+}
+
+struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
+                                  const char *tag, int tag_len)
+{
+     if (ctx->log_stream_name) {
+         return &ctx->stream;
+     }
+
+     return get_dynamic_log_stream(ctx, tag, tag_len);
 }
 
 /*
