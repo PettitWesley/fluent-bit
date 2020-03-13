@@ -418,6 +418,7 @@ struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
             if (ret < 0) {
                 return NULL;
             }
+            ctx->stream_created = FLB_TRUE;
         }
         return stream;
     }
