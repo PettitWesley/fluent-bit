@@ -82,12 +82,15 @@ struct flb_cloudwatch {
     const char *log_format;
     const char *role_arn;
     const char *log_key;
-    char *endpoint;
+    int custom_endpoint;
     /* Should the plugin create the log group */
     int create_group;
 
     /* has the log group successfully been created */
     int group_created;
+
+    /* must be freed on shutdown if custom_endpoint is not set */
+    char *endpoint;
 
     struct event *events;
     size_t events_size;

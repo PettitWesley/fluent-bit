@@ -99,7 +99,11 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
     tmp = flb_output_get_property("endpoint", ins);
     if (tmp) {
-        ctx->endpoint = tmp;
+        ctx->custom_endpoint = FLB_TRUE;
+        ctx->endpoint = (char *) tmp;
+    }
+    else {
+        ctx->custom_endpoint = FLB_FALSE;
     }
 
     tmp = flb_output_get_property("log_key", ins);
