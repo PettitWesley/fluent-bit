@@ -199,9 +199,9 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
                                                     &ctx->sts_tls,
                                                     ctx->base_aws_provider,
                                                     NULL,
-                                                    ctx->role_arn,
+                                                    (char *) ctx->role_arn,
                                                     session_name,
-                                                    ctx->region,
+                                                    (char *) ctx->region,
                                                     NULL,
                                                     flb_aws_client_generator());
         if (!ctx->aws_provider) {
