@@ -178,6 +178,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
             size_t key_str_size = 0;
             int j;
             int check = FLB_FALSE;
+            int found = FLB_FALSE;
 
             kv = map.via.map.ptr;
 
@@ -196,6 +197,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
 
                 if (check == FLB_TRUE) {
                     if (strncmp(ctx->log_key, key_str, key_str_size) == 0) {
+                        found = FLB_TRUE;
                         val = (kv+j)->val;
                         /* set tmp_buf_ptr before using it */
                         tmp_buf_ptr = ctx->tmp_buf + tmp_buf_offset;
@@ -216,6 +218,10 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                     }
                 }
 
+            }
+            if (found == FLB_FALSE) {
+                flb_plg_error(ctx->ins, "Could not find log_key '%s' in record",
+                              ctx->log_key);
             }
             i++;
             continue;
