@@ -71,7 +71,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     if (tmp) {
         ctx->log_group = tmp;
     } else {
-        flb_error("[out_cloudwatch] 'log_group_name' is a required field");
+        flb_plg_error(ctx->ins, "'log_group_name' is a required field");
         goto error;
     }
 
@@ -86,7 +86,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     }
 
     if (!ctx->log_stream_name && !ctx->log_stream_prefix) {
-        flb_error("[out_cloudwatch] 'log_stream_name' or 'log_stream_prefix' "
+        flb_plg_error(ctx->ins, "'log_stream_name' or 'log_stream_prefix' "
                   "is required");
         goto error;
     }
@@ -94,14 +94,13 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     tmp = flb_output_get_property("log_format", ins);
     if (tmp) {
         ctx->log_format = tmp;
-        flb_error("[cw] Log format: %s", ctx->log_format); // remove
     }
 
     tmp = flb_output_get_property("region", ins);
     if (tmp) {
         ctx->region = tmp;
     } else {
-        flb_error("[out_cloudwatch] 'region' is a required field");
+        flb_plg_error(ctx->ins, "'region' is a required field");
         goto error;
     }
 
@@ -137,7 +136,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
                                                 ins->tls_key_passwd);
 
     if (!ctx->cred_tls.context) {
-        flb_error("[out_cloudwatch] Failed to create tls context");
+        flb_plg_error(ctx->ins, "Failed to create tls context");
         goto error;
     }
 
@@ -150,7 +149,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
                                                   ins->tls_key_file,
                                                   ins->tls_key_passwd);
     if (!ctx->client_tls.context) {
-        flb_error("[out_cloudwatch] Failed to create tls context");
+        flb_plg_error(ctx->ins, "Failed to create tls context");
         goto error;
     }
 
@@ -160,7 +159,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
                                                            NULL,
                                                            flb_aws_client_generator());
     if (!ctx->aws_provider) {
-        flb_error("[out_cloudwatch] Failed to create AWS Credential Provider");
+        flb_plg_error(ctx->ins, "Failed to create AWS Credential Provider");
         goto error;
     }
 
@@ -193,7 +192,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
                                                         443, FLB_IO_TLS,
                                                         &ctx->client_tls);
     if (!upstream) {
-        flb_error("[aws_credentials] Connection initialization error");
+        flb_plg_error(ctx->ins, "Connection initialization error");
         goto error;
     }
 
@@ -226,7 +225,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     return 0;
 
 error:
-    flb_error("[out_cloudwatch] Initialization failed");
+    flb_plg_error(ctx->ins, "Initialization failed");
     //TODO: clean up context function
     return -1;
 }
