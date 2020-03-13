@@ -100,11 +100,10 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
     /*
      * Check if tmp_buf is big enough.
      * Realistically, msgpack is never less than half the size of JSON
-     * We allocate 3 times as much memory (plus a small constant)
+     * We allocate 4 times as much memory (plus a small constant)
      * just to be super safe.
-     * Re-allocs are expensive, having a bit of extra memory is not.
      */
-    size = 3 * bytes + 100;
+    size = 4 * bytes + 100;
     if (ctx->tmp_buf == NULL) {
         flb_plg_trace(ctx->ins, "Increasing tmp_buf to %zu", size);
         ctx->tmp_buf = flb_malloc(sizeof(char) * size);
@@ -112,11 +111,14 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
             flb_errno();
             return -1;
         }
-        ctx->tmp_buf_size = (3 * bytes + 100);
+        ctx->tmp_buf_size = (4 * bytes + 100);
     }
     else if (ctx->tmp_buf_size < size) {
         flb_plg_trace(ctx->ins, "Increasing tmp_buf to %zu", size);
-        flb_free(ctx->tmp_buf);
+        if (ctx->tmp_buf) {
+            flb_free(ctx->tmp_buf);
+            ctx->tmp_buf = NULL;
+        }
         ctx->tmp_buf = flb_malloc(sizeof(char) * size);
         if (!ctx->tmp_buf) {
             flb_errno();
@@ -167,17 +169,56 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
             ctx->events_size = size;
         }
 
-        /* lack of space during iteration is unlikely; but check to be safe */
-        size = tmp_buf_offset + 3 * map_size;
-        if (size > ctx->tmp_buf_size) {
-            flb_plg_trace(ctx->ins, "In loop re-allocation of tmp_buf to %zu",
-                          size);
-            ctx->tmp_buf = flb_realloc(ctx->tmp_buf, size);
-            if (!ctx->tmp_buf) {
-                flb_errno();
-                goto error;
+        // TODO: make log key a separate function
+        if (ctx->log_key) {
+            msgpack_object_kv *kv;
+            msgpack_object  key;
+            msgpack_object  val;
+            char *key_str = NULL;
+            size_t key_str_size = 0;
+            int j;
+            int check = FLB_FALSE;
+
+            kv = map.via.map.ptr;
+
+            for(j=0; j < map_size; j++) {
+                key = (kv+j)->key
+                if (key->type == MSGPACK_OBJECT_BIN) {
+                    key_str  = (char *) key->via.bin.ptr;
+                    key_str_size = key->via.bin.size;
+                    check = FLB_TRUE;
+                }
+                if (k->type == MSGPACK_OBJECT_STR) {
+                    key_str  = (char *) key->via.str.ptr;
+                    key_str_size = key->via.str.size;
+                    check = FLB_TRUE;
+                }
+
+                if (check == FLB_TRUE) {
+                    if (strncmp(ctx->log_key, key_str, key_str_size) == 0) {
+                        val = (kv+j)->val;
+                        /* set tmp_buf_ptr before using it */
+                        tmp_buf_ptr = ctx->tmp_buf + tmp_buf_offset;
+                        written = flb_msgpack_to_json(tmp_buf_ptr,
+                                                      ctx->tmp_buf_size - tmp_buf_offset,
+                                                      &val);
+                        if (written < 0) {
+                            flb_plg_error(ctx->ins, "Failed to convert msgpack value to JSON");
+                            goto error;
+                        }
+                        tmp_buf_offset += written;
+                        event = &ctx->events[i];
+                        event->json = tmp_buf_ptr;
+                        event->len = written;
+                        event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
+                                                                 tms.tm.tv_nsec/1000000);
+
+                        i++;
+                    }
+                }
+
             }
-            ctx->tmp_buf_size = size;
+            continue;
         }
 
         /* set tmp_buf_ptr before using it */

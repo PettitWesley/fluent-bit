@@ -81,6 +81,7 @@ struct flb_cloudwatch {
     const char *region;
     const char *log_format;
     const char *role_arn;
+    const char *log_key;
     /* Should the plugin create the log group */
     int create_group;
 

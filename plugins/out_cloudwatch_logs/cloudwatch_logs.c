@@ -97,6 +97,11 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         ctx->log_format = tmp;
     }
 
+    tmp = flb_output_get_property("log_key", ins);
+    if (tmp) {
+        ctx->log_key = tmp;
+    }
+
     tmp = flb_output_get_property("region", ins);
     if (tmp) {
         ctx->region = tmp;
