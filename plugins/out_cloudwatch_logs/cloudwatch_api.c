@@ -427,18 +427,26 @@ struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
 }
 
 /*
- * Send to CW in batches of 10,000 events or 1 MB
- * TODO: actually implement batching..
+ * Send one batch to CW of 10,000 events or 1 MB
  */
-int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
-                    int event_count)
+int send_one_batch(struct flb_cloudwatch *ctx, struct log_stream *stream,
+                   int first_event, int event_count)
 {
     int ret;
     int offset;
     int i;
     struct event *event;
+    /* last event in the list that we will try to send in this single put */
+    int last_event = event_count;
+    /* tracks how many events we were able to send in this put */
+    int events_sent;
+
+    if ((event_count - first_event) > MAX_EVENTS_PER_PUT) {
+        last_event = first_event + MAX_EVENTS_PER_PUT;
+    }
 
 retry:
+    events_sent = first_event
     offset = 0;
     ret = init_put_payload(ctx, stream, &offset);
     if (ret < 0) {
@@ -446,8 +454,14 @@ retry:
         return -1;
     }
 
-    for (i = 0; i < event_count; i++) {
+    for (i = first_event; i < last_event; i++) {
         event = &ctx->events[i];
+
+        /* check that we have room left for this event */
+        if ((offset + event->len + PUT_LOG_EVENTS_FOOTER_LEN)
+             > PUT_LOG_EVENTS_PAYLOAD_SIZE) {
+            break;
+        }
         ret = add_event(ctx, event, &offset);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Failed to write log event to payload buffer");
@@ -460,6 +474,8 @@ retry:
                 return -1;
             }
         }
+
+        events_sent++;
     }
 
     ret = end_put_payload(ctx, &offset);
@@ -468,8 +484,6 @@ retry:
         return -1;
     }
 
-    //printf("\n\nraw payload:\n%s\n", ctx->out_buf);
-
     flb_plg_debug(ctx->ins, "Sending %d events", event_count);
     ret = put_log_events(ctx, stream, (size_t) offset);
     if (ret < 0) {
@@ -477,6 +491,22 @@ retry:
         return -1;
     } else if (ret > 0) {
         goto retry;
+    }
+
+    return events_sent;
+}
+
+int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
+                    int event_count)
+{
+    int offset = 0;
+
+    while (offset < event_count) {
+        offset = send_one_batch(ctx, stream, offset, event_count);
+        if (offset < 0) {
+            return -1;
+        }
+        offset += 1;
     }
 
     return 0;

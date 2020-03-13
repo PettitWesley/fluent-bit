@@ -254,9 +254,9 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     ctx->cw_client->upstream = upstream;
     ctx->cw_client->host = ctx->endpoint;
 
-    /* initialize out_buf */
-
     /*
+     * initialize out_buf
+     *
      * TODO: should intelligently increase it's size as needed instead of
      * initing to max payload value
      */
