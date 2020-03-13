@@ -55,6 +55,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
                               struct flb_config *config, void *data)
 {
     const char *tmp;
+    char *session_name;
     struct flb_cloudwatch *ctx = NULL;
     (void) config;
     (void) data;
@@ -111,6 +112,11 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         ctx->create_group = FLB_TRUE;
     }
 
+    tmp = flb_output_get_property("role_arn", ins);
+    if (tmp) {
+        ctx->role_arn = tmp;
+    }
+
 
     ctx->group_created = FLB_FALSE;
 
@@ -162,6 +168,47 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     if (!ctx->aws_provider) {
         flb_plg_error(ctx->ins, "Failed to create AWS Credential Provider");
         goto error;
+    }
+
+    if(ctx->role_arn) {
+        /* set up sts assume role provider */
+        session_name = flb_sts_session_name();
+        if (!session_name) {
+            flb_plg_error(ctx->ins,
+                          "Failed to generate random STS session name");
+            goto error;
+        }
+
+        /* STS provider needs yet another separate TLS instance */
+        ctx->sts_tls.context = flb_tls_context_new(FLB_TRUE,
+                                                   ins->tls_debug,
+                                                   ins->tls_vhost,
+                                                   ins->tls_ca_path,
+                                                   ins->tls_ca_file,
+                                                   ins->tls_crt_file,
+                                                   ins->tls_key_file,
+                                                   ins->tls_key_passwd);
+        if (!ctx->sts_tls.context) {
+            flb_errno();
+            goto error;
+        }
+
+        ctx->base_aws_provider = ctx->aws_provider;
+
+        ctx->aws_provider = flb_sts_provider_create(config,
+                                                    &ctx->sts_tls,
+                                                    ctx->base_aws_provider,
+                                                    NULL,
+                                                    ctx->role_arn,
+                                                    session_name,
+                                                    ctx->region,
+                                                    NULL,
+                                                    flb_aws_client_generator());
+        if (!ctx->aws_provider) {
+            flb_plg_error(ctx->ins,
+                          "Failed to create AWS STS Credential Provider");
+            goto error;
+        }
     }
 
     /* initialize credentials and set to sync mode */

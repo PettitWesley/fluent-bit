@@ -61,9 +61,17 @@ struct log_stream {
 void log_stream_destroy(struct log_stream *stream);
 
 struct flb_cloudwatch {
+    /*
+     * TLS instances can not be re-used. So we have one for:
+     * - Base cred provider (needed for EKS provider)
+     * - STS Assume role provider
+     * - The CloudWatch Logs client for this plugin
+     */
     struct flb_tls cred_tls;
+    struct flb_tls sts_tls;
     struct flb_tls client_tls;
     struct flb_aws_provider *aws_provider;
+    struct flb_aws_provider *base_aws_provider;
     struct flb_aws_client *cw_client;
 
     /* configuration options */
@@ -72,6 +80,7 @@ struct flb_cloudwatch {
     const char *log_group;
     const char *region;
     const char *log_format;
+    const char *role_arn;
     /* Should the plugin create the log group */
     int create_group;
 
