@@ -183,14 +183,14 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
 
             for(j=0; j < map_size; j++) {
                 key = (kv+j)->key;
-                if (key->type == MSGPACK_OBJECT_BIN) {
-                    key_str  = (char *) key->via.bin.ptr;
-                    key_str_size = key->via.bin.size;
+                if (key.type == MSGPACK_OBJECT_BIN) {
+                    key_str  = (char *) key.via.bin.ptr;
+                    key_str_size = key.via.bin.size;
                     check = FLB_TRUE;
                 }
-                if (k->type == MSGPACK_OBJECT_STR) {
-                    key_str  = (char *) key->via.str.ptr;
-                    key_str_size = key->via.str.size;
+                if (key.type == MSGPACK_OBJECT_STR) {
+                    key_str  = (char *) key.via.str.ptr;
+                    key_str_size = key.via.str.size;
                     check = FLB_TRUE;
                 }
 
