@@ -97,6 +97,11 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         ctx->log_format = tmp;
     }
 
+    tmp = flb_output_get_property("endpoint", ins);
+    if (tmp) {
+        ctx->endpoint = tmp;
+    }
+
     tmp = flb_output_get_property("log_key", ins);
     if (tmp) {
         ctx->log_key = tmp;
@@ -220,9 +225,11 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     ctx->aws_provider->provider_vtable->sync(ctx->aws_provider);
     ctx->aws_provider->provider_vtable->get_credentials(ctx->aws_provider);
 
-    ctx->endpoint = flb_aws_endpoint("logs", (char *) ctx->region);
-    if (!ctx->endpoint) {
-        goto error;
+    if (ctx->endpoint == NULL) {
+        ctx->endpoint = flb_aws_endpoint("logs", (char *) ctx->region);
+        if (!ctx->endpoint) {
+            goto error;
+        }
     }
 
     struct flb_aws_client_generator *generator = flb_aws_client_generator();
