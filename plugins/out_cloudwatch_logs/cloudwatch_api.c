@@ -490,7 +490,7 @@ int create_log_group(struct flb_cloudwatch *ctx)
     flb_sds_t tmp;
     flb_sds_t error;
 
-    flb_plg_error(ctx->ins, "Creating log group %s", ctx->log_group);
+    flb_plg_info(ctx->ins, "Creating log group %s", ctx->log_group);
 
     body = flb_sds_create_size(25 + strlen(ctx->log_group));
     if (!body) {
