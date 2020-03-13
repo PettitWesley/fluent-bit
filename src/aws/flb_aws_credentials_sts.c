@@ -177,6 +177,9 @@ void sync_fn_sts(struct flb_aws_provider *provider) {
     flb_debug("[aws_credentials] Sync called on the STS provider");
     /* Remove async flag */
     implementation->sts_client->upstream->flags &= ~(FLB_IO_ASYNC);
+
+    /* we also need to call sync on the base_provider */
+    ctx->base_provider->provider_vtable->sync(ctx->base_provider);
 }
 
 void async_fn_sts(struct flb_aws_provider *provider) {
@@ -185,6 +188,9 @@ void async_fn_sts(struct flb_aws_provider *provider) {
     flb_debug("[aws_credentials] Async called on the STS provider");
     /* Add async flag */
     implementation->sts_client->upstream->flags |= FLB_IO_ASYNC;
+
+    /* we also need to call async on the base_provider */
+    ctx->base_provider->provider_vtable->async(ctx->base_provider);
 }
 
 void destroy_fn_sts(struct flb_aws_provider *provider) {
