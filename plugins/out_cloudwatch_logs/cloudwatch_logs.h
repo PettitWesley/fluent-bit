@@ -84,6 +84,7 @@ struct flb_cloudwatch {
 
     /* if we're writing to a static log stream, we'll use this */
     struct log_stream stream;
+    int stream_created;
     /* if the log stream is dynamic, we'll use this */
     struct mk_list streams;
 

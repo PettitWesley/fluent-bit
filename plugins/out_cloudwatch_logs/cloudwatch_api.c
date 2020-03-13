@@ -408,9 +408,19 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
 struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
                                   const char *tag, int tag_len)
 {
-     if (ctx->log_stream_name) {
-         return &ctx->stream;
-     }
+    struct log_stream *stream;
+    int ret;
+
+    if (ctx->log_stream_name) {
+        stream = &ctx->stream;
+        if (ctx->stream_created == FLB_FALSE) {
+            ret = create_log_stream(ctx, stream);
+            if (ret < 0) {
+                return NULL;
+            }
+        }
+        return stream;
+    }
 
      return get_dynamic_log_stream(ctx, tag, tag_len);
 }

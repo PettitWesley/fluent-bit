@@ -121,6 +121,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
             flb_errno();
             goto error;
         }
+        ctx->stream_created = FLB_FALSE;
     } else {
         mk_list_init(&ctx->streams);
     }
