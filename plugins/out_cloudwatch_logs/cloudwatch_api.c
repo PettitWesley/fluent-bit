@@ -446,7 +446,7 @@ int send_one_batch(struct flb_cloudwatch *ctx, struct log_stream *stream,
     }
 
 retry:
-    events_sent = first_event
+    events_sent = first_event;
     offset = 0;
     ret = init_put_payload(ctx, stream, &offset);
     if (ret < 0) {
@@ -506,7 +506,6 @@ int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
         if (offset < 0) {
             return -1;
         }
-        offset += 1;
     }
 
     return 0;
