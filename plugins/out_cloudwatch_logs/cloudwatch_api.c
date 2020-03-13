@@ -223,7 +223,9 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                 flb_plg_error(ctx->ins, "Could not find log_key '%s' in record",
                               ctx->log_key);
             }
-            i++;
+            else {
+                i++;
+            }
             continue;
         }
 
