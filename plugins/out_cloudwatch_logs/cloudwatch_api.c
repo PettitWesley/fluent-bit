@@ -213,11 +213,11 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                         event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
                                                                  tms.tm.tv_nsec/1000000);
 
-                        i++;
                     }
                 }
 
             }
+            i++;
             continue;
         }
 
