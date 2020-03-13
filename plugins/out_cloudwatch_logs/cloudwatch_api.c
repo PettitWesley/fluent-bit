@@ -182,7 +182,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
             kv = map.via.map.ptr;
 
             for(j=0; j < map_size; j++) {
-                key = (kv+j)->key
+                key = (kv+j)->key;
                 if (key->type == MSGPACK_OBJECT_BIN) {
                     key_str  = (char *) key->via.bin.ptr;
                     key_str_size = key->via.bin.size;
