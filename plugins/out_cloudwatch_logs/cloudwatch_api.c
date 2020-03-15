@@ -219,7 +219,6 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                         event = &ctx->events[i];
                         event->json = tmp_buf_ptr;
                         event->len = written - 1;
-                        printf("log_key_event: %.*s\n", (int) event->len, event->json);
                         event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
                                                                  tms.tm.tv_nsec/1000000);
 
@@ -548,8 +547,6 @@ retry:
         flb_plg_error(ctx->ins, "Could not complete PutLogEvents payload");
         return -1;
     }
-
-    printf("Ray payload: \n%s\n", ctx->out_buf);
 
     flb_plg_debug(ctx->ins, "Sending %d events", event_count);
     ret = put_log_events(ctx, stream, (size_t) offset);
