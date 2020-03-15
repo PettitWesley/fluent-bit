@@ -208,6 +208,14 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                             flb_plg_error(ctx->ins, "Failed to convert msgpack value to JSON");
                             goto error;
                         }
+                        /*
+                         * flb_msgpack_to_json will encase the value in quotes
+                         * We don't want that for log_key, so we remove the first
+                         * and last character
+                         */
+                        written -= 2;
+                        tmp_buf_ptr++;
+
                         tmp_buf_offset += written;
                         event = &ctx->events[i];
                         event->json = tmp_buf_ptr;
@@ -374,10 +382,18 @@ static int add_event(struct flb_cloudwatch *ctx, struct event *event,
         goto error;
     }
 
-    /* flb_utils_write_str will escape the JSON in event->json */
-    if (!flb_utils_write_str(ctx->out_buf, offset, ctx->out_buf_size,
-                             event->json, event->len)) {
-        goto error;
+    if (ctx->log_key != NULL) {
+        if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+                          event->json, event->len)) {
+            goto error;
+        }
+    }
+    else {
+        /* flb_utils_write_str will escape the JSON in event->json */
+        if (!flb_utils_write_str(ctx->out_buf, offset, ctx->out_buf_size,
+                                 event->json, event->len)) {
+            goto error;
+        }
     }
 
     if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
