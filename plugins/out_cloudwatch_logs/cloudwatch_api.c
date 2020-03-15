@@ -105,7 +105,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
      */
     size = 4 * bytes + 100;
     if (ctx->tmp_buf == NULL) {
-        flb_plg_trace(ctx->ins, "Increasing tmp_buf to %zu", size);
+        flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
         ctx->tmp_buf = flb_malloc(sizeof(char) * size);
         if (!ctx->tmp_buf) {
             flb_errno();
@@ -114,7 +114,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
         ctx->tmp_buf_size = (4 * bytes + 100);
     }
     else if (ctx->tmp_buf_size < size) {
-        flb_plg_trace(ctx->ins, "Increasing tmp_buf to %zu", size);
+        flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
         if (ctx->tmp_buf) {
             flb_free(ctx->tmp_buf);
             ctx->tmp_buf = NULL;
@@ -145,10 +145,12 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
          * Each record is a msgpack array [timestamp, map] of the
          * timestamp and record map.
          */
-         root = result.data;
-         if (root.via.array.size != 2) {
-             continue;
-         }
+        root = result.data;
+        if (root.via.array.size != 2) {
+            continue;
+        }
+
+        flb_debug("i = %d", i);
 
         /* unpack the array of [timestamp, map] */
         flb_time_pop_from_msgpack(&tms, &result, &obj);
@@ -160,7 +162,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
         /* re-alloc event buffer if needed */
         if (i >= ctx->events_size) {
             size = ctx->events_size * 1.5;
-            flb_plg_trace(ctx->ins, "Increasing event buffer to %zu", size);
+            flb_plg_debug(ctx->ins, "Increasing event buffer to %zu", size);
             ctx->events = flb_realloc(ctx->events, size);
             if (!ctx->events) {
                 flb_errno();
