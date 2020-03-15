@@ -101,10 +101,13 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
     /*
      * Check if tmp_buf is big enough.
      * Realistically, msgpack is never less than half the size of JSON
-     * We allocate 4 times as much memory (plus a small constant)
+     * We allocate 3 times as much memory (plus a small constant)
      * just to be super safe.
+     *
+     * TODO: This should be improved in the future. tmp_buf could get very large
+     * and will never be decreased, leading to high mem use.
      */
-    size = 4 * bytes + 100;
+    size = 3 * bytes + 100;
     if (ctx->tmp_buf == NULL) {
         flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
         ctx->tmp_buf = flb_malloc(size);
@@ -530,7 +533,8 @@ retry:
         }
         ret = add_event(ctx, event, &offset);
         if (ret < 0) {
-            flb_plg_error(ctx->ins, "Failed to write log event to payload buffer");
+            flb_plg_error(ctx->ins, "Failed to write log event %d to "
+                          "payload buffer", i - first_event);
             return -1;
         }
         if (i != (event_count - 1)) {
