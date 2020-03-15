@@ -129,12 +129,12 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
 
     /* initialize events if needed */
     if (ctx->events == NULL) {
-        ctx->events = flb_malloc(sizeof(struct event) * 1000000);
+        ctx->events = flb_malloc(sizeof(struct event) * 1000);
         if (!ctx->events) {
             flb_errno();
             return -1;
         }
-        ctx->events_size = 1000000;
+        ctx->events_size = 1000;
     }
 
     /* unpack msgpack */
