@@ -161,7 +161,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
 
         /* re-alloc event buffer if needed */
         if (i >= ctx->events_size) {
-            size = ctx->events_size * 1.5;
+            size = ctx->events_size * 2;
             flb_plg_debug(ctx->ins, "Increasing event buffer to %zu", size);
             ctx->events = flb_realloc(ctx->events, size);
             if (!ctx->events) {
