@@ -822,7 +822,6 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
                                     "PutLogEvents", ctx->ins);
                 flb_sds_destroy(error);
             }
-            flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
             else {
                 /* error could not be parsed, print raw response to debug */
                 flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
