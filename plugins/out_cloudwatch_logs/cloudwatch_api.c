@@ -85,6 +85,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
 {
     size_t off = 0;
     size_t size;
+    int new_len;
     int i = 0;
     size_t tmp_buf_offset = 0;
     size_t written;
@@ -106,12 +107,12 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
     size = 4 * bytes + 100;
     if (ctx->tmp_buf == NULL) {
         flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
-        ctx->tmp_buf = flb_malloc(sizeof(char) * size);
+        ctx->tmp_buf = flb_malloc(size);
         if (!ctx->tmp_buf) {
             flb_errno();
             return -1;
         }
-        ctx->tmp_buf_size = (4 * bytes + 100);
+        ctx->tmp_buf_size = size;
     }
     else if (ctx->tmp_buf_size < size) {
         flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
@@ -119,7 +120,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
             flb_free(ctx->tmp_buf);
             ctx->tmp_buf = NULL;
         }
-        ctx->tmp_buf = flb_malloc(sizeof(char) * size);
+        ctx->tmp_buf = flb_malloc(size);
         if (!ctx->tmp_buf) {
             flb_errno();
             return -1;
@@ -134,7 +135,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
             flb_errno();
             return -1;
         }
-        ctx->events_size = 1000;
+        ctx->events_len = 1000;
     }
 
     /* unpack msgpack */
@@ -160,15 +161,16 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
         map_size = map.via.map.size;
 
         /* re-alloc event buffer if needed */
-        if (i >= ctx->events_size) {
-            size = ctx->events_size * 2;
-            flb_plg_debug(ctx->ins, "Increasing event buffer to %zu", size);
+        if (i >= ctx->events_len) {
+            new_len = ctx->events_len * 2;
+            size = sizeof(struct event) * new_len;
+            flb_plg_debug(ctx->ins, "Increasing event buffer to %d", new_len);
             ctx->events = flb_realloc(ctx->events, size);
             if (!ctx->events) {
                 flb_errno();
                 goto error;
             }
-            ctx->events_size = size;
+            ctx->events_len = new_len;
         }
 
         // TODO: make log key a separate function
