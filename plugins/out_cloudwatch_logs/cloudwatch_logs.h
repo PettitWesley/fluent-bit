@@ -93,7 +93,7 @@ struct flb_cloudwatch {
     char *endpoint;
 
     struct event *events;
-    size_t events_size;
+    int events_len;
 
     /* if we're writing to a static log stream, we'll use this */
     struct log_stream stream;
