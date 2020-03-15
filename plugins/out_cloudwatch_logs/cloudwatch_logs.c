@@ -87,8 +87,14 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     }
 
     if (!ctx->log_stream_name && !ctx->log_stream_prefix) {
-        flb_plg_error(ctx->ins, "'log_stream_name' or 'log_stream_prefix' "
-                  "is required");
+        flb_plg_error(ctx->ins, "Either 'log_stream_name' or 'log_stream_prefix'"
+                      " is required");
+        goto error;
+    }
+
+    if (ctx->log_stream_name && ctx->log_stream_prefix) {
+        flb_plg_error(ctx->ins, "Either 'log_stream_name' or 'log_stream_prefix'"
+                      " is required");
         goto error;
     }
 
