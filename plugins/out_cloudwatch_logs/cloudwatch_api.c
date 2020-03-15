@@ -213,13 +213,12 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                          * We don't want that for log_key, so we remove the first
                          * and last character
                          */
-                        written -= 2;
+                        written--;
                         tmp_buf_ptr++;
-
                         tmp_buf_offset += written;
                         event = &ctx->events[i];
                         event->json = tmp_buf_ptr;
-                        event->len = written;
+                        event->len = written - 1;
                         printf("log_key_event: %.*s\n", (int) event->len, event->json);
                         event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
                                                                  tms.tm.tv_nsec/1000000);
