@@ -151,8 +151,6 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
             continue;
         }
 
-        flb_debug("i = %d", i);
-
         /* unpack the array of [timestamp, map] */
         flb_time_pop_from_msgpack(&tms, &result, &obj);
 
@@ -552,7 +550,7 @@ retry:
         return -1;
     }
 
-    flb_plg_debug(ctx->ins, "Sending %d events", event_count);
+    flb_plg_debug(ctx->ins, "Sending %d events", events_sent - first_event);
     ret = put_log_events(ctx, stream, (size_t) offset);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send log events");
