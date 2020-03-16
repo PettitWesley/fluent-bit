@@ -526,8 +526,16 @@ retry:
     for (i = first_event; i < last_event; i++) {
         event = &ctx->events[i];
 
-        /* check that we have room left for this event */
-        if ((offset + event->len + PUT_LOG_EVENTS_FOOTER_LEN)
+        /*
+         * check that we have room left for this event
+         *
+         * offset will accurately track the true number of bytes written so far.
+         * Until written, we do know the size of the event, it must be escaped.
+         * Multiplying it's length by 2 ensures we are guaranteed to be safe.
+         * 30 is the number of bytes that add_event writes in addition to the
+         * actual event.
+         */
+        if ((offset + event->len * 2 + PUT_LOG_EVENTS_FOOTER_LEN + 30)
              > PUT_LOG_EVENTS_PAYLOAD_SIZE) {
             break;
         }
