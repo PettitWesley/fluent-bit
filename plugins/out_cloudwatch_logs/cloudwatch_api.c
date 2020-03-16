@@ -564,9 +564,7 @@ retry:
         flb_plg_error(ctx->ins, "Could not complete PutLogEvents payload");
         return -1;
     }
-
-    printf("raw payload: \n%s\n", ctx->out_buf);
-
+    
     flb_plg_debug(ctx->ins, "Sending %d events", events_sent - first_event);
     ret = put_log_events(ctx, stream, (size_t) offset);
     if (ret < 0) {
