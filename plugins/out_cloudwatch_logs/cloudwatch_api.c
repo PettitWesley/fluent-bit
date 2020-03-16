@@ -537,7 +537,9 @@ retry:
          */
         if ((offset + event->len * 2 + PUT_LOG_EVENTS_FOOTER_LEN + 30)
              > PUT_LOG_EVENTS_PAYLOAD_SIZE) {
-                 flb_debug("Terminating payload event=%d, offset=%d", i - first_event, offset);
+            flb_debug("Terminating payload event=%d, offset=%d", i - first_event, offset);
+            /* decrement offset, to remove the "," written for the last event */
+            offset--;
             break;
         }
         ret = add_event(ctx, event, &offset);
