@@ -46,8 +46,8 @@
 #define ERR_CODE_ALREADY_EXISTS         "ResourceAlreadyExistsException"
 #define ERR_CODE_INVALID_SEQUENCE_TOKEN "InvalidSequenceTokenException"
 
-#define 24_HOURS_IN_MILLISECONDS        86400000
-#define 4_HOURS_IN_SECONDS              14400
+#define ONE_DAY_IN_MILLISECONDS        86400000
+#define FOUR_HOURS_IN_SECONDS              14400
 
 static struct flb_aws_header create_group_header = {
     .key = "X-Amz-Target",
@@ -488,7 +488,7 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
         log_stream_destroy(new_stream);
         return NULL;
     }
-    new_stream->expiration = time(NULL) + 4_HOURS_IN_SECONDS;
+    new_stream->expiration = time(NULL) + FOUR_HOURS_IN_SECONDS;
 
     mk_list_add(&new_stream->_head, &ctx->streams);
     return new_stream;
@@ -507,7 +507,7 @@ struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
             if (ret < 0) {
                 return NULL;
             }
-            stream->expiration = time(NULL) + 4_HOURS_IN_SECONDS;
+            stream->expiration = time(NULL) + FOUR_HOURS_IN_SECONDS;
             ctx->stream_created = FLB_TRUE;
         }
         return stream;
@@ -526,7 +526,7 @@ static unsigned long long stream_time_span(struct log_stream *stream,
     if (stream->oldest_event > event->timestamp) {
         return stream->newest_event - event->timestamp;
     } else if (stream->newest_event < event->timestamp) {
-        return event->timestamp - stream->oldest_event
+        return event->timestamp - stream->oldest_event;
     }
 
     return stream->newest_event - stream->oldest_event;
@@ -538,7 +538,7 @@ static int check_stream_time_span(struct log_stream *stream,
 {
     unsigned long long span = stream_time_span(stream, event);
 
-    if (span < 24_HOURS_IN_MILLISECONDS) {
+    if (span < ONE_DAY_IN_MILLISECONDS) {
         return FLB_TRUE;
     }
 
@@ -546,7 +546,7 @@ static int check_stream_time_span(struct log_stream *stream,
 }
 
 /* sets the oldest_event and newest_event fields */
-static set_stream_time_span(struct log_stream *stream, struct event *event)
+static void set_stream_time_span(struct log_stream *stream, struct event *event)
 {
     if (stream->oldest_event == 0 || stream->oldest_event > event->timestamp) {
         stream->oldest_event = event->timestamp;
@@ -838,7 +838,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
     flb_plg_debug(ctx->ins, "Sending log events to log stream %s", stream->name);
 
     /* stream is being used, update expiration */
-    stream->expiration = time(NULL) + 4_HOURS_IN_SECONDS;
+    stream->expiration = time(NULL) + FOUR_HOURS_IN_SECONDS;
 
     if (ctx->log_format != NULL) {
         put_log_events_header[1].val = (char *) ctx->log_format;
