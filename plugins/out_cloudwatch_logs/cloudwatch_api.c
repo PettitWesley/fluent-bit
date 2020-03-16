@@ -537,7 +537,7 @@ retry:
                           "payload buffer", i - first_event);
             return -1;
         }
-        if (i != (event_count - 1)) {
+        if (i != (last_event - 1)) {
             if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
                               ",", 1)) {
                 flb_plg_error(ctx->ins, "Could not terminate log event with ','");
