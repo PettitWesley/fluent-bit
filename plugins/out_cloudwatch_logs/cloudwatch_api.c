@@ -821,7 +821,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
                     int end_buf_i = payload_size - 100;
                     char *end_buf = ctx->out_buf + end_buf_i;
                     printf("PAYLOAD START: \n%.100s\n", ctx->out_buf);
-                    printf("PAYLOAD END: \n%s\n", end_buf);
+                    printf("PAYLOAD END: \n%.100s\n", end_buf);
                 }
                 /* some other error occurred; notify user */
                 flb_aws_print_error(c->resp.payload, c->resp.payload_size,
