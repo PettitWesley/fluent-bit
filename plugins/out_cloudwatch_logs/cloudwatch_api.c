@@ -816,9 +816,6 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
                         /* tell the caller to retry */
                         return 1;
                     }
-                } else if (strcmp(error, "SerializationException") == 0) {
-                    /* print the request body to see what was wrong */
-                    printf("PAYLOAD: \n%s\n\n\n", ctx->out_buf);
                 }
                 /* some other error occurred; notify user */
                 flb_aws_print_error(c->resp.payload, c->resp.payload_size,
