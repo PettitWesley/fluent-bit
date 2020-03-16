@@ -46,6 +46,9 @@
 #define ERR_CODE_ALREADY_EXISTS         "ResourceAlreadyExistsException"
 #define ERR_CODE_INVALID_SEQUENCE_TOKEN "InvalidSequenceTokenException"
 
+#define 24_HOURS_IN_MILLISECONDS        86400000
+#define 4_HOURS_IN_SECONDS              14400
+
 static struct flb_aws_header create_group_header = {
     .key = "X-Amz-Target",
     .key_len = 12,
@@ -213,6 +216,11 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                             flb_plg_error(ctx->ins, "Failed to convert msgpack value to JSON");
                             goto error;
                         }
+                        /* Discard empty messages (written == 2 means '""') */
+                        if (written <= 2) {
+                            flb_plg_debug(ctx->ins, "Found empty log message");
+                            continue;
+                        }
                         /*
                          * flb_msgpack_to_json will encase the value in quotes
                          * We don't want that for log_key, so we remove the first
@@ -249,6 +257,11 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
         if (written < 0) {
             flb_plg_error(ctx->ins, "Failed to convert msgpack record to JSON");
             goto error;
+        }
+        /* Discard empty messages (written == 2 means '""') */
+        if (written <= 2) {
+            flb_plg_debug(ctx->ins, "Found empty log message");
+            continue;
         }
         tmp_buf_offset += written;
         event = &ctx->events[i];
@@ -452,6 +465,12 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
         stream = mk_list_entry(head, struct log_stream, _head);
         if (strcmp(name, stream->name) == 0) {
             return stream;
+        } else {
+            /* check if stream is expired, if so, clean it up */
+            if (stream->expiration < time(NULL)) {
+                mk_list_del(&stream->_head);
+                log_stream_destroy(stream);
+            }
         }
     }
 
@@ -469,6 +488,7 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
         log_stream_destroy(new_stream);
         return NULL;
     }
+    new_stream->expiration = time(NULL) + 4_HOURS_IN_SECONDS;
 
     mk_list_add(&new_stream->_head, &ctx->streams);
     return new_stream;
@@ -487,12 +507,54 @@ struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
             if (ret < 0) {
                 return NULL;
             }
+            stream->expiration = time(NULL) + 4_HOURS_IN_SECONDS;
             ctx->stream_created = FLB_TRUE;
         }
         return stream;
     }
 
      return get_dynamic_log_stream(ctx, tag, tag_len);
+}
+
+static unsigned long long stream_time_span(struct log_stream *stream,
+                                           struct event *event)
+{
+    if (stream->oldest_event == 0 || stream->newest_event == 0) {
+        return 0;
+    }
+
+    if (stream->oldest_event > event->timestamp) {
+        return stream->newest_event - event->timestamp;
+    } else if (stream->newest_event < event->timestamp) {
+        return event->timestamp - stream->oldest_event
+    }
+
+    return stream->newest_event - stream->oldest_event;
+}
+
+/* returns FLB_TRUE if time span is less than 24 hours, FLB_FALSE if greater */
+static int check_stream_time_span(struct log_stream *stream,
+                                  struct event *event)
+{
+    unsigned long long span = stream_time_span(stream, event);
+
+    if (span < 24_HOURS_IN_MILLISECONDS) {
+        return FLB_TRUE;
+    }
+
+    return FLB_FALSE;
+}
+
+/* sets the oldest_event and newest_event fields */
+static set_stream_time_span(struct log_stream *stream, struct event *event)
+{
+    if (stream->oldest_event == 0 || stream->oldest_event > event->timestamp) {
+        stream->oldest_event = event->timestamp;
+    }
+
+    if (stream->newest_event == 0 || stream->newest_event < event->timestamp) {
+        stream->newest_event = event->timestamp;
+    }
 }
 
 /*
@@ -515,6 +577,9 @@ int send_one_batch(struct flb_cloudwatch *ctx, struct log_stream *stream,
     }
 
 retry:
+    stream->newest_event = 0;
+    stream->oldest_event = 0;
+
     events_sent = first_event;
     offset = 0;
     ret = init_put_payload(ctx, stream, &offset);
@@ -525,6 +590,12 @@ retry:
 
     for (i = first_event; i < last_event; i++) {
         event = &ctx->events[i];
+
+        if (check_stream_time_span(stream, event) == FLB_FALSE) {
+            /* decrement offset, to remove the "," written for the last event */
+            offset--;
+            break;
+        }
 
         /*
          * check that we have room left for this event
@@ -537,7 +608,8 @@ retry:
          */
         if ((offset + event->len * 2 + PUT_LOG_EVENTS_FOOTER_LEN + 30)
              > PUT_LOG_EVENTS_PAYLOAD_SIZE) {
-            flb_debug("Terminating payload event=%d, offset=%d", i - first_event, offset);
+            flb_plg_debug(ctx->ins, "Terminating payload event=%d, offset=%d",
+                          i - first_event, offset);
             /* decrement offset, to remove the "," written for the last event */
             offset--;
             break;
@@ -556,6 +628,7 @@ retry:
             }
         }
 
+        set_stream_time_span(stream, event);
         events_sent++;
     }
 
@@ -748,7 +821,6 @@ int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream)
     return -1;
 }
 
-//TODO: this method could be cleaned up and made more readable
 /*
  * Returns -1 on failure, 0 on success, and 1 for a sequence token error,
  * which means the caller can retry.
@@ -764,6 +836,9 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
     int num_headers = 1;
 
     flb_plg_debug(ctx->ins, "Sending log events to log stream %s", stream->name);
+
+    /* stream is being used, update expiration */
+    stream->expiration = time(NULL) + 4_HOURS_IN_SECONDS;
 
     if (ctx->log_format != NULL) {
         put_log_events_header[1].val = (char *) ctx->log_format;

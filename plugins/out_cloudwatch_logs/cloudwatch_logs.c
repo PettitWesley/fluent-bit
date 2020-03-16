@@ -66,6 +66,8 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         return -1;
     }
 
+    mk_list_init(&ctx->streams);
+
     ctx->ins = ins;
 
     tmp = flb_output_get_property("log_group_name", ins);
@@ -148,8 +150,6 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
             goto error;
         }
         ctx->stream_created = FLB_FALSE;
-    } else {
-        mk_list_init(&ctx->streams);
     }
 
     /* one tls instance for provider, one for cw client */
@@ -229,6 +229,8 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
                           "Failed to create AWS STS Credential Provider");
             goto error;
         }
+        /* session name can freed after provider is created */
+        flb_free(session_name);
     }
 
     /* initialize credentials and set to sync mode */
@@ -296,7 +298,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
 error:
     flb_plg_error(ctx->ins, "Initialization failed");
-    //TODO: clean up context function
+    flb_cloudwatch_ctx_destroy(ctx);
     return -1;
 }
 
@@ -355,17 +357,75 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
+void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
+{
+    struct log_stream *stream;
+    struct mk_list *tmp;
+    struct mk_list *head;
+
+    if (ctx != NULL) {
+        if (ctx->base_aws_provider) {
+            flb_aws_provider_destroy(ctx->base_aws_provider);
+        }
+
+        if (ctx->aws_provider) {
+            flb_aws_provider_destroy(ctx->aws_provider);
+        }
+
+        if (ctx->cred_tls.context) {
+            flb_tls_context_destroy(ctx->cred_tls.context);
+        }
+
+        if (ctx->sts_tls.context) {
+            flb_tls_context_destroy(ctx->sts_tls.context);
+        }
+
+        if (ctx->client_tls.context) {
+            flb_tls_context_destroy(ctx->client_tls.context);
+        }
+
+        if (ctx->cw_client) {
+            flb_aws_client_destroy(ctx->cw_client);
+        }
+
+        if (ctx->custom_endpoint == FLB_FALSE) {
+            flb_free(ctx->endpoint);
+        }
+
+        if (ctx->log_stream_name) {
+            if (ctx->log_stream->name) {
+                flb_sds_destroy(ctx->log_stream->name);
+            }
+            if (ctx->log_stream->sequence_token) {
+                flb_sds_destroy(ctx->log_stream->sequence_token);
+            }
+        } else {
+            mk_list_foreach_safe(head, tmp, &ctx->streams) {
+                stream = mk_list_entry(head, struct log_stream, _head);
+                mk_list_del(&stream->_head);
+                log_stream_destroy(stream);
+            }
+        }
+
+        if (ctx->events) {
+            flb_free(ctx->events);
+        }
+
+        if (ctx->tmp_buf) {
+            flb_free(ctx->tmp_buf);
+        }
+
+        if (ctx->out_buf) {
+            flb_free(ctx->out_buf);
+        }
+    }
+}
+
 static int cb_cloudwatch_exit(void *data, struct flb_config *config)
 {
     struct flb_cloudwatch *ctx = data;
 
-    if (!ctx) {
-        return 0;
-    }
-
-    //TODO
-
-    flb_free(ctx);
+    flb_cloudwatch_ctx_destroy(ctx);
     return 0;
 }
 

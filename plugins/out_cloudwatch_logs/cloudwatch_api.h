@@ -21,7 +21,11 @@
 #ifndef FLB_OUT_CLOUDWATCH_API
 #define FLB_OUT_CLOUDWATCH_API
 
-//#define PUT_LOG_EVENTS_PAYLOAD_SIZE    1048576
+/*
+ * The CloudWatch API documents that the maximum payload is 1,048,576 bytes
+ * For reasons that are under investigation, using that number in this plugin
+ * leads to API errors. No issues have been seen setting it to 1,000,000 bytes.
+ */
 #define PUT_LOG_EVENTS_PAYLOAD_SIZE    1000000
 #define MAX_EVENTS_PER_PUT             10000
 

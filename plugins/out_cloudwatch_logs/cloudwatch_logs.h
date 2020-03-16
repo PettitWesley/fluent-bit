@@ -55,6 +55,13 @@ struct log_stream {
      */
     time_t expiration;
 
+    /*
+     * Used to track the "time span" of a single PutLogEvents payload
+     * Which can not exceed 24 hours.
+     */
+    unsigned long long oldest_event;
+    unsigned long long newest_event;
+
     struct mk_list _head;
 };
 
@@ -113,5 +120,7 @@ struct flb_cloudwatch {
     /* Plugin output instance reference */
     struct flb_output_instance *ins;
 };
+
+void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx);
 
 #endif
