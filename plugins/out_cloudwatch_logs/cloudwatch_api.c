@@ -464,6 +464,7 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
     mk_list_foreach_safe(head, tmp, &ctx->streams) {
         stream = mk_list_entry(head, struct log_stream, _head);
         if (strcmp(name, stream->name) == 0) {
+            flb_sds_destroy(name);
             return stream;
         } else {
             /* check if stream is expired, if so, clean it up */

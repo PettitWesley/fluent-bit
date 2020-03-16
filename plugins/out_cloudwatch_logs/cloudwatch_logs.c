@@ -57,6 +57,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     const char *tmp;
     char *session_name;
     struct flb_cloudwatch *ctx = NULL;
+    struct flb_aws_credentials *creds = NULL;
     (void) config;
     (void) data;
 
@@ -235,7 +236,10 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
     /* initialize credentials and set to sync mode */
     ctx->aws_provider->provider_vtable->sync(ctx->aws_provider);
-    ctx->aws_provider->provider_vtable->get_credentials(ctx->aws_provider);
+    creds = ctx->aws_provider->provider_vtable->get_credentials(ctx->aws_provider);
+    if (creds) {
+        flb_aws_credentials_destroy(creds);
+    }
 
     if (ctx->endpoint == NULL) {
         ctx->endpoint = flb_aws_endpoint("logs", (char *) ctx->region);
