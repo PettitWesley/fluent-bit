@@ -393,11 +393,11 @@ void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
         }
 
         if (ctx->log_stream_name) {
-            if (ctx->log_stream->name) {
-                flb_sds_destroy(ctx->log_stream->name);
+            if (ctx->stream->name) {
+                flb_sds_destroy(ctx->stream->name);
             }
-            if (ctx->log_stream->sequence_token) {
-                flb_sds_destroy(ctx->log_stream->sequence_token);
+            if (ctx->stream->sequence_token) {
+                flb_sds_destroy(ctx->stream->sequence_token);
             }
         } else {
             mk_list_foreach_safe(head, tmp, &ctx->streams) {
