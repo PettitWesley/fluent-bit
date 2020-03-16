@@ -21,8 +21,7 @@
 #ifndef FLB_OUT_CLOUDWATCH_API
 #define FLB_OUT_CLOUDWATCH_API
 
-#define PUT_LOG_EVENTS_PAYLOAD_SIZE    2048
-// #define PUT_LOG_EVENTS_PAYLOAD_SIZE    1048576
+#define PUT_LOG_EVENTS_PAYLOAD_SIZE    1048576
 #define MAX_EVENTS_PER_PUT             10000
 
 /* number of characters needed to 'end' a PutLogEvents payload */
