@@ -69,6 +69,8 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
     mk_list_init(&ctx->streams);
 
+    ctx->active_instances = 0;
+
     ctx->ins = ins;
 
     tmp = flb_output_get_property("log_group_name", ins);
@@ -319,15 +321,19 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
+    ctx->active_instances += 1;
+
     if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
         ret = create_log_group(ctx);
         if (ret < 0) {
+            ctx->active_instances += -1;
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
     }
 
     stream = get_log_stream(ctx, tag, tag_len);
     if (!stream) {
+        ctx->active_instances += -1;
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
@@ -346,6 +352,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     event_count = msg_pack_to_events(ctx, data, bytes);
     if (event_count < 0) {
         flb_debug("Could not convert message pack to events");
+        ctx->active_instances += -1;
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
@@ -355,9 +362,13 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
 
     ret = send_in_batches(ctx, stream, event_count);
     if (ret < 0) {
+        ctx->active_instances += -1;
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
+    flb_warn("Active instances: %d", ctx->active_instances);
+
+    ctx->active_instances += -1;
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 

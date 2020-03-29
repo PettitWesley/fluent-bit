@@ -108,6 +108,8 @@ struct flb_cloudwatch {
     /* if the log stream is dynamic, we'll use this */
     struct mk_list streams;
 
+    int active_instances;
+
     /*
      * for performance, allocate large buffers at first flush and then re-use
      * till the plugin exits
