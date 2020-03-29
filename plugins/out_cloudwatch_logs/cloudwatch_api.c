@@ -84,7 +84,8 @@ static struct flb_aws_header put_log_events_header[] = {
  *
  * Return value is number of events created, or -1 on error.
  */
-int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t bytes)
+int msg_pack_to_events(struct flb_cloudwatch *ctx, struct flush *buf,
+                       const char *data, size_t bytes)
 {
     size_t off = 0;
     size_t size;
@@ -102,46 +103,42 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
     struct event *event;
 
     /*
-     * Check if tmp_buf is big enough.
-     * Realistically, msgpack is never less than half the size of JSON
-     * We allocate 3 times as much memory (plus a small constant)
-     * just to be super safe.
-     *
-     * TODO: This should be improved in the future. tmp_buf could get very large
-     * and will never be decreased, leading to high mem use.
+     * tmp_buf needs to hold a json representation of the msgpack
+     * 'size' is a safe estimate for the amount of memory needed
+     * TODO: Need to re-alloc in loop if needed
      */
     size = 3 * bytes + 100;
-    if (ctx->tmp_buf == NULL) {
+    if (buf->tmp_buf == NULL) {
         flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
-        ctx->tmp_buf = flb_malloc(size);
-        if (!ctx->tmp_buf) {
+        buf->tmp_buf = flb_malloc(size);
+        if (!buf->tmp_buf) {
             flb_errno();
             return -1;
         }
-        ctx->tmp_buf_size = size;
+        buf->tmp_buf_size = size;
     }
-    else if (ctx->tmp_buf_size < size) {
+    else if (buf->tmp_buf_size < size) {
         flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
-        if (ctx->tmp_buf) {
-            flb_free(ctx->tmp_buf);
-            ctx->tmp_buf = NULL;
+        if (buf->tmp_buf) {
+            flb_free(buf->tmp_buf);
+            buf->tmp_buf = NULL;
         }
-        ctx->tmp_buf = flb_malloc(size);
-        if (!ctx->tmp_buf) {
+        buf->tmp_buf = flb_malloc(size);
+        if (!buf->tmp_buf) {
             flb_errno();
             return -1;
         }
-        ctx->tmp_buf_size = size;
+        buf->tmp_buf_size = size;
     }
 
     /* initialize events if needed */
-    if (ctx->events == NULL) {
-        ctx->events = flb_malloc(sizeof(struct event) * 1000);
-        if (!ctx->events) {
+    if (buf->events == NULL) {
+        buf->events = flb_malloc(sizeof(struct event) * 1000);
+        if (!buf->events) {
             flb_errno();
             return -1;
         }
-        ctx->events_capacity = 1000;
+        buf->events_capacity = 1000;
     }
 
     /* unpack msgpack */
@@ -165,17 +162,19 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
         map_size = map.via.map.size;
 
         /* re-alloc event buffer if needed */
-        if (i >= ctx->events_capacity) {
-            new_len = ctx->events_capacity * 2;
+        if (i >= buf->events_capacity) {
+            new_len = buf->events_capacity * 2;
             size = sizeof(struct event) * new_len;
             flb_plg_debug(ctx->ins, "Increasing event buffer to %d", new_len);
-            ctx->events = flb_realloc(ctx->events, size);
-            if (!ctx->events) {
+            buf->events = flb_realloc(buf->events, size);
+            if (!buf->events) {
                 flb_errno();
                 goto error;
             }
-            ctx->events_capacity = new_len;
+            buf->events_capacity = new_len;
         }
+
+        /* re-alloc tmp_buf if needed */
 
         // TODO: make log key a separate function
         if (ctx->log_key) {
@@ -208,9 +207,9 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                         found = FLB_TRUE;
                         val = (kv+j)->val;
                         /* set tmp_buf_ptr before using it */
-                        tmp_buf_ptr = ctx->tmp_buf + tmp_buf_offset;
+                        tmp_buf_ptr = buf->tmp_buf + tmp_buf_offset;
                         written = flb_msgpack_to_json(tmp_buf_ptr,
-                                                      ctx->tmp_buf_size - tmp_buf_offset,
+                                                      buf->tmp_buf_size - tmp_buf_offset,
                                                       &val);
                         if (written < 0) {
                             flb_plg_error(ctx->ins, "Failed to convert msgpack value to JSON");
@@ -229,7 +228,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
                         written--;
                         tmp_buf_ptr++;
                         tmp_buf_offset += written;
-                        event = &ctx->events[i];
+                        event = &buf->events[i];
                         event->json = tmp_buf_ptr;
                         event->len = written - 1;
                         event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
@@ -250,9 +249,9 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
         }
 
         /* set tmp_buf_ptr before using it */
-        tmp_buf_ptr = ctx->tmp_buf + tmp_buf_offset;
+        tmp_buf_ptr = buf->tmp_buf + tmp_buf_offset;
         written = flb_msgpack_to_json(tmp_buf_ptr,
-                                      ctx->tmp_buf_size - tmp_buf_offset,
+                                      buf->tmp_buf_size - tmp_buf_offset,
                                       &map);
         if (written < 0) {
             flb_plg_error(ctx->ins, "Failed to convert msgpack record to JSON");
@@ -264,7 +263,7 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, const char *data, size_t byte
             continue;
         }
         tmp_buf_offset += written;
-        event = &ctx->events[i];
+        event = &buf->events[i];
         event->json = tmp_buf_ptr;
         event->len = written;
         event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
@@ -315,52 +314,52 @@ static inline int try_to_write(char *buf, int *off, size_t left,
 /*
  * Writes the "header" for a put log events payload
  */
-static int init_put_payload(struct flb_cloudwatch *ctx,
+static int init_put_payload(struct flb_cloudwatch *ctx, struct flush *buf,
                             struct log_stream *stream, int *offset)
 {
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "{\"logGroupName\":\"", 17)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       ctx->log_group, 0)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "\",\"logStreamName\":\"", 19)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       stream->name, 0)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "\",", 2)) {
         goto error;
     }
 
     if (stream->sequence_token) {
-        if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                           "\"sequenceToken\":\"", 17)) {
             goto error;
         }
 
-        if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                           stream->sequence_token, 0)) {
             goto error;
         }
 
-        if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                           "\",", 2)) {
             goto error;
         }
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "\"logEvents\":[", 13)) {
         goto error;
     }
@@ -374,45 +373,45 @@ error:
 /*
  * Writes a log event to the output buffer
  */
-static int add_event(struct flb_cloudwatch *ctx, struct event *event,
-                     int *offset)
+static int add_event(struct flb_cloudwatch *ctx, struct flush *buf,
+                     struct event *event, int *offset)
 {
-    char buf[50];
+    char ts[50];
 
-    if (!sprintf(buf, "%llu", event->timestamp)) {
+    if (!sprintf(ts, "%llu", event->timestamp)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "{\"timestamp\":", 13)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
-                      buf, 0)) {
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      ts, 0)) {
         goto error;
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       ",\"message\":\"", 12)) {
         goto error;
     }
 
     if (ctx->log_key != NULL) {
-        if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                           event->json, event->len)) {
             goto error;
         }
     }
     else {
         /* flb_utils_write_str will escape the JSON in event->json */
-        if (!flb_utils_write_str(ctx->out_buf, offset, ctx->out_buf_size,
+        if (!flb_utils_write_str(buf->out_buf, offset, buf->out_buf_size,
                                  event->json, event->len)) {
             goto error;
         }
     }
 
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "\"}", 2)) {
         goto error;
     }
@@ -424,13 +423,14 @@ error:
 }
 
 /* Terminates a PutLogEvents payload */
-static int end_put_payload(struct flb_cloudwatch *ctx, int *offset)
+static int end_put_payload(struct flb_cloudwatch *ctx, struct flush *buf,
+                           int *offset)
 {
-    if (!try_to_write(ctx->out_buf, offset, ctx->out_buf_size,
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "]}", 2)) {
         return -1;
     }
-    ctx->out_buf[*offset] = '\0';
+    buf->out_buf[*offset] = '\0';
 
     return 0;
 }
@@ -561,7 +561,8 @@ static void set_stream_time_span(struct log_stream *stream, struct event *event)
 /*
  * Send one batch to CW of 10,000 events or 1 MB
  */
-int send_one_batch(struct flb_cloudwatch *ctx, struct log_stream *stream,
+int send_one_batch(struct flb_cloudwatch *ctx, struct flush *buf,
+                   struct log_stream *stream,
                    int first_event, int event_count)
 {
     int ret;
@@ -583,14 +584,14 @@ retry:
 
     events_sent = first_event;
     offset = 0;
-    ret = init_put_payload(ctx, stream, &offset);
+    ret = init_put_payload(ctx, buf, stream, &offset);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to initialize PutLogEvents payload");
         return -1;
     }
 
     for (i = first_event; i < last_event; i++) {
-        event = &ctx->events[i];
+        event = &buf->events[i];
 
         if (check_stream_time_span(stream, event) == FLB_FALSE) {
             /* decrement offset, to remove the "," written for the last event */
@@ -615,14 +616,14 @@ retry:
             offset--;
             break;
         }
-        ret = add_event(ctx, event, &offset);
+        ret = add_event(ctx, buf, event, &offset);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Failed to write log event %d to "
                           "payload buffer", i - first_event);
             return -1;
         }
         if (i != (last_event - 1)) {
-            if (!try_to_write(ctx->out_buf, &offset, ctx->out_buf_size,
+            if (!try_to_write(buf->out_buf, &offset, buf->out_buf_size,
                               ",", 1)) {
                 flb_plg_error(ctx->ins, "Could not terminate log event with ','");
                 return -1;
@@ -633,14 +634,14 @@ retry:
         events_sent++;
     }
 
-    ret = end_put_payload(ctx, &offset);
+    ret = end_put_payload(ctx, buf, &offset);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not complete PutLogEvents payload");
         return -1;
     }
 
     flb_plg_debug(ctx->ins, "Sending %d events", events_sent - first_event);
-    ret = put_log_events(ctx, stream, (size_t) offset);
+    ret = put_log_events(ctx, buf, stream, (size_t) offset);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send log events");
         return -1;
@@ -651,13 +652,13 @@ retry:
     return events_sent;
 }
 
-int send_in_batches(struct flb_cloudwatch *ctx, struct log_stream *stream,
-                    int event_count)
+int send_in_batches(struct flb_cloudwatch *ctx, struct flush *buf,
+                    struct log_stream *stream, int event_count)
 {
     int offset = 0;
 
     while (offset < event_count) {
-        offset = send_one_batch(ctx, stream, offset, event_count);
+        offset = send_one_batch(ctx, buf, stream, offset, event_count);
         if (offset < 0) {
             return -1;
         }
@@ -826,8 +827,8 @@ int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream)
  * Returns -1 on failure, 0 on success, and 1 for a sequence token error,
  * which means the caller can retry.
  */
-int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
-                   size_t payload_size)
+int put_log_events(struct flb_cloudwatch *ctx, struct flush *buf,
+                   struct log_stream *stream, size_t payload_size)
 {
 
     struct flb_http_client *c = NULL;
@@ -849,7 +850,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
 
     cw_client = ctx->cw_client;
     c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
-                                          "/", ctx->out_buf, payload_size,
+                                          "/", buf->out_buf, payload_size,
                                           put_log_events_header, num_headers);
     if (c) {
         flb_plg_debug(ctx->ins, "PutLogEvents http status=%d", c->resp.status);
@@ -921,4 +922,15 @@ int put_log_events(struct flb_cloudwatch *ctx, struct log_stream *stream,
         flb_http_client_destroy(c);
     }
     return -1;
+}
+
+
+void cw_flush_destroy(struct cw_flush *buf)
+{
+    if (buf) {
+        flb_free(buf->tmp_buf);
+        flb_free(buf->out_buf);
+        flb_free(buf->events);
+        flb_free(buf);
+    }
 }

@@ -36,16 +36,6 @@ struct event {
     unsigned long long timestamp;
 };
 
-// type logStream struct {
-// 	logEvents         []*cloudwatchlogs.InputLogEvent
-// 	currentByteLength int
-// 	currentBatchStart *time.Time
-// 	currentBatchEnd   *time.Time
-// 	nextSequenceToken *string
-// 	logStreamName     string
-// 	expiration        time.Time
-// }
-
 struct log_stream {
     flb_sds_t name;
     flb_sds_t sequence_token;
@@ -99,23 +89,11 @@ struct flb_cloudwatch {
     /* must be freed on shutdown if custom_endpoint is not set */
     char *endpoint;
 
-    struct event *events;
-    int events_capacity;
-
     /* if we're writing to a static log stream, we'll use this */
     struct log_stream stream;
     int stream_created;
     /* if the log stream is dynamic, we'll use this */
     struct mk_list streams;
-
-    /*
-     * for performance, allocate large buffers at first flush and then re-use
-     * till the plugin exits
-     */
-    char *tmp_buf;
-    size_t tmp_buf_size;
-    char *out_buf;
-    size_t out_buf_size;
 
     /* Plugin output instance reference */
     struct flb_output_instance *ins;

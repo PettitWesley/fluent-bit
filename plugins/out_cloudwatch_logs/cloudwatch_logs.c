@@ -316,6 +316,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     int ret;
     int event_count;
     struct log_stream *stream = NULL;
+    struct flush *buf = NULL;
     (void) i_ins;
     (void) config;
 
@@ -331,33 +332,36 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    // if (ctx->stream_created == FLB_FALSE) {
-    //     ret = create_log_stream(ctx);
-    //     if (ret < 0) {
-    //         FLB_OUTPUT_RETURN(FLB_RETRY);
-    //     }
-    // }
+    buf = flb_malloc(sizeof(struct flush));
+    if (!buf) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
 
     /*
      *  1. Parse msgpack to events
      *  2. Sort events on timestamp
      *  3. Send to CW in batches
      */
-    event_count = msg_pack_to_events(ctx, data, bytes);
+    event_count = msg_pack_to_events(ctx, buf, data, bytes);
     if (event_count < 0) {
         flb_debug("Could not convert message pack to events");
+        cw_flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    //TODO: should sort individual batches
-    // Also sort an array of pointers to this list, not the actual data
-    qsort(ctx->events, event_count, sizeof(struct event), compare_events);
+    /* TODO: should sort individual batches
+     * Also sort an array of pointers to this list, not the actual data
+     */
+    qsort(buf->events, event_count, sizeof(struct event), compare_events);
 
-    ret = send_in_batches(ctx, stream, event_count);
+    ret = send_in_batches(ctx, buf, stream, event_count);
     if (ret < 0) {
+        cw_flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
+    cw_flush_destroy(buf);
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
@@ -409,18 +413,6 @@ void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
                 mk_list_del(&stream->_head);
                 log_stream_destroy(stream);
             }
-        }
-
-        if (ctx->events) {
-            flb_free(ctx->events);
-        }
-
-        if (ctx->tmp_buf) {
-            flb_free(ctx->tmp_buf);
-        }
-
-        if (ctx->out_buf) {
-            flb_free(ctx->out_buf);
         }
     }
 }
