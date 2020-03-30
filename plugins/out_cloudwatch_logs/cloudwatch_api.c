@@ -84,7 +84,7 @@ static struct flb_aws_header put_log_events_header[] = {
  *
  * Return value is number of events created, or -1 on error.
  */
-int msg_pack_to_events(struct flb_cloudwatch *ctx, struct flush *buf,
+int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                        const char *data, size_t bytes)
 {
     size_t off = 0;
@@ -314,7 +314,7 @@ static inline int try_to_write(char *buf, int *off, size_t left,
 /*
  * Writes the "header" for a put log events payload
  */
-static int init_put_payload(struct flb_cloudwatch *ctx, struct flush *buf,
+static int init_put_payload(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                             struct log_stream *stream, int *offset)
 {
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
@@ -373,7 +373,7 @@ error:
 /*
  * Writes a log event to the output buffer
  */
-static int add_event(struct flb_cloudwatch *ctx, struct flush *buf,
+static int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                      struct event *event, int *offset)
 {
     char ts[50];
@@ -423,7 +423,7 @@ error:
 }
 
 /* Terminates a PutLogEvents payload */
-static int end_put_payload(struct flb_cloudwatch *ctx, struct flush *buf,
+static int end_put_payload(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                            int *offset)
 {
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
@@ -561,7 +561,7 @@ static void set_stream_time_span(struct log_stream *stream, struct event *event)
 /*
  * Send one batch to CW of 10,000 events or 1 MB
  */
-int send_one_batch(struct flb_cloudwatch *ctx, struct flush *buf,
+int send_one_batch(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                    struct log_stream *stream,
                    int first_event, int event_count)
 {
@@ -652,7 +652,7 @@ retry:
     return events_sent;
 }
 
-int send_in_batches(struct flb_cloudwatch *ctx, struct flush *buf,
+int send_in_batches(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                     struct log_stream *stream, int event_count)
 {
     int offset = 0;
@@ -827,7 +827,7 @@ int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream)
  * Returns -1 on failure, 0 on success, and 1 for a sequence token error,
  * which means the caller can retry.
  */
-int put_log_events(struct flb_cloudwatch *ctx, struct flush *buf,
+int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                    struct log_stream *stream, size_t payload_size)
 {
 
