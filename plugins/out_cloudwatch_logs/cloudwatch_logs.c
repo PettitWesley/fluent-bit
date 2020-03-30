@@ -282,18 +282,6 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     ctx->cw_client->upstream = upstream;
     ctx->cw_client->host = ctx->endpoint;
 
-    /*
-     * initialize out_buf
-     *
-     * TODO: should intelligently increase it's size as needed instead of
-     * initing to max payload value
-     */
-    ctx->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
-    if (!ctx->out_buf) {
-        flb_free(ctx);
-        return -1;
-    }
-    ctx->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -337,6 +325,15 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
+
+    /* TODO: should intelligently alloc based on needed memory */
+    buf->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    if (!ctx->out_buf) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+    buf->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
 
     /*
      *  1. Parse msgpack to events
