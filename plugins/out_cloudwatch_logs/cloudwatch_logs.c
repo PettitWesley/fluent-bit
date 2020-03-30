@@ -320,14 +320,14 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    buf = flb_malloc(sizeof(struct cw_flush));
+    buf = flb_calloc(1, sizeof(struct cw_flush));
     if (!buf) {
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     /* TODO: should intelligently alloc based on needed memory */
-    buf->out_buf = flb_calloc(1, sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    buf->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
     if (!buf->out_buf) {
         flb_errno();
         cw_flush_destroy(buf);
