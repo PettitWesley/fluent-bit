@@ -107,7 +107,8 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
      * 'size' is a safe estimate for the amount of memory needed
      * TODO: Need to re-alloc in loop if needed
      */
-    size = 3 * bytes + 100;
+    // size = 3 * bytes + 100;
+    size = 2 * bytes + 100;
     if (buf->tmp_buf == NULL) {
         flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
         buf->tmp_buf = flb_malloc(size);
