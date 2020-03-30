@@ -316,7 +316,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     int ret;
     int event_count;
     struct log_stream *stream = NULL;
-    struct flush *buf = NULL;
+    struct cw_flush *buf = NULL;
     (void) i_ins;
     (void) config;
 
@@ -332,7 +332,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    buf = flb_malloc(sizeof(struct flush));
+    buf = flb_malloc(sizeof(struct cw_flush));
     if (!buf) {
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_RETRY);
