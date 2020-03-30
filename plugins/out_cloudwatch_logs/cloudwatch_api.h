@@ -22,15 +22,22 @@
 #define FLB_OUT_CLOUDWATCH_API
 
 /*
- * The CloudWatch API documents that the maximum payload is 1,048,576 bytes
- * For reasons that are under investigation, using that number in this plugin
- * leads to API errors. No issues have been seen setting it to 1,000,000 bytes.
+ * The maximum batch size is 1,048,576 bytes, and this size is calculated
+ * as the sum of all event messages in UTF-8, plus 26 bytes for each log event.
  */
-#define PUT_LOG_EVENTS_PAYLOAD_SIZE    1000000
-#define MAX_EVENTS_PER_PUT             10000
+#define PUT_LOG_EVENTS_BATCH_SIZE    1048576
+#define MAX_EVENTS_PER_PUT           10000
 
+/*
+ * Number of characters needed to 'start' a PutLogEvents payload
+ * This does not include the number of bytes needed for the group, stream,
+ * and sequence token.
+ */
+#define PUT_LOG_EVENTS_HEADER_LEN     68
 /* number of characters needed to 'end' a PutLogEvents payload */
-#define PUT_LOG_EVENTS_FOOTER_LEN      4
+#define PUT_LOG_EVENTS_FOOTER_LEN     4
+/* number of bytes needed to write an event, not including the event itself */
+#define PUT_LOG_EVENTS_EVENT_LEN      
 
 #include "cloudwatch_logs.h"
 

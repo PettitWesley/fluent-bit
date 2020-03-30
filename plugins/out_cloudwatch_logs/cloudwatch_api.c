@@ -79,16 +79,15 @@ static struct flb_aws_header put_log_events_header[] = {
 };
 
 /*
- * Parses all incoming msgpack records to events and stores them in the ctx
- * events pointer. Uses the ctx tmp_buf to store the JSON strings.
- *
- * Return value is number of events created, or -1 on error.
+ * Parses all incoming msgpack records to events and stores them in the buf
+ * events pointer. Uses the buf tmp_buf to store the JSON strings.
  */
 int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                        const char *data, size_t bytes)
 {
     size_t off = 0;
     size_t size;
+    int events_size;
     int new_len;
     int i = 0;
     size_t tmp_buf_offset = 0;
@@ -104,42 +103,34 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
 
     /*
      * tmp_buf needs to hold a json representation of the msgpack
-     * 'size' is a safe estimate for the amount of memory needed
-     * TODO: Need to re-alloc in loop if needed
+     * this can never be more than the max payload size
+     * TODO: make this more intelligent, it can often be smaller
      */
-    size = 3 * bytes + 100;
-    if (buf->tmp_buf == NULL) {
-        flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
-        buf->tmp_buf = flb_malloc(size);
-        if (!buf->tmp_buf) {
-            flb_errno();
-            return -1;
-        }
-        buf->tmp_buf_size = size;
+    /*size = 3 * bytes + 100; */
+    size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
+    buf->tmp_buf = flb_malloc(size);
+    if (!buf->tmp_buf) {
+        flb_errno();
+        return -1;
     }
-    else if (buf->tmp_buf_size < size) {
-        flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
-        if (buf->tmp_buf) {
-            flb_free(buf->tmp_buf);
-            buf->tmp_buf = NULL;
-        }
-        buf->tmp_buf = flb_malloc(size);
-        if (!buf->tmp_buf) {
-            flb_errno();
-            return -1;
-        }
-        buf->tmp_buf_size = size;
-    }
+    buf->tmp_buf_size = size;
 
-    /* initialize events if needed */
-    if (buf->events == NULL) {
-        buf->events = flb_malloc(sizeof(struct event) * 1000);
-        if (!buf->events) {
-            flb_errno();
-            return -1;
-        }
-        buf->events_capacity = 1000;
+
+    /*
+     * We don't know how many events will end up in a single put. Heuristic is
+     * to make the size partly based on the size of the incoming msgpack.
+     * It can be re-alloc'd in the loop if needed.
+     */
+    events_size = 5000;
+    if ((2 * bytes) > PUT_LOG_EVENTS_PAYLOAD_SIZE) {
+        events_size = MAX_EVENTS_PER_PUT;
     }
+    buf->events = flb_malloc(sizeof(struct event) * events_size);
+    if (!buf->events) {
+        flb_errno();
+        return -1;
+    }
+    buf->events_capacity = events_size;
 
     /* unpack msgpack */
 
@@ -161,9 +152,20 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         map = root.via.array.ptr[1];
         map_size = map.via.map.size;
 
+        if (i == MAX_EVENTS_PER_PUT) {
+            /* time to send */
+            //TODO: send one batch
+            i = 0;
+            tmp_buf_offset = 0;
+            tmp_buf_ptr = buf->tmp_buf
+        }
+
         /* re-alloc event buffer if needed */
         if (i >= buf->events_capacity) {
             new_len = buf->events_capacity * 2;
+            if (new_len > MAX_EVENTS_PER_PUT) {
+                new_len = MAX_EVENTS_PER_PUT;
+            }
             size = sizeof(struct event) * new_len;
             flb_plg_debug(ctx->ins, "Increasing event buffer to %d", new_len);
             buf->events = flb_realloc(buf->events, size);
@@ -173,8 +175,6 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
             }
             buf->events_capacity = new_len;
         }
-
-        /* re-alloc tmp_buf if needed */
 
         // TODO: make log key a separate function
         if (ctx->log_key) {
