@@ -328,7 +328,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
 
     /* TODO: should intelligently alloc based on needed memory */
     buf->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
-    if (!ctx->out_buf) {
+    if (!buf->out_buf) {
         flb_errno();
         cw_flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
