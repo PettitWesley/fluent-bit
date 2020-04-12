@@ -24,6 +24,7 @@
 #include <fluent-bit/flb_slist.h>
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
+#include <fluent-bit/flb_macros.h>
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_output_plugin.h>
 
@@ -46,8 +47,8 @@
 #define ERR_CODE_ALREADY_EXISTS         "ResourceAlreadyExistsException"
 #define ERR_CODE_INVALID_SEQUENCE_TOKEN "InvalidSequenceTokenException"
 
-#define ONE_DAY_IN_MILLISECONDS        86400000
-#define FOUR_HOURS_IN_SECONDS              14400
+#define ONE_DAY_IN_MILLISECONDS          86400000
+#define FOUR_HOURS_IN_SECONDS            14400
 
 static struct flb_aws_header create_group_header = {
     .key = "X-Amz-Target",
@@ -79,68 +80,97 @@ static struct flb_aws_header put_log_events_header[] = {
 };
 
 /*
- * Parses all incoming msgpack records to events and stores them in the ctx
- * events pointer. Uses the ctx tmp_buf to store the JSON strings.
- *
- * Return value is number of events created, or -1 on error.
+ * Processes the msgpack object
+ * Returns 0 on success, -1 on general errors,
+ * and 1 if we ran out of space to write the event
+ * which means a send must occur
  */
-int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
-                       const char *data, size_t bytes)
+int process_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+                  const msgpack_object *obj, struct flb_time *tms)
+{
+    size_t written;
+    size_t size;
+    int offset = 0;
+
+    /* set tmp_buf_ptr before using it */
+    buf->tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
+    written = flb_msgpack_to_json(buf->tmp_buf_ptr,
+                                  buf->tmp_buf_size - buf->tmp_buf_offset,
+                                  obj);
+    if (written < 0) {
+        /*
+         * negative value means failure to write to buffer,
+         * which means we ran out of space, and must send the logs
+         */
+        return 1;
+    }
+    /* Discard empty messages (written == 2 means '""') */
+    if (written <= 2) {
+        flb_plg_debug(ctx->ins, "Found empty log message");
+        return 0;
+    }
+
+    /* the json string must be escaped, unless the log_key option is used */
+    if (ctx->log_key == NULL) {
+        /*
+         * check if event_buf is initialized and big enough
+         * If all chars need to be hex encoded (impossible), 6x space would be
+         * needed
+         */
+        size = written * 6;
+        if (buf->event_buf == NULL || buf->event_buf_size < size) {
+            flb_free(buf->event_buf);
+            buf->event_buf = flb_malloc(size);
+            buf->event_buf_size = size
+            if (buf->event_buf == NULL) {
+                flb_errno();
+                return -1;
+            }
+        }
+        if (!flb_utils_write_str(buf->event_buf, offset, size,
+                                 buf->tmp_buf_ptr, written)) {
+            return 1;
+        }
+        written = offset;
+    }
+
+    buf->tmp_buf_offset += written;
+    event = &buf->events[buf->event_index];
+    event->json = buf->tmp_buf_ptr;
+    event->len = written;
+    event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
+                                             tms.tm.tv_nsec/1000000);
+    buf->event_index++;
+
+}
+
+/*
+ * Processes the msgpack object, sends the current batch if needed
+ * Returns FLB_OK, FLB_RETRY, or FLB_ERROR
+ */
+int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+              const msgpack_object *obj, struct flb_time *tms)
+{
+
+
+}
+
+/*
+ * Main routine- processes msgpack and sends in batches
+ */
+int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+                     struct log_stream *stream,
+                     const char *data, size_t bytes)
 {
     size_t off = 0;
     size_t size;
     int new_len;
     int i = 0;
-    size_t tmp_buf_offset = 0;
-    size_t written;
     size_t map_size;
-    char *tmp_buf_ptr = NULL;
-    struct flb_time tms;
     msgpack_unpacked result;
     msgpack_object  *obj;
     msgpack_object  map;
     msgpack_object root;
-    struct event *event;
-
-    /*
-     * tmp_buf needs to hold a json representation of the msgpack
-     * 'size' is a safe estimate for the amount of memory needed
-     * TODO: Need to re-alloc in loop if needed
-     */
-    // size = 3 * bytes + 100;
-    size = 2 * bytes + 100;
-    if (buf->tmp_buf == NULL) {
-        flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
-        buf->tmp_buf = flb_malloc(size);
-        if (!buf->tmp_buf) {
-            flb_errno();
-            return -1;
-        }
-        buf->tmp_buf_size = size;
-    }
-    else if (buf->tmp_buf_size < size) {
-        flb_plg_debug(ctx->ins, "Increasing tmp_buf to %zu", size);
-        if (buf->tmp_buf) {
-            flb_free(buf->tmp_buf);
-            buf->tmp_buf = NULL;
-        }
-        buf->tmp_buf = flb_malloc(size);
-        if (!buf->tmp_buf) {
-            flb_errno();
-            return -1;
-        }
-        buf->tmp_buf_size = size;
-    }
-
-    /* initialize events if needed */
-    if (buf->events == NULL) {
-        buf->events = flb_malloc(sizeof(struct event) * 5000);
-        if (!buf->events) {
-            flb_errno();
-            return -1;
-        }
-        buf->events_capacity = 5000;
-    }
 
     /* unpack msgpack */
 
@@ -175,7 +205,6 @@ int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
             buf->events_capacity = new_len;
         }
 
-        /* re-alloc tmp_buf if needed */
 
         // TODO: make log key a separate function
         if (ctx->log_key) {
@@ -398,18 +427,9 @@ static int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         goto error;
     }
 
-    if (ctx->log_key != NULL) {
-        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                          event->json, event->len)) {
-            goto error;
-        }
-    }
-    else {
-        /* flb_utils_write_str will escape the JSON in event->json */
-        if (!flb_utils_write_str(buf->out_buf, offset, buf->out_buf_size,
-                                 event->json, event->len)) {
-            goto error;
-        }
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      event->json, event->len)) {
+        goto error;
     }
 
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
@@ -932,6 +952,7 @@ void cw_flush_destroy(struct cw_flush *buf)
         flb_free(buf->tmp_buf);
         flb_free(buf->out_buf);
         flb_free(buf->events);
+        flb_free(buf->event_buf);
         flb_free(buf);
     }
 }

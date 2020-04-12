@@ -39,18 +39,30 @@ struct cw_flush {
     /* temporary buffer for storing the serialized event messages */
     char *tmp_buf;
     size_t tmp_buf_size;
+    /* current index of tmp_buf */
+    size_t tmp_buf_offset;
+
     /* log events- each of these has a pointer to their message in tmp_buf */
     struct event *events;
     int events_capacity;
+    /* current event */
+    int event_index;
+
     /* the payload of the API request */
     char *out_buf;
     size_t out_buf_size;
+
+    /* buffer used to temporarily hold an event during processing */
+    char *event_buf;
+    size_t event_buf_size;
 };
 
 void cw_flush_destroy(struct cw_flush *buf);
 
-int msg_pack_to_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
-                       const char *data, size_t bytes);
+int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+                     struct log_stream *stream,
+                     const char *data, size_t bytes);
+// replace/remove
 int send_in_batches(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                     struct log_stream *stream, int event_count);
 int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream);
@@ -61,5 +73,9 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                    size_t payload_size);
 int create_log_group(struct flb_cloudwatch *ctx);
 int compare_events(const void *a_arg, const void *b_arg);
+
+
+int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+               const msgpack_object *obj, struct flb_time *tms);
 
 #endif
