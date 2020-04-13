@@ -122,12 +122,13 @@ int process_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         if (buf->event_buf == NULL || buf->event_buf_size < size) {
             flb_free(buf->event_buf);
             buf->event_buf = flb_malloc(size);
-            buf->event_buf_size = size
+            buf->event_buf_size = size;
             if (buf->event_buf == NULL) {
                 flb_errno();
                 return -1;
             }
         }
+        offset = 0;
         if (!flb_utils_write_str(buf->event_buf, offset, size,
                                  tmp_buf_ptr, written)) {
             return -1;
