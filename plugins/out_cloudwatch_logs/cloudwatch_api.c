@@ -460,7 +460,7 @@ int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         buf->events = flb_realloc(buf->events, size);
         if (!buf->events) {
             flb_errno();
-            goto error;
+            return -1;
         }
         buf->events_capacity = new_len;
     }
