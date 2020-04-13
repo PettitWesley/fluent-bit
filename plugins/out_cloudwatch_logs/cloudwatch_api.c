@@ -176,6 +176,8 @@ static int write_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
 {
     char ts[50];
 
+    printf("debug: event: %s\nlen: %d\n", event->json, event->len);
+
     if (!sprintf(ts, "%llu", event->timestamp)) {
         goto error;
     }
