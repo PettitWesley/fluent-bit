@@ -388,7 +388,7 @@ int send_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
 
     for (i = 0; i < buf->event_index; i++) {
         event = &buf->events[i];
-        printf("Before sort: event->json: %.*s\n", event->len, event->json);
+        //printf("Before sort: event->json: %.*s\n", event->len, event->json);
     }
 
     /* events must be sorted by timestamp in a put payload */
