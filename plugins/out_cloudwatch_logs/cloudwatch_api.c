@@ -224,6 +224,47 @@ static int end_put_payload(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     return 0;
 }
 
+static unsigned long long stream_time_span(struct log_stream *stream,
+                                           struct event *event)
+{
+    if (stream->oldest_event == 0 || stream->newest_event == 0) {
+        return 0;
+    }
+
+    if (stream->oldest_event > event->timestamp) {
+        return stream->newest_event - event->timestamp;
+    } else if (stream->newest_event < event->timestamp) {
+        return event->timestamp - stream->oldest_event;
+    }
+
+    return stream->newest_event - stream->oldest_event;
+}
+
+/* returns FLB_TRUE if time span is less than 24 hours, FLB_FALSE if greater */
+static int check_stream_time_span(struct log_stream *stream,
+                                  struct event *event)
+{
+    unsigned long long span = stream_time_span(stream, event);
+
+    if (span < ONE_DAY_IN_MILLISECONDS) {
+        return FLB_TRUE;
+    }
+
+    return FLB_FALSE;
+}
+
+/* sets the oldest_event and newest_event fields */
+static void set_stream_time_span(struct log_stream *stream, struct event *event)
+{
+    if (stream->oldest_event == 0 || stream->oldest_event > event->timestamp) {
+        stream->oldest_event = event->timestamp;
+    }
+
+    if (stream->newest_event == 0 || stream->newest_event < event->timestamp) {
+        stream->newest_event = event->timestamp;
+    }
+}
+
 
 /*
  * Processes the msgpack object
@@ -322,7 +363,7 @@ int process_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
 }
 
 /* Resets or inits a cw_flush struct */
-int reset_flush_buf(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+void reset_flush_buf(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                     struct log_stream *stream) {
     buf->event_index = 0;
     buf->tmp_buf_offset = 0;
@@ -401,6 +442,8 @@ int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
 {
     int ret;
     struct event *event;
+    int new_len;
+    size_t size;
     int retry_add = FLB_FALSE;
     int event_bytes = 0;
 
@@ -484,7 +527,6 @@ int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                      const char *data, size_t bytes)
 {
     size_t off = 0;
-    size_t size;
     int i = 0;
     size_t map_size;
     msgpack_unpacked result;
@@ -661,47 +703,6 @@ struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
     }
 
      return get_dynamic_log_stream(ctx, tag, tag_len);
-}
-
-static unsigned long long stream_time_span(struct log_stream *stream,
-                                           struct event *event)
-{
-    if (stream->oldest_event == 0 || stream->newest_event == 0) {
-        return 0;
-    }
-
-    if (stream->oldest_event > event->timestamp) {
-        return stream->newest_event - event->timestamp;
-    } else if (stream->newest_event < event->timestamp) {
-        return event->timestamp - stream->oldest_event;
-    }
-
-    return stream->newest_event - stream->oldest_event;
-}
-
-/* returns FLB_TRUE if time span is less than 24 hours, FLB_FALSE if greater */
-static int check_stream_time_span(struct log_stream *stream,
-                                  struct event *event)
-{
-    unsigned long long span = stream_time_span(stream, event);
-
-    if (span < ONE_DAY_IN_MILLISECONDS) {
-        return FLB_TRUE;
-    }
-
-    return FLB_FALSE;
-}
-
-/* sets the oldest_event and newest_event fields */
-static void set_stream_time_span(struct log_stream *stream, struct event *event)
-{
-    if (stream->oldest_event == 0 || stream->oldest_event > event->timestamp) {
-        stream->oldest_event = event->timestamp;
-    }
-
-    if (stream->newest_event == 0 || stream->newest_event < event->timestamp) {
-        stream->newest_event = event->timestamp;
-    }
 }
 
 /*
