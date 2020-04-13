@@ -79,6 +79,152 @@ static struct flb_aws_header put_log_events_header[] = {
     },
 };
 
+int compare_events(const void *a_arg, const void *b_arg)
+{
+    struct event *r_a = (struct event *) a_arg;
+    struct event *r_b = (struct event *) b_arg;
+
+    if (r_a->timestamp < r_b->timestamp) {
+        return -1;
+    }
+    else if (r_a->timestamp == r_b->timestamp) {
+        return 0;
+    }
+    else {
+        return 1;
+    }
+}
+
+static inline int try_to_write(char *buf, int *off, size_t left,
+                               const char *str, size_t str_len)
+{
+    if (str_len <= 0){
+        str_len = strlen(str);
+    }
+    if (left <= *off+str_len) {
+        return FLB_FALSE;
+    }
+    memcpy(buf+*off, str, str_len);
+    *off += str_len;
+    return FLB_TRUE;
+}
+
+/*
+ * Writes the "header" for a put log events payload
+ */
+static int init_put_payload(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+                            struct log_stream *stream, int *offset)
+{
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      "{\"logGroupName\":\"", 17)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      ctx->log_group, 0)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      "\",\"logStreamName\":\"", 19)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      stream->name, 0)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      "\",", 2)) {
+        goto error;
+    }
+
+    if (stream->sequence_token) {
+        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                          "\"sequenceToken\":\"", 17)) {
+            goto error;
+        }
+
+        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                          stream->sequence_token, 0)) {
+            goto error;
+        }
+
+        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                          "\",", 2)) {
+            goto error;
+        }
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      "\"logEvents\":[", 13)) {
+        goto error;
+    }
+
+    return 0;
+
+error:
+    return -1;
+}
+
+/*
+ * Writes a log event to the output buffer
+ */
+static int write_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+                       struct event *event, int *offset)
+{
+    char ts[50];
+
+    if (!sprintf(ts, "%llu", event->timestamp)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      "{\"timestamp\":", 13)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      ts, 0)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      ",\"message\":\"", 12)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      event->json, event->len)) {
+        goto error;
+    }
+
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      "\"}", 2)) {
+        goto error;
+    }
+
+    return 0;
+
+error:
+    return -1;
+}
+
+/* Terminates a PutLogEvents payload */
+static int end_put_payload(struct flb_cloudwatch *ctx, struct cw_flush *buf,
+                           int *offset)
+{
+    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
+                      "]}", 2)) {
+        return -1;
+    }
+    buf->out_buf[*offset] = '\0';
+
+    return 0;
+}
+
+
 /*
  * Processes the msgpack object
  * Returns 0 on success, -1 on general errors,
@@ -129,7 +275,7 @@ int process_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
             }
         }
         offset = 0;
-        if (!flb_utils_write_str(buf->event_buf, offset, size,
+        if (!flb_utils_write_str(buf->event_buf, &offset, size,
                                  tmp_buf_ptr, written)) {
             return -1;
         }
@@ -434,150 +580,6 @@ error:
     return -1;
 }
 
-int compare_events(const void *a_arg, const void *b_arg)
-{
-    struct event *r_a = (struct event *) a_arg;
-    struct event *r_b = (struct event *) b_arg;
-
-    if (r_a->timestamp < r_b->timestamp) {
-        return -1;
-    }
-    else if (r_a->timestamp == r_b->timestamp) {
-        return 0;
-    }
-    else {
-        return 1;
-    }
-}
-
-static inline int try_to_write(char *buf, int *off, size_t left,
-                               const char *str, size_t str_len)
-{
-    if (str_len <= 0){
-        str_len = strlen(str);
-    }
-    if (left <= *off+str_len) {
-        return FLB_FALSE;
-    }
-    memcpy(buf+*off, str, str_len);
-    *off += str_len;
-    return FLB_TRUE;
-}
-
-/*
- * Writes the "header" for a put log events payload
- */
-static int init_put_payload(struct flb_cloudwatch *ctx, struct cw_flush *buf,
-                            struct log_stream *stream, int *offset)
-{
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      "{\"logGroupName\":\"", 17)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      ctx->log_group, 0)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      "\",\"logStreamName\":\"", 19)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      stream->name, 0)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      "\",", 2)) {
-        goto error;
-    }
-
-    if (stream->sequence_token) {
-        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                          "\"sequenceToken\":\"", 17)) {
-            goto error;
-        }
-
-        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                          stream->sequence_token, 0)) {
-            goto error;
-        }
-
-        if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                          "\",", 2)) {
-            goto error;
-        }
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      "\"logEvents\":[", 13)) {
-        goto error;
-    }
-
-    return 0;
-
-error:
-    return -1;
-}
-
-/*
- * Writes a log event to the output buffer
- */
-static int write_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
-                       struct event *event, int *offset)
-{
-    char ts[50];
-
-    if (!sprintf(ts, "%llu", event->timestamp)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      "{\"timestamp\":", 13)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      ts, 0)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      ",\"message\":\"", 12)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      event->json, event->len)) {
-        goto error;
-    }
-
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      "\"}", 2)) {
-        goto error;
-    }
-
-    return 0;
-
-error:
-    return -1;
-}
-
-/* Terminates a PutLogEvents payload */
-static int end_put_payload(struct flb_cloudwatch *ctx, struct cw_flush *buf,
-                           int *offset)
-{
-    if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      "]}", 2)) {
-        return -1;
-    }
-    buf->out_buf[*offset] = '\0';
-
-    return 0;
-}
 
 struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
                                           const char *tag, int tag_len)
