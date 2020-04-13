@@ -29,6 +29,10 @@
 #define PUT_LOG_EVENTS_PAYLOAD_SIZE    1000000
 #define MAX_EVENTS_PER_PUT             10000
 
+/* number of characters needed to 'start' a PutLogEvents payload */
+#define PUT_LOG_EVENTS_HEADER_LEN      72
+/* number of characters needed per event in a PutLogEvents payload */
+#define PUT_LOG_EVENTS_PER_EVENT_LEN   42
 /* number of characters needed to 'end' a PutLogEvents payload */
 #define PUT_LOG_EVENTS_FOOTER_LEN      4
 
@@ -41,6 +45,9 @@ struct cw_flush {
     size_t tmp_buf_size;
     /* current index of tmp_buf */
     size_t tmp_buf_offset;
+
+    /* projected final size of the payload for this flush */
+    size_t data_size;
 
     /* log events- each of these has a pointer to their message in tmp_buf */
     struct event *events;
@@ -73,9 +80,5 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                    size_t payload_size);
 int create_log_group(struct flb_cloudwatch *ctx);
 int compare_events(const void *a_arg, const void *b_arg);
-
-
-int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
-               const msgpack_object *obj, struct flb_time *tms);
 
 #endif
