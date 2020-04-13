@@ -196,6 +196,9 @@ int send_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     int i;
     struct event *event;
 
+    /* events must be sorted by timestamp in a put payload */
+    qsort(buf->events, buf->event_index, sizeof(struct event), compare_events);
+
 retry:
     stream->newest_event = 0;
     stream->oldest_event = 0;
@@ -244,7 +247,6 @@ retry:
 
 /*
  * Processes the msgpack object, sends the current batch if needed
- * Returns FLB_OK, FLB_RETRY, or FLB_ERROR
  */
 int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
               struct log_stream *stream,
@@ -260,10 +262,23 @@ int add_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         reset_flush_buf(ctx, buf, stream);
     }
 
+    /* re-alloc event buffer if needed */
+    if ((buf->event_index + 1) >= buf->events_capacity) {
+        new_len = MAX_EVENTS_PER_PUT;
+        size = sizeof(struct event) * new_len;
+        flb_plg_debug(ctx->ins, "Increasing event buffer to %d", new_len);
+        buf->events = flb_realloc(buf->events, size);
+        if (!buf->events) {
+            flb_errno();
+            goto error;
+        }
+        buf->events_capacity = new_len;
+    }
+
 retry_add_event:
     ret = process_event(ctx, buf, obj, tms);
     if (ret < 0) {
-        return FLB_RETRY;
+        return -1;
     } else if (ret > 0) {
         /* send logs and then retry the add */
         buf->event_index--;
@@ -292,16 +307,18 @@ retry_add_event:
         goto send;
     }
 
-    /* send is not needed yet, return to caller */ 
+    /* send is not needed yet, return to caller */
     buf->data_size += event_bytes;
     set_stream_time_span(stream, event);
+    buf->event_index++;
 
-    return FLB_OK;
+    return 0;
 
 send:
     ret = send_log_events(ctx, buf, stream);
+    reset_flush_buf(ctx, buf, stream);
     if (ret < 0) {
-        return FLB_RETRY;
+        return -1;
     }
 
     if (retry_add == FLB_TRUE) {
@@ -313,6 +330,7 @@ send:
 
 /*
  * Main routine- processes msgpack and sends in batches
+ * return value is the number of events processed
  */
 int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                      struct log_stream *stream,
@@ -320,13 +338,22 @@ int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
 {
     size_t off = 0;
     size_t size;
-    int new_len;
     int i = 0;
     size_t map_size;
     msgpack_unpacked result;
     msgpack_object  *obj;
     msgpack_object  map;
     msgpack_object root;
+    msgpack_object_kv *kv;
+    msgpack_object  key;
+    msgpack_object  val;
+    char *key_str = NULL;
+    size_t key_str_size = 0;
+    int j;
+    int ret;
+    int check = FLB_FALSE;
+    int found = FLB_FALSE;
+    struct flb_time tms;
 
     /* unpack msgpack */
     msgpack_unpacked_init(&result);
@@ -347,30 +374,11 @@ int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         map = root.via.array.ptr[1];
         map_size = map.via.map.size;
 
-        /* re-alloc event buffer if needed */
-        if (i >= buf->events_capacity) {
-            new_len = buf->events_capacity * 2;
-            size = sizeof(struct event) * new_len;
-            flb_plg_debug(ctx->ins, "Increasing event buffer to %d", new_len);
-            buf->events = flb_realloc(buf->events, size);
-            if (!buf->events) {
-                flb_errno();
-                goto error;
-            }
-            buf->events_capacity = new_len;
-        }
-
-
-        // TODO: make log key a separate function
         if (ctx->log_key) {
-            msgpack_object_kv *kv;
-            msgpack_object  key;
-            msgpack_object  val;
-            char *key_str = NULL;
-            size_t key_str_size = 0;
-            int j;
-            int check = FLB_FALSE;
-            int found = FLB_FALSE;
+            key_str = NULL;
+            key_str_size = 0;
+            check = FLB_FALSE;
+            found = FLB_FALSE;
 
             kv = map.via.map.ptr;
 
@@ -391,34 +399,10 @@ int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                     if (strncmp(ctx->log_key, key_str, key_str_size) == 0) {
                         found = FLB_TRUE;
                         val = (kv+j)->val;
-                        /* set tmp_buf_ptr before using it */
-                        tmp_buf_ptr = buf->tmp_buf + tmp_buf_offset;
-                        written = flb_msgpack_to_json(tmp_buf_ptr,
-                                                      buf->tmp_buf_size - tmp_buf_offset,
-                                                      &val);
-                        if (written < 0) {
-                            flb_plg_error(ctx->ins, "Failed to convert msgpack value to JSON");
+                        ret = add_event(ctx, buf, stream, &val, &tms);
+                        if (ret < 0 ) {
                             goto error;
                         }
-                        /* Discard empty messages (written == 2 means '""') */
-                        if (written <= 2) {
-                            flb_plg_debug(ctx->ins, "Found empty log message");
-                            continue;
-                        }
-                        /*
-                         * flb_msgpack_to_json will encase the value in quotes
-                         * We don't want that for log_key, so we remove the first
-                         * and last character
-                         */
-                        written--;
-                        tmp_buf_ptr++;
-                        tmp_buf_offset += written;
-                        event = &buf->events[i];
-                        event->json = tmp_buf_ptr;
-                        event->len = written - 1;
-                        event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
-                                                                 tms.tm.tv_nsec/1000000);
-
                     }
                 }
 
@@ -433,27 +417,10 @@ int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
             continue;
         }
 
-        /* set tmp_buf_ptr before using it */
-        tmp_buf_ptr = buf->tmp_buf + tmp_buf_offset;
-        written = flb_msgpack_to_json(tmp_buf_ptr,
-                                      buf->tmp_buf_size - tmp_buf_offset,
-                                      &map);
-        if (written < 0) {
-            flb_plg_error(ctx->ins, "Failed to convert msgpack record to JSON");
+        ret = add_event(ctx, buf, stream, &map, &tms);
+        if (ret < 0 ) {
             goto error;
         }
-        /* Discard empty messages (written == 2 means '""') */
-        if (written <= 2) {
-            flb_plg_debug(ctx->ins, "Found empty log message");
-            continue;
-        }
-        tmp_buf_offset += written;
-        event = &buf->events[i];
-        event->json = tmp_buf_ptr;
-        event->len = written;
-        event->timestamp = (unsigned long long) (tms.tm.tv_sec * 1000 +
-                                                 tms.tm.tv_nsec/1000000);
-
         i++;
     }
     msgpack_unpacked_destroy(&result);

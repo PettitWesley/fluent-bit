@@ -69,9 +69,6 @@ void cw_flush_destroy(struct cw_flush *buf);
 int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                      struct log_stream *stream,
                      const char *data, size_t bytes);
-// replace/remove
-int send_in_batches(struct flb_cloudwatch *ctx, struct cw_flush *buf,
-                    struct log_stream *stream, int event_count);
 int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream);
 struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
                                   const char *tag, int tag_len);

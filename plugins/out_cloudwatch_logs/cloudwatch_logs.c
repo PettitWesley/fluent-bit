@@ -343,33 +343,17 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     }
     buf->tmp_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
 
-    buf->events = flb_malloc(sizeof(struct event) * 5000);
+    buf->events = flb_malloc(sizeof(struct event) * 1000);
     if (!buf->events) {
         flb_errno();
         cw_flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
-    buf->events_capacity = 5000;
+    buf->events_capacity = 1000;
 
-    /*
-     *  1. Parse msgpack to events
-     *  2. Sort events on timestamp
-     *  3. Send to CW in batches
-     */
-    event_count = msg_pack_to_events(ctx, buf, data, bytes);
+    event_count = process_and_send(ctx, buf, stream, data, bytes);
     if (event_count < 0) {
-        flb_debug("Could not convert message pack to events");
-        cw_flush_destroy(buf);
-        FLB_OUTPUT_RETURN(FLB_RETRY);
-    }
-
-    /* TODO: should sort individual batches
-     * Also sort an array of pointers to this list, not the actual data
-     */
-    qsort(buf->events, event_count, sizeof(struct event), compare_events);
-
-    ret = send_in_batches(ctx, buf, stream, event_count);
-    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Failed to send events");
         cw_flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
