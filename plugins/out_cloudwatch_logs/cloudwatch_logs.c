@@ -413,6 +413,7 @@ void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
                 log_stream_destroy(stream);
             }
         }
+        flb_free(ctx);
     }
 }
 
