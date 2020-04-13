@@ -343,7 +343,6 @@ int process_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         event->len = written;
         event->timestamp = (unsigned long long) (tms->tm.tv_sec * 1000 +
                                                  tms->tm.tv_nsec/1000000);
-        buf->event_index++;
 
     } else {
         /*
@@ -360,7 +359,6 @@ int process_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         event->len = written - 1;
         event->timestamp = (unsigned long long) (tms->tm.tv_sec * 1000 +
                                                  tms->tm.tv_nsec/1000000);
-        buf->event_index++;
     }
 
     return 0;
