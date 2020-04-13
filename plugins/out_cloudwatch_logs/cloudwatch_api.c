@@ -176,7 +176,7 @@ static int write_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
 {
     char ts[50];
 
-    printf("debug: event: %s\nlen: %d\n", event->json, event->len);
+    // printf("debug: event: %s\nlen: %d\n", event->json, event->len);
 
     if (!sprintf(ts, "%llu", event->timestamp)) {
         goto error;
@@ -300,7 +300,7 @@ int process_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         return 0;
     }
 
-    printf("debug: written: %d, tmp_buf_ptr: %.*s\n", written, written, tmp_buf_ptr);
+    // printf("debug: written: %d, tmp_buf_ptr: %.*s\n", written, written, tmp_buf_ptr);
 
     /* the json string must be escaped, unless the log_key option is used */
     if (ctx->log_key == NULL) {
@@ -407,7 +407,7 @@ retry:
 
     for (i = 0; i < buf->event_index; i++) {
         event = &buf->events[i];
-        printf("debug: i: %d\n", i);
+        // printf("debug: i: %d\n", i);
         ret = write_event(ctx, buf, event, &offset);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Failed to write log event %d to "
@@ -479,7 +479,7 @@ retry_add_event:
         return -1;
     } else if (ret > 0) {
         /* send logs and then retry the add */
-        printf("debug: sending because write failure\n");
+        // printf("debug: sending because write failure\n");
         buf->event_index--;
         retry_add = FLB_TRUE;
         goto send;
@@ -492,7 +492,7 @@ retry_add_event:
         /* do not send this event */
         buf->event_index--;
         retry_add = FLB_TRUE;
-        printf("debug: sending because time span\n");
+        // printf("debug: sending because time span\n");
         goto send;
     }
 
@@ -500,12 +500,12 @@ retry_add_event:
         /* do not send this event */
         buf->event_index--;
         retry_add = FLB_TRUE;
-        printf("debug: sending because payload size\n");
+        // printf("debug: sending because payload size\n");
         goto send;
     }
 
     if (buf->event_index == MAX_EVENTS_PER_PUT) {
-        printf("debug: sending because max events\n");
+        // printf("debug: sending because max events\n");
         goto send;
     }
 
