@@ -689,7 +689,7 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
     new_stream->expiration = time(NULL) + FOUR_HOURS_IN_SECONDS;
 
     /* init stream mutex */
-    if (pthread_mutex_init(new_stream->lock, NULL) != 0) {
+    if (pthread_mutex_init(&new_stream->lock, NULL) != 0) {
         flb_plg_debug(ctx->ins, "Stream mutex init failed");
         return NULL;
     }
@@ -713,7 +713,7 @@ struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
             }
 
             /* init stream mutex */
-            if (pthread_mutex_init(stream->lock, NULL) != 0) {
+            if (pthread_mutex_init(&stream->lock, NULL) != 0) {
                 flb_plg_debug(ctx->ins, "Stream mutex init failed");
                 return NULL;
             }
