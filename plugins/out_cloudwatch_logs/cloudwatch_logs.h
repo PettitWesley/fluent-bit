@@ -27,7 +27,6 @@
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
-#include <pthread.h>
 
 struct event {
     char *json;
@@ -52,13 +51,6 @@ struct log_stream {
      */
     unsigned long long oldest_event;
     unsigned long long newest_event;
-
-    /*
-     * Concurrent writes to a single log stream will not work because
-     * of the sequence token (I really wish they would remove that
-     * from the API...)
-     */
-    pthread_mutex_t lock;
 
     struct mk_list _head;
 };
