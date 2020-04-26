@@ -329,9 +329,14 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
+    /* lock stream */
+    flb_plg_debug(ctx->ins, "Attempting to acquire lock, %s", session_id);
+    pthread_mutex_lock(&stream->lock);
+
     buf = flb_calloc(1, sizeof(struct cw_flush));
     if (!buf) {
         flb_errno();
+        pthread_mutex_unlock(&stream->lock);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
@@ -342,6 +347,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     if (!buf->out_buf) {
         flb_errno();
         cw_flush_destroy(buf);
+        pthread_mutex_unlock(&stream->lock);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
     buf->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
@@ -350,6 +356,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     if (!buf->tmp_buf) {
         flb_errno();
         cw_flush_destroy(buf);
+        pthread_mutex_unlock(&stream->lock);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
     buf->tmp_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
@@ -358,6 +365,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     if (!buf->events) {
         flb_errno();
         cw_flush_destroy(buf);
+        pthread_mutex_unlock(&stream->lock);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
     buf->events_capacity = 1000;
@@ -366,12 +374,14 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send events");
         cw_flush_destroy(buf);
+        pthread_mutex_unlock(&stream->lock);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     flb_plg_info(ctx->ins, "Sent %d events to CloudWatch, %s", event_count, session_id);
 
     cw_flush_destroy(buf);
+    pthread_mutex_unlock(&stream->lock);
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
