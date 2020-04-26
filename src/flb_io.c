@@ -446,6 +446,7 @@ int flb_io_net_write(struct flb_upstream_conn *u_conn, const void *data,
     }
 #ifdef FLB_HAVE_TLS
     else if (u->flags & FLB_IO_TLS) {
+        flb_debug("calling flb_io_tls_net_write()");
         ret = flb_io_tls_net_write(th, u_conn, data, len, out_len);
     }
 #endif

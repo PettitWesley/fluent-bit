@@ -84,6 +84,7 @@ struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client
     struct flb_http_client *c = NULL;
 
     //TODO: Need to think more about the retry strategy.
+    flb_debug("Making a request to %s", aws_client->host);
 
     c = request_do(aws_client, method, uri, body, body_len,
                    dynamic_headers, dynamic_headers_len);

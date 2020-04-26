@@ -442,11 +442,13 @@ int flb_io_tls_net_write(struct flb_thread *th, struct flb_upstream_conn *u_conn
                             (unsigned char *) data + total,
                             len - total);
     if (ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
+        flb_debug("in flb_io_tls_net_write() about to switch threads");
         io_tls_event_switch(u_conn, MK_EVENT_WRITE);
         flb_thread_yield(th, FLB_FALSE);
         goto retry_write;
     }
     else if (ret == MBEDTLS_ERR_SSL_WANT_READ) {
+        flb_debug("in flb_io_tls_net_write() about to switch threads");
         io_tls_event_switch(u_conn, MK_EVENT_READ);
         flb_thread_yield(th, FLB_FALSE);
         goto retry_write;
@@ -461,6 +463,7 @@ int flb_io_tls_net_write(struct flb_thread *th, struct flb_upstream_conn *u_conn
     /* Update counter and check if we need to continue writing */
     total += ret;
     if (total < len) {
+        flb_debug("in flb_io_tls_net_write() about to switch threads");
         io_tls_event_switch(u_conn, MK_EVENT_WRITE);
         flb_thread_yield(th, FLB_FALSE);
         goto retry_write;
