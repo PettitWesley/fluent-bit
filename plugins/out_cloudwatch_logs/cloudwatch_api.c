@@ -941,8 +941,8 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                                   "will retry, %s", buf->session_id);
                     tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
                                            "expectedSequenceToken");
-                    flb_plg_debug(ctx->ins, "expected token: %s", tmp);
-                    flb_plg_debug(ctx->ins, "Raw resp: %s", c->resp.payload);
+                    flb_plg_debug(ctx->ins, "expected token: %s, %s", tmp, buf->session_id);
+                    flb_plg_debug(ctx->ins, "Raw resp: %s, %s", c->resp.payload, buf->session_id);
                     if (tmp) {
                         if (stream->sequence_token != NULL) {
                             flb_sds_destroy(stream->sequence_token);
