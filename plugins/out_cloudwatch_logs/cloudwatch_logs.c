@@ -308,6 +308,15 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
+    char *session_id;
+
+    session_id = flb_sts_session_name();
+    if (!session_id) {
+        flb_plg_error(ctx->ins,
+                      "Failed to generate random STS session name");
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
     if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
         ret = create_log_group(ctx);
         if (ret < 0) {
@@ -325,6 +334,8 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
+
+    buf->session_id = session_id;
 
     /* TODO: could be more efficient in some cases with these memory allocs */
     buf->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
@@ -358,7 +369,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    flb_plg_info(ctx->ins, "Sent %d events to CloudWatch", event_count);
+    flb_plg_info(ctx->ins, "Sent %d events to CloudWatch, %s", event_count, session_id);
 
     cw_flush_destroy(buf);
     FLB_OUTPUT_RETURN(FLB_OK);

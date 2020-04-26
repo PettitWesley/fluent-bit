@@ -62,6 +62,8 @@ struct cw_flush {
     /* buffer used to temporarily hold an event during processing */
     char *event_buf;
     size_t event_buf_size;
+
+    char *session_id;
 };
 
 void cw_flush_destroy(struct cw_flush *buf);

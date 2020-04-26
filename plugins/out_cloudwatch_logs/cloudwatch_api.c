@@ -423,7 +423,7 @@ retry:
         return -1;
     }
 
-    flb_plg_debug(ctx->ins, "Sending %d events", i);
+    flb_plg_debug(ctx->ins, "Sending %d events, %s", i, buf->session_id);
     ret = put_log_events(ctx, buf, stream, (size_t) offset);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send log events");
@@ -884,7 +884,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     flb_sds_t error;
     int num_headers = 1;
 
-    flb_plg_debug(ctx->ins, "Sending log events to log stream %s", stream->name);
+    flb_plg_debug(ctx->ins, "Sending log events to log stream %s, %s", stream->name, buf->session_id);
 
     /* stream is being used, update expiration */
     stream->expiration = time(NULL) + FOUR_HOURS_IN_SECONDS;
@@ -938,9 +938,11 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                      * and retry.
                      */
                     flb_plg_debug(ctx->ins, "Sequence token was invalid, "
-                                  "will retry");
+                                  "will retry, %s", buf->session_id);
                     tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
                                            "expectedSequenceToken");
+                    flb_plg_debug(ctx->ins, "expected token: %s", tmp);
+                    flb_plg_debug(ctx->ins, "Raw resp: %s", c->resp.payload);
                     if (tmp) {
                         if (stream->sequence_token != NULL) {
                             flb_sds_destroy(stream->sequence_token);
