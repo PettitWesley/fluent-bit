@@ -280,7 +280,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     upstream->flags &= ~(FLB_IO_ASYNC);
 
     /* TODO: Remove */
-    upstream->flags |= FLB_IO_TCP_KA;
+    //upstream->flags |= FLB_IO_TCP_KA;
 
     ctx->cw_client->upstream = upstream;
     ctx->cw_client->host = ctx->endpoint;
