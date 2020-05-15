@@ -30,6 +30,8 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 
+#include <unistd.h>
+
 #include "in_dummy.h"
 
 
@@ -66,6 +68,10 @@ static int in_dummy_collect(struct flb_input_instance *ins,
     msgpack_packer mp_pck;
     msgpack_sbuffer mp_sbuf;
     struct flb_dummy *ctx = in_context;
+
+    flb_info("[in_dummy] About to sleep...");
+    sleep(5);
+    flb_info("[in_dummy] Sleep complete.");
 
     if (ctx->samples > 0 && (ctx->samples_count >= ctx->samples)) {
         return -1;
