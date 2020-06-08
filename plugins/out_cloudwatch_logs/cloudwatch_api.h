@@ -38,32 +38,6 @@
 
 #include "cloudwatch_logs.h"
 
-/* buffers used for each flush */
-struct cw_flush {
-    /* temporary buffer for storing the serialized event messages */
-    char *tmp_buf;
-    size_t tmp_buf_size;
-    /* current index of tmp_buf */
-    size_t tmp_buf_offset;
-
-    /* projected final size of the payload for this flush */
-    size_t data_size;
-
-    /* log events- each of these has a pointer to their message in tmp_buf */
-    struct event *events;
-    int events_capacity;
-    /* current event */
-    int event_index;
-
-    /* the payload of the API request */
-    char *out_buf;
-    size_t out_buf_size;
-
-    /* buffer used to temporarily hold an event during processing */
-    char *event_buf;
-    size_t event_buf_size;
-};
-
 void cw_flush_destroy(struct cw_flush *buf);
 
 int process_and_send(struct flb_cloudwatch *ctx, struct cw_flush *buf,

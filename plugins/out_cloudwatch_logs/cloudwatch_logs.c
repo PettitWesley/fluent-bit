@@ -58,6 +58,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     char *session_name;
     struct flb_cloudwatch *ctx = NULL;
     struct flb_aws_credentials *creds = NULL;
+    struct cw_flush *buf = NULL;
     (void) config;
     (void) data;
 
@@ -282,6 +283,39 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     ctx->cw_client->upstream = upstream;
     ctx->cw_client->host = ctx->endpoint;
 
+    /* alloc the payload/processing buffer */
+    buf = flb_calloc(1, sizeof(struct cw_flush));
+    if (!buf) {
+        flb_errno();
+        goto error;
+    }
+
+    buf->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    if (!buf->out_buf) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        goto error;
+    }
+    buf->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
+
+    buf->tmp_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    if (!buf->tmp_buf) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        goto error;
+    }
+    buf->tmp_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
+
+    buf->events = flb_malloc(sizeof(struct event) * 1000);
+    if (!buf->events) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        goto error;
+    }
+    buf->events_capacity = 1000;
+
+    ctx->buf = buf;
+
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -304,7 +338,6 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     int ret;
     int event_count;
     struct log_stream *stream = NULL;
-    struct cw_flush *buf = NULL;
     (void) i_ins;
     (void) config;
 
@@ -320,47 +353,14 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    buf = flb_calloc(1, sizeof(struct cw_flush));
-    if (!buf) {
-        flb_errno();
-        FLB_OUTPUT_RETURN(FLB_RETRY);
-    }
-
-    /* TODO: could be more efficient in some cases with these memory allocs */
-    buf->out_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
-    if (!buf->out_buf) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        FLB_OUTPUT_RETURN(FLB_RETRY);
-    }
-    buf->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
-
-    buf->tmp_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
-    if (!buf->tmp_buf) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        FLB_OUTPUT_RETURN(FLB_RETRY);
-    }
-    buf->tmp_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
-
-    buf->events = flb_malloc(sizeof(struct event) * 1000);
-    if (!buf->events) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        FLB_OUTPUT_RETURN(FLB_RETRY);
-    }
-    buf->events_capacity = 1000;
-
-    event_count = process_and_send(ctx, buf, stream, data, bytes);
+    event_count = process_and_send(ctx, ctx->buf, stream, data, bytes);
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send events");
-        cw_flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     flb_plg_info(ctx->ins, "Sent %d events to CloudWatch", event_count);
 
-    cw_flush_destroy(buf);
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
@@ -373,6 +373,10 @@ void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
     if (ctx != NULL) {
         if (ctx->base_aws_provider) {
             flb_aws_provider_destroy(ctx->base_aws_provider);
+        }
+
+        if (ctx->buf) {
+            cw_flush_destroy(ctx->buf);
         }
 
         if (ctx->aws_provider) {
