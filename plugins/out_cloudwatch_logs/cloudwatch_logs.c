@@ -346,6 +346,8 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
+    flb_plg_info(ctx->ins, "PRE-RELEASE-TEST-VERSION");
+
     if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
         ret = create_log_group(ctx);
         if (ret < 0) {

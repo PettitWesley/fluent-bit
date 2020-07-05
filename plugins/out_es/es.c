@@ -598,6 +598,8 @@ static void cb_es_flush(const void *data, size_t bytes,
     struct flb_http_client *c;
     flb_sds_t signature = NULL;
 
+    flb_plg_info(ctx->ins, "PRE-RELEASE-TEST-VERSION");
+
     /* Get upstream connection */
     u_conn = flb_upstream_conn_get(ctx->u);
     if (!u_conn) {
