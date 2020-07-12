@@ -274,6 +274,7 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
     if (aws_client->has_auth) {
         signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
                                   aws_client->region, aws_client->service,
+                                  aws_client->s3_mode,
                                   aws_client->provider);
         if (!signature) {
             if (aws_client->debug_only == FLB_TRUE) {
