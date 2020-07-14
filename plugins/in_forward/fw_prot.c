@@ -369,7 +369,7 @@ int fw_prot_process(struct fw_conn *conn)
                 chunk_id = -1;
                 ret = get_options_chunk(&root, 2, &chunk_id);
                 if (ret == -1) {
-                    flb_plg_debug(ctx->ins, "invalid options field");
+                    flb_plg_error(ctx->ins, "line 372: invalid options field");
                     msgpack_unpacked_destroy(&result);
                     msgpack_unpacker_free(unp);
                     return -1;
@@ -396,7 +396,7 @@ int fw_prot_process(struct fw_conn *conn)
                 chunk_id = -1;
                 ret = get_options_chunk(&root, 3, &chunk_id);
                 if (ret == -1) {
-                    flb_plg_debug(ctx->ins, "invalid options field");
+                    flb_plg_error(ctx->ins, "line 399: invalid options field");
                     msgpack_unpacked_destroy(&result);
                     msgpack_unpacker_free(unp);
                     return -1;
@@ -432,7 +432,7 @@ int fw_prot_process(struct fw_conn *conn)
                 chunk_id = -1;
                 ret = get_options_chunk(&root, 2, &chunk_id);
                 if (ret == -1) {
-                    flb_plg_debug(ctx->ins, "invalid options field");
+                    flb_plg_error(ctx->ins, "line 435: invalid options field");
                     msgpack_unpacked_destroy(&result);
                     msgpack_unpacker_free(unp);
                     return -1;
