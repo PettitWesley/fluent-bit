@@ -1,4 +1,4 @@
 set(src
-  stdout.c)
+  s3.c)
 
-FLB_PLUGIN(out_stdout "${src}" "")
+FLB_PLUGIN(out_s3 "${src}" "")

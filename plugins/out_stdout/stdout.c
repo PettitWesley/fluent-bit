@@ -24,6 +24,8 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
+#include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_signv4.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -51,19 +53,6 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         return -1;
     }
 
-    ctx->out_format = FLB_PACK_JSON_FORMAT_NONE;
-    tmp = flb_output_get_property("format", ins);
-    if (tmp) {
-        ret = flb_pack_to_json_format_type(tmp);
-        if (ret == -1) {
-            flb_plg_error(ctx->ins, "unrecognized 'format' option. "
-                          "Using 'msgpack'");
-        }
-        else {
-            ctx->out_format = ret;
-        }
-    }
-
     /* Date format for JSON output */
     ctx->json_date_format = FLB_PACK_JSON_DATE_DOUBLE;
     tmp = flb_output_get_property("json_date_format", ins);
@@ -78,10 +67,247 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    char *role_arn = NULL;
+    char *external_id = NULL;
+    struct flb_aws_client_generator *generator;
+    char *session_name;
+
+    tmp = flb_output_get_property("bucket", ins);
+    if (tmp) {
+        ctx->bucket = (char *) tmp;
+    } else {
+        flb_error("[out_s3] 'bucket' is a required parameter");
+        goto error;
+    }
+
+    tmp = flb_output_get_property("prefix", ins);
+    if (tmp) {
+        ctx->prefix = (char *) tmp;
+    } else {
+        ctx->prefix = "fluent-bit";
+    }
+
+    tmp = flb_output_get_property("region", ins);
+    if (tmp) {
+        ctx->region = (char *) tmp;
+    } else {
+        flb_error("[out_s3] 'region' is a required parameter");
+        goto error;
+    }
+
+    tmp = flb_output_get_property("time_key", ins);
+    if (tmp) {
+        ctx->time_key = (char *) tmp;
+    } else {
+        ctx->time_key = "time";
+    }
+
+    tmp = flb_output_get_property("endpoint", ins);
+    if (tmp) {
+        ctx->endpoint = (char *) tmp;
+        ctx->free_endpoint = FLB_FALSE;
+    } else {
+        /* default endpoint for the given region */
+        ctx->endpoint = flb_s3_endpoint(ctx->bucket, ctx->region);
+        ctx->free_endpoint = FLB_TRUE;
+        if (!ctx->endpoint) {
+            flb_error("[out_s3] Could not construct S3 endpoint");
+            goto error;
+        }
+    }
+
+    ctx->client_tls.context = flb_tls_context_new(FLB_TRUE,
+                                                  ins->tls_debug,
+                                                  ins->tls_vhost,
+                                                  ins->tls_ca_path,
+                                                  ins->tls_ca_file,
+                                                  ins->tls_crt_file,
+                                                  ins->tls_key_file,
+                                                  ins->tls_key_passwd);
+    if (!ctx->client_tls.context) {
+        flb_plg_error(ctx->ins, "Failed to create tls context");
+        goto error;
+    }
+
+    /* AWS provider needs a separate TLS instance */
+    ctx->provider_tls.context = flb_tls_context_new(FLB_TRUE,
+                                                    ins->tls_debug,
+                                                    ins->tls_vhost,
+                                                    ins->tls_ca_path,
+                                                    ins->tls_ca_file,
+                                                    ins->tls_crt_file,
+                                                    ins->tls_key_file,
+                                                    ins->tls_key_passwd);
+    if (!ctx->provider_tls.context) {
+        flb_errno();
+        goto error;
+    }
+
+    ctx->provider = flb_standard_chain_provider_create(config,
+                                                       &ctx->provider_tls,
+                                                       ctx->region,
+                                                       NULL,
+                                                       flb_aws_client_generator());
+
+    if (!ctx->provider) {
+        flb_error("[out_s3] Failed to create AWS Credential Provider");
+        goto error;
+    }
+
+    tmp = flb_output_get_property("role_arn", ins);
+    if (tmp) {
+        /* Use the STS Provider */
+        ctx->base_provider = ctx->provider;
+        role_arn = (char *) tmp;
+        tmp = flb_output_get_property("external_id", ins);
+        if (tmp) {
+            external_id = (char *) tmp;
+        }
+
+        /* STS provider needs yet another separate TLS instance */
+        ctx->sts_provider_tls.context = flb_tls_context_new(FLB_TRUE,
+                                                            ins->tls_debug,
+                                                            ins->tls_vhost,
+                                                            ins->tls_ca_path,
+                                                            ins->tls_ca_file,
+                                                            ins->tls_crt_file,
+                                                            ins->tls_key_file,
+                                                            ins->tls_key_passwd);
+
+        if (!ctx->sts_provider_tls.context) {
+            flb_errno();
+            goto error;
+        }
+
+        session_name = flb_sts_session_name();
+        if (!session_name) {
+            flb_error("[out_s3] Failed to create aws iam role "
+                      "session name");
+            flb_errno();
+            goto error;
+        }
+
+        ctx->provider = flb_sts_provider_create(config,
+                                                &ctx->sts_provider_tls,
+                                                ctx->base_provider,
+                                                external_id,
+                                                role_arn,
+                                                session_name,
+                                                ctx->region,
+                                                NULL,
+                                                flb_aws_client_generator());
+        if (!ctx->provider) {
+            flb_error("[out_s3] Failed to create AWS STS Credential "
+                      "Provider");
+            goto error;
+        }
+
+    }
+
+    /* create S3 client */
+    generator = flb_aws_client_generator();
+    ctx->s3_client = generator->create();
+    if (!ctx->s3_client) {
+        goto error;
+    }
+    ctx->s3_client->name = "s3_client";
+    ctx->s3_client->has_auth = FLB_TRUE;
+    ctx->s3_client->provider = ctx->provider;
+    ctx->s3_client->region = ctx->region;
+    ctx->s3_client->service = "s3";
+    ctx->s3_client->port = 443;
+    ctx->s3_client->flags = 0;
+    ctx->s3_client->proxy = NULL;
+    ctx->s3_client->s3_mode = S3_MODE_SIGNED_PAYLOAD;
+
+    ctx->s3_client->upstream = flb_upstream_create(config, ctx->endpoint, 443,
+                                                   FLB_IO_TLS, &ctx->client_tls);
+    if (!ctx->s3_client->upstream) {
+        flb_error("[out_s3] Connection initialization error");
+        goto error;
+    }
+
+    ctx->s3_client->host = ctx->endpoint;
+
+    /* initialize credentials in sync mode */
+    ctx->provider->provider_vtable->sync(ctx->provider);
+    ctx->provider->provider_vtable->init(ctx->provider);
+    /* set back to async */
+    ctx->provider->provider_vtable->async(ctx->provider);
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
     return 0;
+
+error:
+    return -1;
+}
+
+/*
+ * The S3 file name is
+ * /<prefix>/-<datestamp>
+ */
+static flb_sds_t construct_uri(struct flb_stdout *ctx)
+{
+    flb_sds_t uri;
+    flb_sds_t tmp;
+    char datestamp[40];
+    struct tm gmt;
+    time_t t_now = time(NULL);
+
+    if (!gmtime_r(&t_now, &gmt)) {
+        flb_errno();
+        return NULL;
+    }
+
+    strftime(datestamp, sizeof(datestamp) - 1, "%Y/%m/%d/%H/%M:%S", &gmt);
+
+    uri = flb_sds_create_size(strlen(ctx->prefix) + 50);
+
+    tmp = flb_sds_printf(&uri, "/%s/%s", ctx->prefix, datestamp);
+    if (!tmp) {
+        flb_sds_destroy(uri);
+        return NULL;
+    }
+    uri = tmp;
+
+    return uri;
+}
+
+static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
+{
+    flb_sds_t uri = NULL;
+    struct flb_http_client *c = NULL;
+    struct flb_aws_client *s3_client;
+
+    uri = construct_uri(ctx);
+    if (!uri) {
+        flb_plg_error(ctx->ins, "Failed to construct request URI");
+        return -1;
+    }
+
+    s3_client = ctx->s3_client;
+    c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
+                                          uri, json, flb_sds_len(json),
+                                          NULL, 0);
+    if (c) {
+        flb_plg_debug(ctx->ins, "PutObject http status=%d", c->resp.status);
+        if (c->resp.status == 200) {
+            flb_plg_info(ctx->ins, "Successfully uploaded object %s", uri);
+            flb_sds_destroy(uri);
+            return 0;
+        }
+        flb_aws_print_xml_error(c->resp.payload, c->resp.payload_size,
+                                "PutObject", ctx->ins);
+        if (c->resp.data != NULL) {
+            flb_plg_debug(ctx->ins, "Raw PutObject response: %s", c->resp.data);
+        }
+    }
+
+    flb_plg_error(ctx->ins, "PutOjbect request failed");
+    flb_sds_destroy(uri);
+    return -1;
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
@@ -90,54 +316,23 @@ static void cb_stdout_flush(const void *data, size_t bytes,
                             void *out_context,
                             struct flb_config *config)
 {
-    msgpack_unpacked result;
-    size_t off = 0, cnt = 0;
     struct flb_stdout *ctx = out_context;
-    flb_sds_t json;
-    char *buf = NULL;
+    flb_sds_t json = NULL;
+    int ret;
     (void) i_ins;
     (void) config;
-    struct flb_time tmp;
-    msgpack_object *p;
 
-    if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
-        json = flb_pack_msgpack_to_json_format(data, bytes,
-                                               ctx->out_format,
-                                               ctx->json_date_format,
-                                               ctx->json_date_key);
-        write(STDOUT_FILENO, json, flb_sds_len(json));
-        flb_sds_destroy(json);
+    json = flb_pack_msgpack_to_json_format(data, bytes,
+                                           FLB_PACK_JSON_FORMAT_LINES,
+                                           ctx->json_date_format,
+                                           ctx->json_date_key);
 
-        /*
-         * If we are 'not' in json_lines mode, we need to add an extra
-         * breakline.
-         */
-        if (ctx->out_format != FLB_PACK_JSON_FORMAT_LINES) {
-            printf("\n");
-        }
-        fflush(stdout);
+    ret = s3_put_object(ctx, json);
+    if (ret < 0) {
+        return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
-    else {
-        /* A tag might not contain a NULL byte */
-        buf = flb_malloc(tag_len + 1);
-        if (!buf) {
-            flb_errno();
-            FLB_OUTPUT_RETURN(FLB_RETRY);
-        }
-        memcpy(buf, tag, tag_len);
-        buf[tag_len] = '\0';
-        msgpack_unpacked_init(&result);
-        while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
-            printf("[%zd] %s: [", cnt++, buf);
-            flb_time_pop_from_msgpack(&tmp, &result, &p);
-            printf("%"PRIu32".%09lu, ", (uint32_t)tmp.tm.tv_sec, tmp.tm.tv_nsec);
-            msgpack_object_print(stdout, *p);
-            printf("]\n");
-        }
-        msgpack_unpacked_destroy(&result);
-        flb_free(buf);
-    }
-    fflush(stdout);
+    flb_sds_destroy(json);
+
 
     FLB_OUTPUT_RETURN(FLB_OK);
 }
@@ -157,21 +352,25 @@ static int cb_stdout_exit(void *data, struct flb_config *config)
 /* Configuration properties map */
 static struct flb_config_map config_map[] = {
     {
-     FLB_CONFIG_MAP_STR, "format", NULL,
-     0, FLB_FALSE, 0,
-     "Specifies the data format to be printed. Supported formats are msgpack json, json_lines and json_stream."
-    },
-    {
      FLB_CONFIG_MAP_STR, "json_date_format", NULL,
      0, FLB_FALSE, 0,
-    "Specifies the name of the date field in output."
+    "Specifies the format of the date. Supported formats are double, iso8601 and epoch."
     },
     {
      FLB_CONFIG_MAP_STR, "json_date_key", "date",
      0, FLB_TRUE, offsetof(struct flb_stdout, json_date_key),
-    "Specifies the format of the date. Supported formats are double, iso8601 and epoch."
+    "Specifies the name of the date field in output."
     },
-
+    {
+     FLB_CONFIG_MAP_STR, "bucket", "firenosed-dolphin-bucket",
+     0, FLB_TRUE, offsetof(struct flb_stdout, bucket),
+    "S3 bucket name."
+    },
+    {
+     FLB_CONFIG_MAP_STR, "region", "us-east-1",
+     0, FLB_TRUE, offsetof(struct flb_stdout, region),
+    "AWS region."
+    },
     /* EOF */
     {0}
 };

@@ -23,8 +23,28 @@
 
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_sds.h>
+#include <fluent-bit/flb_info.h>
+#include <fluent-bit/flb_aws_credentials.h>
+#include <fluent-bit/flb_aws_util.h>
+
 
 struct flb_stdout {
+    char *bucket;
+    char *region;
+    char *prefix;
+    char *time_key;
+    char *endpoint;
+    int free_endpoint;
+
+    struct flb_aws_provider *provider;
+    struct flb_aws_provider *base_provider;
+    /* tls instances can't be re-used; aws provider requires a separate one */
+    struct flb_tls provider_tls;
+    /* one for the standard chain provider, one for sts assume role */
+    struct flb_tls sts_provider_tls;
+    struct flb_tls client_tls;
+
+    struct flb_aws_client *s3_client;
     int out_format;
     int json_date_format;
     flb_sds_t json_date_key;

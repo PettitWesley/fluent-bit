@@ -18,8 +18,8 @@
  *  limitations under the License.
  */
 
-#ifndef FLB_OUT_STDOUT
-#define FLB_OUT_STDOUT
+#ifndef FLB_OUT_S3
+#define FLB_OUT_S3
 
 
 #include <fluent-bit/flb_info.h>
@@ -40,8 +40,12 @@ struct flb_s3 {
     struct flb_tls provider_tls;
     /* one for the standard chain provider, one for sts assume role */
     struct flb_tls sts_provider_tls;
+    struct flb_tls client_tls;
 
     struct flb_aws_client *s3_client;
+
+    /* Plugin output instance reference */
+    struct flb_output_instance *ins;
 };
 
 #endif
