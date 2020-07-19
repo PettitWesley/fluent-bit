@@ -28,6 +28,12 @@
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
 
+#define AWS_SERVICE_ENDPOINT_FORMAT            "%s.%s.amazonaws.com"
+#define AWS_SERVICE_ENDPOINT_BASE_LEN          15
+
+#define S3_SERVICE_ENDPOINT_FORMAT             "%s.s3.amazonaws.com"
+#define S3_SERVICE_ENDPOINT_BASE_LEN           17
+
 struct flb_http_client *request_do(struct flb_aws_client *aws_client,
                                    int method, const char *uri,
                                    const char *body, size_t body_len,
@@ -66,6 +72,52 @@ char *flb_aws_endpoint(char* service, char* region)
     }
 
     bytes = snprintf(endpoint, len, AWS_SERVICE_ENDPOINT_FORMAT, service, region);
+    if (bytes < 0) {
+        flb_errno();
+        flb_free(endpoint);
+        return NULL;
+    }
+
+    if (is_cn) {
+        memcpy(endpoint + bytes, ".cn", 3);
+        endpoint[bytes + 3] = '\0';
+    }
+
+    return endpoint;
+
+}
+
+/*
+ * https://bucket.s3.amazonaws.com(.cn)
+ */
+char *flb_s3_endpoint(char* bucket, char* region)
+{
+    char *endpoint = NULL;
+    size_t len = S3_SERVICE_ENDPOINT_BASE_LEN;
+    int is_cn = FLB_FALSE;
+    int bytes;
+
+
+    /* In the China regions, ".cn" is appended to the URL */
+    if (strcmp("cn-north-1", region) == 0) {
+        len += 3;
+        is_cn = FLB_TRUE;
+    }
+    if (strcmp("cn-northwest-1", region) == 0) {
+        len += 3;
+        is_cn = FLB_TRUE;
+    }
+
+    len += strlen(bucket);
+    len++; /* null byte */
+
+    endpoint = flb_malloc(len);
+    if (!endpoint) {
+        flb_errno();
+        return NULL;
+    }
+
+    bytes = snprintf(endpoint, len, S3_SERVICE_ENDPOINT_FORMAT, bucket);
     if (bytes < 0) {
         flb_errno();
         flb_free(endpoint);
@@ -312,6 +364,76 @@ error:
     return NULL;
 }
 
+void flb_aws_print_xml_error(char *response, size_t response_len,
+                             char *api, struct flb_output_instance *ins)
+{
+    flb_sds_t error;
+    flb_sds_t message;
+
+    error = flb_xml_get_val(response, response_len, "<Code>");
+    if (!error) {
+        flb_plg_error(ins, "%s: Could not parse response", api);
+        return;
+    }
+
+    message = flb_xml_get_val(response, response_len, "<Message>");
+    if (!message) {
+        /* just print the error */
+        flb_plg_error(ins, "%s API responded with error='%s'", api, error);
+    }
+    else {
+        flb_plg_error(ins, "%s API responded with error='%s', message='%s'",
+                      api, error, message);
+        flb_sds_destroy(message);
+    }
+
+    flb_sds_destroy(error);
+}
+
+/* Parses AWS XML API Error responses and returns the value of the <code> tag */
+flb_sds_t flb_aws_xml_error(char *response, size_t response_len)
+{
+    return flb_xml_get_val(response, response_len, "<code>");
+}
+
+/*
+ * Parses an XML document and returns the value of the given tag
+ * Param `tag` should include angle brackets; ex "<code>"
+ */
+flb_sds_t flb_xml_get_val(char *response, size_t response_len, char *tag)
+{
+    flb_sds_t val = NULL;
+    char *node = NULL;
+    char *end;
+    int len;
+
+    if (response_len == 0) {
+        return NULL;
+    }
+    node = strstr(response, tag);
+    if (!node) {
+        flb_debug("[aws] Could not find <code> tag in API response");
+        return NULL;
+    }
+
+    /* advance to end of tag */
+    node += strlen(tag);
+
+    end = strchr(node, '<');
+    if (!end) {
+        flb_error("[aws] Could not find end of '%s' node in xml", tag);
+        return NULL;
+    }
+    len = end - node;
+    val = flb_sds_create_len(node, len);
+    if (!val) {
+        flb_errno();
+        return NULL;
+    }
+
+    return val;
+}
+
 void flb_aws_print_error(char *response, size_t response_len,
                               char *api, struct flb_output_instance *ins)
 {
@@ -337,7 +459,7 @@ void flb_aws_print_error(char *response, size_t response_len,
     flb_sds_destroy(error);
 }
 
-/* parses AWS API error responses and returns the value of the __type field */
+/* parses AWS JSON API error responses and returns the value of the __type field */
 flb_sds_t flb_aws_error(char *response, size_t response_len)
 {
     return flb_json_get_val(response, response_len, "__type");
