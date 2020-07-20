@@ -312,10 +312,12 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
     return -1;
 }
 
-static int buffer_data_locally(struct flb_stdout *ctx, flb_sds_t json)
+/*
+ * Gets the local buffer chunk which is not currently being uploaded
+ * If all chunks have in progress uploads, creates a new one
+*/
+static struct upload_chunk get_buffer_chunk(struct flb_stdout *ctx)
 {
-    int ret;
-    int len;
     struct upload_chunk *chunk = NULL;
     struct upload_chunk *tmp_chunk = NULL;
     struct mk_list *tmp;
@@ -336,24 +338,45 @@ static int buffer_data_locally(struct flb_stdout *ctx, flb_sds_t json)
     if (chunk == NULL) {
         /* create a new upload */
         chunk = flb_calloc(1, sizeof(struct upload_chunk));
+        if (!chunk) {
+            flb_errno();
+            return NULL;
+        }
         chunk->upload_in_progress = FLB_FALSE;
         s3_key = get_s3_key(ctx);
         if (!s3_key) {
             flb_plg_error(ctx->ins, "Failed to construct S3 Object Key");
-            return -1;
+            flb_free(chunk);
+            return NULL;
         }
         chunk->s3_key = s3_key;
         /* add chunk to list */
         mk_list_add(&chunk->_head, &ctx->upload_chunks);
     }
 
-    len = flb_sds_len(json);
-    if (len + chunk->size) > CHUNKED_UPLOAD_SIZE) {
-        /* tell caller to send current data */
-        return 1;
-    }
+    return chunk;
+}
+
+/*
+ * Stores data in the temporary local buffer
+ */
+static int buffer_data_locally(struct flb_stdout *ctx,
+                               struct upload_chunk *chunk, flb_sds_t json)
+{
 
 }
+
+// int ret;
+// int len;
+// struct upload_chunk *chunk = NULL;
+//
+// chunk = get_buffer_chunk(ctx);
+//
+// len = flb_sds_len(json);
+// if (len + chunk->size) > CHUNKED_UPLOAD_SIZE) {
+//     /* tell caller to send current data */
+//     return 1;
+// }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
                             const char *tag, int tag_len,
