@@ -204,6 +204,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 
     }
 
+    mk_list_init(&ctx->chunks);
+
     /* create S3 client */
     generator = flb_aws_client_generator();
     ctx->s3_client = generator->create();
@@ -248,7 +250,7 @@ error:
  * The S3 file name is
  * /<prefix>/-<datestamp>
  */
-static flb_sds_t construct_uri(struct flb_stdout *ctx)
+static flb_sds_t get_s3_key(struct flb_stdout *ctx)
 {
     flb_sds_t uri;
     flb_sds_t tmp;
@@ -281,9 +283,9 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
 
-    uri = construct_uri(ctx);
+    uri = get_s3_key(ctx);
     if (!uri) {
-        flb_plg_error(ctx->ins, "Failed to construct request URI");
+        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key");
         return -1;
     }
 
@@ -308,6 +310,49 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
     flb_plg_error(ctx->ins, "PutOjbect request failed");
     flb_sds_destroy(uri);
     return -1;
+}
+
+static int buffer_data_locally(struct flb_stdout *ctx, flb_sds_t json)
+{
+    int ret;
+    int len;
+    struct upload_chunk *chunk = NULL;
+    struct upload_chunk *tmp_chunk = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    flb_sds_t s3_key = NULL
+
+    /* is there a buffered chunk which is not currently being uploaded? */
+    if (mk_list_size(&ctx->upload_chunks) > 0) {
+        mk_list_foreach_safe(head, tmp, &ctx->upload_chunks) {
+            tmp_chunk = mk_list_entry(head, struct upload_chunk, _head);
+            if (tmp_chunk->upload_in_progress == FLB_FALSE) {
+                chunk = tmp_chunk;
+                break;
+            }
+        }
+    }
+
+    if (chunk == NULL) {
+        /* create a new upload */
+        chunk = flb_calloc(1, sizeof(struct upload_chunk));
+        chunk->upload_in_progress = FLB_FALSE;
+        s3_key = get_s3_key(ctx);
+        if (!s3_key) {
+            flb_plg_error(ctx->ins, "Failed to construct S3 Object Key");
+            return -1;
+        }
+        chunk->s3_key = s3_key;
+        /* add chunk to list */
+        mk_list_add(&chunk->_head, &ctx->upload_chunks);
+    }
+
+    len = flb_sds_len(json);
+    if (len + chunk->size) > CHUNKED_UPLOAD_SIZE) {
+        /* tell caller to send current data */
+        return 1;
+    }
+
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
@@ -370,6 +415,14 @@ static struct flb_config_map config_map[] = {
      FLB_CONFIG_MAP_STR, "region", "us-east-1",
      0, FLB_TRUE, offsetof(struct flb_stdout, region),
     "AWS region."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "buffer_dir", "/fluent-bit/buffer/s3",
+     0, FLB_TRUE, offsetof(struct flb_stdout, region),
+    "Directory to locally buffer data before sending. Plugin uses the S3 Multipart "
+    "upload API to send data in chunks of 5 MB at a time- only a small amount of"
+    " data will be locally buffered at any given point in time."
     },
     /* EOF */
     {0}
