@@ -459,11 +459,10 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     ret = s3_put_object(ctx, json);
     flb_sds_destroy(json);
     if (ret < 0) {
-        local_buf->offset = 0;
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-
+    local_buf->offset = 0;
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
