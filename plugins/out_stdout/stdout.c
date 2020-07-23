@@ -288,6 +288,8 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
     flb_sds_t uri = NULL;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
+    char *body;
+    size_t body_len = ctx->local_buffer.offset + flb_sds_len(json);
 
     uri = get_s3_key(ctx);
     if (!uri) {
@@ -295,9 +297,29 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
         return -1;
     }
 
+    body = flb_malloc(body_len + 1);
+    if (!body) {
+        flb_errno();
+        flb_sds_destroy(uri);
+        return -1;
+    }
+    body = memcpy(body, ctx->local_buffer.buf, ctx->local_buffer.offset);
+    if (!body) {
+        flb_errno();
+        flb_sds_destroy(uri);
+        return -1;
+    }
+    body = memcpy(body + ctx->local_buffer.offset, json, flb_sds_len(json));
+    if (!body) {
+        flb_errno();
+        flb_sds_destroy(uri);
+        return -1;
+    }
+    body[body_len] = '\0';
+
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
-                                          uri, json, flb_sds_len(json),
+                                          uri, body, body_len,
                                           NULL, 0);
     if (c) {
         flb_plg_debug(ctx->ins, "PutObject http status=%d", c->resp.status);
@@ -416,6 +438,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         check = memcpy(local_buf->buf + local_buf->offset, json, len);
         if (check == NULL) {
             flb_errno();
+            flb_sds_destroy(json);
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
         local_buf->offset += len;
@@ -423,14 +446,15 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
         /* data persisted, return */
         flb_plg_error(ctx->ins, "Buffered %d bytes", len);
+        flb_sds_destroy(json);
         FLB_OUTPUT_RETURN(FLB_OK);
     }
 
     ret = s3_put_object(ctx, json);
+    flb_sds_destroy(json);
     if (ret < 0) {
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
-    flb_sds_destroy(json);
 
 
     FLB_OUTPUT_RETURN(FLB_OK);
