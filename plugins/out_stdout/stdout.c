@@ -289,6 +289,7 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
     char *body;
+    char *tmp;
     size_t body_len = ctx->local_buffer.offset + flb_sds_len(json);
 
     uri = get_s3_key(ctx);
@@ -303,15 +304,17 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
         flb_sds_destroy(uri);
         return -1;
     }
-    body = memcpy(body, ctx->local_buffer.buf, ctx->local_buffer.offset);
-    if (!body) {
+    tmp = memcpy(body, ctx->local_buffer.buf, ctx->local_buffer.offset);
+    if (!tmp) {
         flb_errno();
+        flb_free(body);
         flb_sds_destroy(uri);
         return -1;
     }
-    body = memcpy(body + ctx->local_buffer.offset, json, flb_sds_len(json));
-    if (!body) {
+    tmp = memcpy(body + ctx->local_buffer.offset, json, flb_sds_len(json));
+    if (!tmp) {
         flb_errno();
+        flb_free(body);
         flb_sds_destroy(uri);
         return -1;
     }
@@ -326,6 +329,7 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
         if (c->resp.status == 200) {
             flb_plg_info(ctx->ins, "Successfully uploaded object %s", uri);
             flb_sds_destroy(uri);
+            flb_free(body);
             return 0;
         }
         flb_aws_print_xml_error(c->resp.payload, c->resp.payload_size,
@@ -337,6 +341,7 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
 
     flb_plg_error(ctx->ins, "PutOjbect request failed");
     flb_sds_destroy(uri);
+    lb_free(body);
     return -1;
 }
 
@@ -453,6 +458,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     ret = s3_put_object(ctx, json);
     flb_sds_destroy(json);
     if (ret < 0) {
+        local_buf->offset = 0;
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
