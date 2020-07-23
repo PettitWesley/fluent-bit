@@ -341,7 +341,7 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
 
     flb_plg_error(ctx->ins, "PutOjbect request failed");
     flb_sds_destroy(uri);
-    lb_free(body);
+    flb_free(body);
     return -1;
 }
 
