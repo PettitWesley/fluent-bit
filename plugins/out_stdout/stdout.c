@@ -445,7 +445,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         local_buf->buf[local_buf->offset] = '\0';
 
         /* data persisted, return */
-        flb_plg_error(ctx->ins, "Buffered %d bytes", len);
+        flb_plg_debug(ctx->ins, "Buffered %d bytes", len);
         flb_sds_destroy(json);
         FLB_OUTPUT_RETURN(FLB_OK);
     }
