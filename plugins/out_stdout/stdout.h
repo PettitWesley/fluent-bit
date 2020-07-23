@@ -30,13 +30,19 @@
 /* Upload data to S3 in 5MB chunks */
 #define CHUNKED_UPLOAD_SIZE 5000000
 
-struct upload_chunk {
-    flb_sds_t s3_key;
-    size_t size;
-    int upload_in_progress;
+struct chunk_buffer {
+    char *buf;
+    int offset;
+    size_t buf_size;
+};
 
-    struct mk_list _head;
-}
+// struct upload_chunk {
+//     flb_sds_t s3_key;
+//     size_t size;
+//     int upload_in_progress;
+//
+//     struct mk_list _head;
+// }
 
 struct flb_stdout {
     char *bucket;
@@ -58,7 +64,7 @@ struct flb_stdout {
     int json_date_format;
     flb_sds_t json_date_key;
 
-    struct mk_list upload_chunks;
+    struct chunk_buffer local_buffer;
 
     struct flb_output_instance *ins;
 };
