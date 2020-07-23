@@ -438,7 +438,6 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     len = flb_sds_len(json);
     local_buf = &ctx->local_buffer;
-    flb_debug("buffer offset: %d", local_buf->offset);
     if ((local_buf->offset + len) < CHUNKED_UPLOAD_SIZE) {
         /* add data to buffer */
         check = memcpy(local_buf->buf + local_buf->offset, json, len);
