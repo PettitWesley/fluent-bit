@@ -249,11 +249,16 @@ int remove_chunk(struct local_chunk *c)
     int ret;
     char tmp[PATH_MAX];
 
-    ret = remove(chunk->file_path);
+    ret = remove(c->file_path);
     if (ret < 0) {
+        flb_errno();
         return ret;
     }
 
     snprintf(tmp, sizeof(tmp), "%s.tag", c->file_path);
-    return remove(tmp);
+    ret = remove(tmp);
+    if (ret < 0) {
+        flb_errno();
+    }
+    return ret;
 }
