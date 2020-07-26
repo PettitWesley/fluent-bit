@@ -128,7 +128,7 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
         flb_plg_debug(store->ins, "Creating new local buffer for tag %s", tag);
         c = flb_calloc(1, sizeof(struct local_chunk));
         if (!c) {
-            flb_sds_destroy(key);
+            flb_sds_destroy(hash_key);
             flb_errno();
             return -1;
         }
