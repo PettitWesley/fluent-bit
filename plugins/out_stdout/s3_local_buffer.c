@@ -28,7 +28,7 @@
 #include "s3_local_buffer.h"
 
 
-void destroy_chunk(struct chunk *c)
+void destroy_chunk(struct local_chunk *c)
 {
     if (!c) {
         return;
@@ -87,22 +87,20 @@ static size_t append_data(struct local_buffer *store, char *path,
 
 /*
  * Stores data in the local file system
- * Subsequent data with the same 'key' will be stored to the same local 'chunk'
+ * 'c' can be NULL if no local chunk suitable for this data has been created yet
  */
-int buffer_data(struct local_buffer *store, char *key, char *data, size_t bytes)
+int buffer_data(struct local_buffer *store, struct local_chunk *c,
+                char *data, size_t bytes)
 {
-    struct chunk *c = NULL;
     int ret;
     size_t written;
     flb_sds_t path;
     flb_sds_t tmp_sds;
 
-    c = get_chunk(store, key);
-
     if (c == NULL) {
         /* create a new chunk */
         flb_plg_debug(store->ins, "Creating new local buffer for key %s", key);
-        c = flb_calloc(1, sizeof(struct chunk));
+        c = flb_calloc(1, sizeof(struct local_chunk));
         if (!c) {
             flb_errno();
             return -1;
@@ -155,15 +153,15 @@ int buffer_data(struct local_buffer *store, char *key, char *data, size_t bytes)
 /*
  * Returns the chunk associated with the given key
  */
-struct chunk *get_chunk(struct local_buffer *store, char *key)
+struct local_chunk *get_chunk(struct local_buffer *store, char *key)
 {
     struct mk_list *tmp;
     struct mk_list *head;
-    struct chunk *c = NULL;
-    struct chunk *tmp_chunk;
+    struct local_chunk *c = NULL;
+    struct local_chunk *tmp_chunk;
 
     mk_list_foreach_safe(head, tmp, &store->chunks) {
-        tmp_chunk = mk_list_entry(head, struct chunk, _head);
+        tmp_chunk = mk_list_entry(head, struct local_chunk, _head);
         if (strcmp(tmp_chunk->key, key) == 0) {
             c = tmp_chunk;
             break;

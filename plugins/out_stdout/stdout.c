@@ -204,13 +204,9 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 
     }
 
-    ctx->local_buffer.buf = flb_malloc(CHUNKED_UPLOAD_SIZE + 1);
-    if (ctx->local_buffer.buf == NULL) {
-        flb_errno();
-        goto error;
-    }
-    ctx->local_buffer.buf_size = CHUNKED_UPLOAD_SIZE;
-
+    ctx->store.ins = ctx->ins;
+    ctx->store.dir = ctx->buffer_dir;
+    mk_list_init(&ctx->store.chunks);
 
     /* create S3 client */
     generator = flb_aws_client_generator();
@@ -283,14 +279,15 @@ static flb_sds_t get_s3_key(struct flb_stdout *ctx)
     return uri;
 }
 
-static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
+static int s3_put_object(struct flb_stdout *ctx, char *buffered_data,
+                         size_t buffer_size, flb_sds_t json)
 {
     flb_sds_t uri = NULL;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
     char *body;
     char *tmp;
-    size_t body_len = ctx->local_buffer.offset + flb_sds_len(json);
+    size_t body_len = buffer_size + flb_sds_len(json);
 
     uri = get_s3_key(ctx);
     if (!uri) {
@@ -304,14 +301,14 @@ static int s3_put_object(struct flb_stdout *ctx, flb_sds_t json)
         flb_sds_destroy(uri);
         return -1;
     }
-    tmp = memcpy(body, ctx->local_buffer.buf, ctx->local_buffer.offset);
+    tmp = memcpy(body, buffer_data, buffer_size);
     if (!tmp) {
         flb_errno();
         flb_free(body);
         flb_sds_destroy(uri);
         return -1;
     }
-    tmp = memcpy(body + ctx->local_buffer.offset, json, flb_sds_len(json));
+    tmp = memcpy(body + buffer_size, json, flb_sds_len(json));
     if (!tmp) {
         flb_errno();
         flb_free(body);
@@ -419,8 +416,9 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 {
     struct flb_stdout *ctx = out_context;
     flb_sds_t json = NULL;
-    struct chunk_buffer *local_buf;
-    char *check = NULL;
+    struct local_chunk *chunk;
+    char *data = NULL;
+    size_t data_size;
     int ret;
     int len;
     (void) i_ins;
@@ -437,22 +435,44 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     len = flb_sds_len(json);
-    local_buf = &ctx->local_buffer;
-    if ((local_buf->offset + len) < CHUNKED_UPLOAD_SIZE) {
-        /* add data to buffer */
-        check = memcpy(local_buf->buf + local_buf->offset, json, len);
-        if (check == NULL) {
-            flb_errno();
-            flb_sds_destroy(json);
+    if (tag[tag_len] != '\0') {
+        flb_error("Tag is not null delimited");
+    }
+    chunk = get_chunk(ctx->store, tag);
+
+    if (c == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
+        /* add data to local buffer */
+        ret = buffer_data(ctx->store, chunk, json, (size_t) len);
+        flb_sds_destroy(json);
+        if (ret < 0) {
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
-        local_buf->offset += len;
-        local_buf->buf[local_buf->offset] = '\0';
-
-        /* data persisted, return */
-        flb_plg_debug(ctx->ins, "Buffered %d bytes", len);
-        flb_sds_destroy(json);
         FLB_OUTPUT_RETURN(FLB_OK);
+    }
+
+    // len = flb_sds_len(json);
+    // local_buf = &ctx->local_buffer;
+    // if ((local_buf->offset + len) < CHUNKED_UPLOAD_SIZE) {
+    //     /* add data to buffer */
+    //     check = memcpy(local_buf->buf + local_buf->offset, json, len);
+    //     if (check == NULL) {
+    //         flb_errno();
+    //         flb_sds_destroy(json);
+    //         FLB_OUTPUT_RETURN(FLB_RETRY);
+    //     }
+    //     local_buf->offset += len;
+    //     local_buf->buf[local_buf->offset] = '\0';
+    //
+    //     /* data persisted, return */
+    //     flb_plg_debug(ctx->ins, "Buffered %d bytes", len);
+    //     flb_sds_destroy(json);
+    //     FLB_OUTPUT_RETURN(FLB_OK);
+    // }
+
+    ret = flb_read_file(chunk->file_path, &data, &data_size);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not read locally buffered data %s",
+                      chunk->file_path);
     }
 
     ret = s3_put_object(ctx, json);
@@ -502,7 +522,7 @@ static struct flb_config_map config_map[] = {
 
     {
      FLB_CONFIG_MAP_STR, "buffer_dir", "/fluent-bit/buffer/s3",
-     0, FLB_TRUE, offsetof(struct flb_stdout, region),
+     0, FLB_TRUE, offsetof(struct flb_stdout, buffer_dir),
     "Directory to locally buffer data before sending. Plugin uses the S3 Multipart "
     "upload API to send data in chunks of 5 MB at a time- only a small amount of"
     " data will be locally buffered at any given point in time."

@@ -21,7 +21,7 @@
 #ifndef FLB_OUT_S3_LOCAL_BUFFER_H
 #define FLB_OUT_S3_LOCAL_BUFFER_H
 
-struct chunk {
+struct local_chunk {
     flb_sds_t key;
     flb_sds_t file_path;
     size_t size;
@@ -46,16 +46,17 @@ struct local_buffer {
 
 /*
  * Stores data in the local file system
- * Subsequent data with the same 'key' will be stored to the same local 'chunk'
+ * 'c' can be NULL if no local chunk suitable for this data has been created yet
  */
-int buffer_data(struct local_buffer *store, char *key, char *data, size_t bytes);
+int buffer_data(struct local_buffer *store, struct local_chunk *c,
+                char *data, size_t bytes);
 
 /*
  * Returns the chunk associated with the given key
  */
-struct chunk *get_chunk(struct local_buffer *store, char *key);
+struct local_chunk *get_chunk(struct local_buffer *store, char *key);
 
 
-void destroy_chunk(struct chunk *c);
+void destroy_chunk(struct local_chunk *c);
 
 #endif

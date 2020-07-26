@@ -27,6 +27,8 @@
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
 
+#include "s3_local_buffer.h"
+
 /* Upload data to S3 in 5MB chunks */
 #define CHUNKED_UPLOAD_SIZE 5000000
 
@@ -64,7 +66,8 @@ struct flb_stdout {
     int json_date_format;
     flb_sds_t json_date_key;
 
-    struct chunk_buffer local_buffer;
+    struct local_buffer buffer;
+    char *buffer_dir;
 
     struct flb_output_instance *ins;
 };
