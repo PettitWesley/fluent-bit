@@ -71,7 +71,7 @@ static int chunk_mkdir(const char *file) {
     return 0;
 }
 
-static int append_data(struct local_buffer *store, char *path,
+static size_t append_data(struct local_buffer *store, char *path,
                        char *data, size_t bytes)
 {
     FILE *f;
@@ -81,15 +81,8 @@ static int append_data(struct local_buffer *store, char *path,
         return -1;
     }
     written = fwrite(data, 1, bytes, f);
-    if (written < bytes) {
-        flb_plg_error(store->ins, "Failed to write %d bytes to local buffer %s",
-                      bytes - written, path);
-        flb_errno();
-        fclose(f);
-        return -1;
-    }
     fclose(f);
-    return 0;
+    return written;
 }
 
 /*
@@ -98,21 +91,13 @@ static int append_data(struct local_buffer *store, char *path,
  */
 int buffer_data(struct local_buffer *store, char *key, char *data, size_t bytes)
 {
-    struct mk_list *tmp;
-    struct mk_list *head;
     struct chunk *c = NULL;
-    struct chunk *tmp_chunk;
     int ret;
+    size_t written;
     flb_sds_t path;
     flb_sds_t tmp_sds;
 
-    mk_list_foreach_safe(head, tmp, &store->chunks) {
-        tmp_chunk = mk_list_entry(head, struct chunk, _head);
-        if (strcmp(tmp_chunk->key, key) == 0) {
-            c = tmp_chunk;
-            break;
-        }
-    }
+    c = get_chunk(store, key);
 
     if (c == NULL) {
         /* create a new chunk */
@@ -150,11 +135,17 @@ int buffer_data(struct local_buffer *store, char *key, char *data, size_t bytes)
         mk_list_add(&c->_head, &store->chunks);
     }
 
-    ret = append_data(store, c->file_path, data, bytes);
-    if (ret < 0) {
-        flb_plg_error(store->ins, "Failed to buffer data");
+    written = append_data(store, c->file_path, data, bytes);
+    if (written > 0) {
+        c->size += written;
+    }
+    if (written < bytes) {
+        flb_plg_error(store->ins, "Failed to write %d bytes to local buffer %s",
+                      bytes - written, path);
+        flb_errno();
         return -1;
     }
+
     flb_plg_debug(store->ins, "Buffered %d bytes", bytes);
     return 0;
 }
@@ -164,9 +155,20 @@ int buffer_data(struct local_buffer *store, char *key, char *data, size_t bytes)
 /*
  * Returns the chunk associated with the given key
  */
-struct chunk *get_chunk(struct local_buffer *store, char *key);
+struct chunk *get_chunk(struct local_buffer *store, char *key)
+{
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct chunk *c = NULL;
+    struct chunk *tmp_chunk;
 
-/*
- * Reads data from the chunk in the local buffer
- */
-char *read_chunk(struct chunk *c);
+    mk_list_foreach_safe(head, tmp, &store->chunks) {
+        tmp_chunk = mk_list_entry(head, struct chunk, _head);
+        if (strcmp(tmp_chunk->key, key) == 0) {
+            c = tmp_chunk;
+            break;
+        }
+    }
+
+    return c;
+}

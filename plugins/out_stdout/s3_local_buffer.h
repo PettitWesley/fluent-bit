@@ -42,7 +42,7 @@ struct local_buffer {
  * Reads buffer directory and finds any existing files
  * This ensures the plugin will still send data even if FB is restarted
  */
-int init_from_file_system(struct local_buffer *store);
+// int init_from_file_system(struct local_buffer *store);
 
 /*
  * Stores data in the local file system
@@ -55,10 +55,6 @@ int buffer_data(struct local_buffer *store, char *key, char *data, size_t bytes)
  */
 struct chunk *get_chunk(struct local_buffer *store, char *key);
 
-/*
- * Reads data from the chunk in the local buffer
- */
-char *read_chunk(struct chunk *c);
 
 void destroy_chunk(struct chunk *c);
 
