@@ -95,7 +95,7 @@ static int write_tag(char *buffer_path, char *tag)
     char tmp[PATH_MAX];
     size_t ret;
 
-    snprintf(tmp, sizeof(tmp), "%s.tag", buffer_pat);
+    snprintf(tmp, sizeof(tmp), "%s.tag", buffer_path);
     ret = append_data(tmp, tag, strlen(tag));
     if (ret <= 0) {
         return -1;
@@ -191,10 +191,18 @@ struct local_chunk *get_chunk(struct local_buffer *store, char *tag)
     struct mk_list *head;
     struct local_chunk *c = NULL;
     struct local_chunk *tmp_chunk;
+    flb_sds_t hash_key;
+
+    hash_key = simple_hash(tag);
+    if (!hash_key) {
+        flb_plg_error(store->ins, "Could not create local buffer hash key for tag %s",
+                      tag);
+        return -1;
+    }
 
     mk_list_foreach_safe(head, tmp, &store->chunks) {
         tmp_chunk = mk_list_entry(head, struct local_chunk, _head);
-        if (strcmp(tmp_chunk->key, key) == 0) {
+        if (strcmp(tmp_chunk->key, hash_key) == 0) {
             c = tmp_chunk;
             break;
         }
