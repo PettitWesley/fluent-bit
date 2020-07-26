@@ -169,3 +169,34 @@ struct local_chunk *get_chunk(struct local_buffer *store, char *key)
 
     return c;
 }
+
+/*
+ * Simple and fast hashing algorithm to create keys in the local buffer
+ */
+flb_sds_t simple_hash(char *str)
+{
+    unsigned long hash = 5381;
+    int c;
+    flb_sds_t hash_str;
+    flb_sds_t tmp;
+
+    while (c = *str++) {
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    }
+
+    /* flb_sds_printf allocs if the incoming sds is not at least 64 bytes */
+    hash_str = flb_sds_create_size(64);
+    if (!hash_str) {
+        flb_errno();
+        return NULL;
+    }
+    tmp = flb_sds_printf(&hash_str, "%lu", hash);
+    if (!tmp) {
+        flb_errno();
+        flb_sds_destroy(hash_str);
+        return NULL;
+    }
+    hash_str = tmp;
+
+    return hash_str;
+}

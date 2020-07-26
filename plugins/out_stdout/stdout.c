@@ -356,6 +356,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 {
     struct flb_stdout *ctx = out_context;
     flb_sds_t json = NULL;
+    flb_sds_t key;
     struct local_chunk *chunk;
     char *buffered_data = NULL;
     size_t buffer_size;
@@ -364,6 +365,12 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
+    key = simple_hash(tag);
+    if (!key) {
+        flb_plg_error(ctx->ins, "Could not create local buffer hash key");
+        FLB_OUTPUT_RETURN(FLB_ERROR);
+    }
+
     json = flb_pack_msgpack_to_json_format(data, bytes,
                                            FLB_PACK_JSON_FORMAT_LINES,
                                            ctx->json_date_format,
@@ -371,25 +378,25 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     if (json == NULL) {
         flb_plg_error(ctx->ins, "Could not marshal msgpack to JSON");
+        flb_sds_destroy(key);
         FLB_OUTPUT_RETURN(FLB_ERROR);
     }
 
     len = flb_sds_len(json);
-    if (tag[tag_len] != '\0') {
-        flb_error("Tag is not null delimited");
-    }
-    chunk = get_chunk(&ctx->store, tag);
+    chunk = get_chunk(&ctx->store, key);
 
     if (chunk == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
         /* add data to local buffer */
-        ret = buffer_data(&ctx->store, chunk, tag, json, (size_t) len);
+        ret = buffer_data(&ctx->store, chunk, key, json, (size_t) len);
         flb_sds_destroy(json);
+        flb_sds_destroy(key);
         if (ret < 0) {
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
         FLB_OUTPUT_RETURN(FLB_OK);
     }
-
+    flb_sds_destroy(key);
+    
     /* remove chunk from buffer list- needed for async http so that the
      * same chunk won't be sent more than once
      */
@@ -407,12 +414,13 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    /* delete the local buffer */
+    /* data was sent successfully- delete the local buffer */
     ret = remove(chunk->file_path);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
                       chunk->file_path);
     }
+    free_chunk(chunk);
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
