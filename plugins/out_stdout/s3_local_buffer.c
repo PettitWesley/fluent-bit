@@ -87,10 +87,10 @@ static size_t append_data(struct local_buffer *store, char *path,
 
 /*
  * Stores data in the local file system
- * 'c' can be NULL if no local chunk suitable for this data has been created yet
+ * 'c' should be NULL if no local chunk suitable for this data has been created yet
  */
 int buffer_data(struct local_buffer *store, struct local_chunk *c,
-                char *data, size_t bytes)
+                char *key, char *data, size_t bytes)
 {
     int ret;
     size_t written;

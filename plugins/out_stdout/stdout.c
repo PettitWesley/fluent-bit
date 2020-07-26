@@ -301,7 +301,7 @@ static int s3_put_object(struct flb_stdout *ctx, char *buffered_data,
         flb_sds_destroy(uri);
         return -1;
     }
-    tmp = memcpy(body, buffer_data, buffer_size);
+    tmp = memcpy(body, buffered_data, buffer_size);
     if (!tmp) {
         flb_errno();
         flb_free(body);
@@ -442,7 +442,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     if (chunk == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
         /* add data to local buffer */
-        ret = buffer_data(&ctx->store, chunk, json, (size_t) len);
+        ret = buffer_data(&ctx->store, chunk, tag, json, (size_t) len);
         flb_sds_destroy(json);
         if (ret < 0) {
             FLB_OUTPUT_RETURN(FLB_RETRY);
