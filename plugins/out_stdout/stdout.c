@@ -208,6 +208,11 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     ctx->store.ins = ctx->ins;
     ctx->store.dir = ctx->buffer_dir;
     mk_list_init(&ctx->store.chunks);
+    ret = mkdir_all(ctx->store.dir);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Failed to create directories for local buffer: %s",
+                      ctx->store.dir);
+    }
 
     /* create S3 client */
     generator = flb_aws_client_generator();

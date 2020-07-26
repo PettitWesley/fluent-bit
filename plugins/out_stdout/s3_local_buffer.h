@@ -56,6 +56,10 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
  */
 struct local_chunk *get_chunk(struct local_buffer *store, char *key);
 
+/*
+ * Recursively creates directories
+ */
+int mkdir_all(const char *dir);
 
 void free_chunk(struct local_chunk *c);
 

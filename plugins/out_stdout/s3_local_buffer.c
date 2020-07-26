@@ -43,15 +43,15 @@ void free_chunk(struct local_chunk *c)
 }
 
 /*
- * Recursively creates directories needed for 'file'
+ * Recursively creates directories
  */
-static int chunk_mkdir(const char *file) {
+int mkdir_all(const char *dir) {
     char tmp[PATH_MAX];
     char *p = NULL;
     int ret;
     size_t len;
 
-    snprintf(tmp, sizeof(tmp),"%s",file);
+    snprintf(tmp, sizeof(tmp), "%s", dir);
     len = strlen(tmp);
     if(tmp[len - 1] == '/') {
         tmp[len - 1] = 0;
@@ -66,6 +66,11 @@ static int chunk_mkdir(const char *file) {
             }
             *p = '/';
         }
+    }
+    ret = mkdir(tmp, S_IRWXU);
+    if (ret < 0 && errno != EEXIST) {
+        flb_errno();
+        return -1;
     }
 
     return 0;
@@ -124,12 +129,6 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
         }
         path = tmp_sds;
         c->file_path = path;
-        ret = chunk_mkdir(path);
-        if (ret < 0) {
-            flb_plg_error(store->ins, "Failed to create directories in path %s", path);
-            free_chunk(c);
-            return ret;
-        }
         mk_list_add(&c->_head, &store->chunks);
     }
 
