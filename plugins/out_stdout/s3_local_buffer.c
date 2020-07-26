@@ -125,7 +125,7 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
 
     if (c == NULL) {
         /* create a new chunk */
-        flb_plg_debug(store->ins, "Creating new local buffer for key %s", key);
+        flb_plg_debug(store->ins, "Creating new local buffer for tag %s", tag);
         c = flb_calloc(1, sizeof(struct local_chunk));
         if (!c) {
             flb_sds_destroy(key);
@@ -197,7 +197,7 @@ struct local_chunk *get_chunk(struct local_buffer *store, char *tag)
     if (!hash_key) {
         flb_plg_error(store->ins, "Could not create local buffer hash key for tag %s",
                       tag);
-        return -1;
+        return NULL;
     }
 
     mk_list_foreach_safe(head, tmp, &store->chunks) {
