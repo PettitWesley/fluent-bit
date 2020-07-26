@@ -440,7 +440,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
     chunk = get_chunk(&ctx->store, tag);
 
-    if (c == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
+    if (chunk == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
         /* add data to local buffer */
         ret = buffer_data(&ctx->store, chunk, json, (size_t) len);
         flb_sds_destroy(json);
