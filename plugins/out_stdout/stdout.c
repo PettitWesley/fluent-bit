@@ -26,7 +26,6 @@
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
-#include <stdio.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -405,7 +404,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     /* data was sent successfully- delete the local buffer */
-    ret = remove(chunk->file_path);
+    ret = remove_chunk(chunk);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
                       chunk->file_path);

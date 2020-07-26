@@ -22,6 +22,7 @@
 #include <fluent-bit/flb_output_plugin.h>
 #include <monkey/mk_core/mk_list.h>
 #include <sys/stat.h>
+#include <stdio.h>
 #include <errno.h>
 #include <limits.h>
 
@@ -240,4 +241,19 @@ flb_sds_t simple_hash(char *str)
     hash_str = tmp;
 
     return hash_str;
+}
+
+/* Removes all files associated with a chunk once it has been removed */
+int remove_chunk(struct local_chunk *c)
+{
+    int ret;
+    char tmp[PATH_MAX];
+
+    ret = remove(chunk->file_path);
+    if (ret < 0) {
+        return ret;
+    }
+
+    snprintf(tmp, sizeof(tmp), "%s.tag", c->file_path);
+    return remove(tmp);
 }
