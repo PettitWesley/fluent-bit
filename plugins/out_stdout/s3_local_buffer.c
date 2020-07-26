@@ -140,14 +140,14 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
             free_chunk(c);
             return -1;
         }
-        path = flb_sds_create_size(strlen(store->dir) + strlen(key));
+        path = flb_sds_create_size(strlen(store->dir) + strlen(hash_key));
         if (!path) {
             flb_errno();
             free_chunk(c);
             flb_errno();
             return -1;
         }
-        tmp_sds = flb_sds_printf(&path, "%s/%s", store->dir, key);
+        tmp_sds = flb_sds_printf(&path, "%s/%s", store->dir, hash_key);
         if (!tmp_sds) {
             flb_errno();
             free_chunk(c);
