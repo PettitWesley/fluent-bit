@@ -49,12 +49,12 @@ struct local_buffer {
  * 'c' should be NULL if no local chunk suitable for this data has been created yet
  */
 int buffer_data(struct local_buffer *store, struct local_chunk *c,
-                char *key, char *data, size_t bytes);
+                char *tag, char *data, size_t bytes);
 
 /*
- * Returns the chunk associated with the given key
+ * Returns the chunk associated with the given tag
  */
-struct local_chunk *get_chunk(struct local_buffer *store, char *key);
+struct local_chunk *get_chunk(struct local_buffer *store, char *tag);
 
 /*
  * Recursively creates directories

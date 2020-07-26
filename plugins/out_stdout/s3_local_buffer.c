@@ -76,8 +76,7 @@ int mkdir_all(const char *dir) {
     return 0;
 }
 
-static size_t append_data(struct local_buffer *store, char *path,
-                       char *data, size_t bytes)
+static size_t append_data(char *path, char *data, size_t bytes)
 {
     FILE *f;
     size_t written;
@@ -90,28 +89,52 @@ static size_t append_data(struct local_buffer *store, char *path,
     return written;
 }
 
+/* we store the Fluent tag in a file "<hash_key>.tag" */
+static int write_tag(char *buffer_path, char *tag)
+{
+    char tmp[PATH_MAX];
+    size_t ret;
+
+    snprintf(tmp, sizeof(tmp), "%s.tag", buffer_pat);
+    ret = append_data(tmp, tag, strlen(tag));
+    if (ret <= 0) {
+        return -1;
+    }
+    return 0;
+}
+
 /*
  * Stores data in the local file system
  * 'c' should be NULL if no local chunk suitable for this data has been created yet
  */
 int buffer_data(struct local_buffer *store, struct local_chunk *c,
-                char *key, char *data, size_t bytes)
+                char *tag, char *data, size_t bytes)
 {
-    int ret;
     size_t written;
     flb_sds_t path;
     flb_sds_t tmp_sds;
+    flb_sds_t hash_key;
+    int ret;
+
+    hash_key = simple_hash(tag);
+    if (!hash_key) {
+        flb_plg_error(store->ins, "Could not create local buffer hash key for tag %s",
+                      tag);
+        return -1;
+    }
 
     if (c == NULL) {
         /* create a new chunk */
         flb_plg_debug(store->ins, "Creating new local buffer for key %s", key);
         c = flb_calloc(1, sizeof(struct local_chunk));
         if (!c) {
+            flb_sds_destroy(key);
             flb_errno();
             return -1;
         }
         c->create_time = time(NULL);
-        c->key = flb_sds_create(key);
+        c->key = flb_sds_create(hash_key);
+        flb_sds_destroy(hash_key);
         if (!c->key) {
             flb_errno();
             free_chunk(c);
@@ -120,19 +143,29 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
         path = flb_sds_create_size(strlen(store->dir) + strlen(key));
         if (!path) {
             flb_errno();
+            free_chunk(c);
+            flb_errno();
+            return -1;
         }
         tmp_sds = flb_sds_printf(&path, "%s/%s", store->dir, key);
         if (!tmp_sds) {
             flb_errno();
             free_chunk(c);
             flb_sds_destroy(path);
+            return -1;
         }
         path = tmp_sds;
         c->file_path = path;
+        /* save the fluent tag */
+        ret = write_tag(path, tag);
+        if (ret < 0) {
+            flb_plg_error(store->ins, "Could not save Fluent tag to file system; buffer dir=%s",
+                          store->dir);
+        }
         mk_list_add(&c->_head, &store->chunks);
     }
 
-    written = append_data(store, c->file_path, data, bytes);
+    written = append_data(c->file_path, data, bytes);
     if (written > 0) {
         c->size += written;
     }
@@ -152,7 +185,7 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
 /*
  * Returns the chunk associated with the given key
  */
-struct local_chunk *get_chunk(struct local_buffer *store, char *key)
+struct local_chunk *get_chunk(struct local_buffer *store, char *tag)
 {
     struct mk_list *tmp;
     struct mk_list *head;
