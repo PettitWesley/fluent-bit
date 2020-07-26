@@ -417,8 +417,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_stdout *ctx = out_context;
     flb_sds_t json = NULL;
     struct local_chunk *chunk;
-    char *data = NULL;
-    size_t data_size;
+    char *buffered_data = NULL;
+    size_t buffer_size;
     int ret;
     int len;
     (void) i_ins;
@@ -469,13 +469,13 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     //     FLB_OUTPUT_RETURN(FLB_OK);
     // }
 
-    ret = flb_read_file(chunk->file_path, &data, &data_size);
+    ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not read locally buffered data %s",
                       chunk->file_path);
     }
 
-    ret = s3_put_object(ctx, json);
+    ret = s3_put_object(ctx, buffered_data, buffer_size, json);
     flb_sds_destroy(json);
     if (ret < 0) {
         return FLB_OUTPUT_RETURN(FLB_RETRY);
