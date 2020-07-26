@@ -66,7 +66,7 @@ struct flb_stdout {
     int json_date_format;
     flb_sds_t json_date_key;
 
-    struct local_buffer buffer;
+    struct local_buffer store;
     char *buffer_dir;
 
     struct flb_output_instance *ins;
