@@ -438,11 +438,11 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     if (tag[tag_len] != '\0') {
         flb_error("Tag is not null delimited");
     }
-    chunk = get_chunk(ctx->store, tag);
+    chunk = get_chunk(&ctx->store, tag);
 
     if (c == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
         /* add data to local buffer */
-        ret = buffer_data(ctx->store, chunk, json, (size_t) len);
+        ret = buffer_data(&ctx->store, chunk, json, (size_t) len);
         flb_sds_destroy(json);
         if (ret < 0) {
             FLB_OUTPUT_RETURN(FLB_RETRY);
@@ -481,7 +481,6 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    local_buf->offset = 0;
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
