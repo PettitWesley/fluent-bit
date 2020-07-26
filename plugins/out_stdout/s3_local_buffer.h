@@ -61,6 +61,11 @@ struct local_chunk *get_chunk(struct local_buffer *store, char *key);
  */
 int mkdir_all(const char *dir);
 
+/*
+ * Simple and fast hashing algorithm to create keys in the local buffer
+ */
+flb_sds_t simple_hash(char *str);
+
 void free_chunk(struct local_chunk *c);
 
 #endif
