@@ -67,7 +67,7 @@ int mkdir_all(const char *dir);
 flb_sds_t simple_hash(char *str);
 
 /* Removes all files associated with a chunk once it has been removed */
-int remove_chunk(struct local_chunk *c)
+int remove_chunk(struct local_chunk *c);
 
 void free_chunk(struct local_chunk *c);
 
