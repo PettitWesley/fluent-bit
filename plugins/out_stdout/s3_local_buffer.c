@@ -180,7 +180,7 @@ flb_sds_t simple_hash(char *str)
     flb_sds_t hash_str;
     flb_sds_t tmp;
 
-    while (c = *str++) {
+    while ((c = *str++)) {
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
     }
 
