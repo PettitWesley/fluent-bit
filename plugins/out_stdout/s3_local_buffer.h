@@ -57,6 +57,6 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
 struct local_chunk *get_chunk(struct local_buffer *store, char *key);
 
 
-void destroy_chunk(struct local_chunk *c);
+void free_chunk(struct local_chunk *c);
 
 #endif

@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
+#include <stdio.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -336,77 +337,11 @@ static int s3_put_object(struct flb_stdout *ctx, char *buffered_data,
         }
     }
 
-    flb_plg_error(ctx->ins, "PutOjbect request failed");
+    flb_plg_error(ctx->ins, "PutObject request failed");
     flb_sds_destroy(uri);
     flb_free(body);
     return -1;
 }
-
-/*
- * Gets the local buffer chunk which is not currently being uploaded
- * If all chunks have in progress uploads, creates a new one
-*/
-// static struct upload_chunk get_buffer_chunk(struct flb_stdout *ctx)
-// {
-//     struct upload_chunk *chunk = NULL;
-//     struct upload_chunk *tmp_chunk = NULL;
-//     struct mk_list *tmp;
-//     struct mk_list *head;
-//     flb_sds_t s3_key = NULL
-//
-//     /* is there a buffered chunk which is not currently being uploaded? */
-//     if (mk_list_size(&ctx->upload_chunks) > 0) {
-//         mk_list_foreach_safe(head, tmp, &ctx->upload_chunks) {
-//             tmp_chunk = mk_list_entry(head, struct upload_chunk, _head);
-//             if (tmp_chunk->upload_in_progress == FLB_FALSE) {
-//                 chunk = tmp_chunk;
-//                 break;
-//             }
-//         }
-//     }
-//
-//     if (chunk == NULL) {
-//         /* create a new upload */
-//         chunk = flb_calloc(1, sizeof(struct upload_chunk));
-//         if (!chunk) {
-//             flb_errno();
-//             return NULL;
-//         }
-//         chunk->upload_in_progress = FLB_FALSE;
-//         s3_key = get_s3_key(ctx);
-//         if (!s3_key) {
-//             flb_plg_error(ctx->ins, "Failed to construct S3 Object Key");
-//             flb_free(chunk);
-//             return NULL;
-//         }
-//         chunk->s3_key = s3_key;
-//         /* add chunk to list */
-//         mk_list_add(&chunk->_head, &ctx->upload_chunks);
-//     }
-//
-//     return chunk;
-// }
-//
-// /*
-//  * Stores data in the temporary local buffer
-//  */
-// static int buffer_data_locally(struct flb_stdout *ctx,
-//                                struct upload_chunk *chunk, flb_sds_t json)
-// {
-//
-// }
-
-// int ret;
-// int len;
-// struct upload_chunk *chunk = NULL;
-//
-// chunk = get_buffer_chunk(ctx);
-//
-// len = flb_sds_len(json);
-// if (len + chunk->size) > CHUNKED_UPLOAD_SIZE) {
-//     /* tell caller to send current data */
-//     return 1;
-// }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
                             const char *tag, int tag_len,
@@ -450,24 +385,10 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_OK);
     }
 
-    // len = flb_sds_len(json);
-    // local_buf = &ctx->local_buffer;
-    // if ((local_buf->offset + len) < CHUNKED_UPLOAD_SIZE) {
-    //     /* add data to buffer */
-    //     check = memcpy(local_buf->buf + local_buf->offset, json, len);
-    //     if (check == NULL) {
-    //         flb_errno();
-    //         flb_sds_destroy(json);
-    //         FLB_OUTPUT_RETURN(FLB_RETRY);
-    //     }
-    //     local_buf->offset += len;
-    //     local_buf->buf[local_buf->offset] = '\0';
-    //
-    //     /* data persisted, return */
-    //     flb_plg_debug(ctx->ins, "Buffered %d bytes", len);
-    //     flb_sds_destroy(json);
-    //     FLB_OUTPUT_RETURN(FLB_OK);
-    // }
+    /* remove chunk from buffer list- needed for async http so that the
+     * same chunk won't be sent more than once
+     */
+    mk_list_del(&chunk->_head);
 
     ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
     if (ret < 0) {
@@ -481,6 +402,12 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
+    /* delete the local buffer */
+    ret = remove(chunk->file_path);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
+                      chunk->file_path);
+    }
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 

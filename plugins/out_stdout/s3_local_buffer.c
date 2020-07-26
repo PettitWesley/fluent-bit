@@ -28,7 +28,7 @@
 #include "s3_local_buffer.h"
 
 
-void destroy_chunk(struct local_chunk *c)
+void free_chunk(struct local_chunk *c)
 {
     if (!c) {
         return;
@@ -109,7 +109,7 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
         c->key = flb_sds_create(key);
         if (!c->key) {
             flb_errno();
-            destroy_chunk(c);
+            free_chunk(c);
             return -1;
         }
         path = flb_sds_create_size(strlen(store->dir) + strlen(key));
@@ -119,7 +119,7 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
         tmp_sds = flb_sds_printf(&path, "%s/%s", store->dir, key);
         if (!tmp_sds) {
             flb_errno();
-            destroy_chunk(c);
+            free_chunk(c);
             flb_sds_destroy(path);
         }
         path = tmp_sds;
@@ -127,7 +127,7 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
         ret = chunk_mkdir(path);
         if (ret < 0) {
             flb_plg_error(store->ins, "Failed to create directories in path %s", path);
-            destroy_chunk(c);
+            free_chunk(c);
             return ret;
         }
         mk_list_add(&c->_head, &store->chunks);
