@@ -68,7 +68,7 @@ int init_from_file_system(struct local_buffer *store)
 {
     DIR *d;
     struct dirent *dir;
-    struct local_chunk *c
+    struct local_chunk *c;
     char *tag;
 
     d = opendir(store->dir);
