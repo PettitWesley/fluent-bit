@@ -300,7 +300,7 @@ static int put_all_chunks(struct flb_stdout *ctx)
 
     flb_plg_info(ctx->ins, "Sending all locally buffered data to S3");
 
-    mk_list_foreach_safe(head, tmp, &ctx->store->chunks) {
+    mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
         chunk = mk_list_entry(head, struct local_chunk, _head);
 
         ret = construct_request_buffer(ctx, NULL, chunk, &buffer, &buffer_size);
@@ -322,7 +322,7 @@ static int put_all_chunks(struct flb_stdout *ctx)
         flb_free(buffer);
         if (ret < 0) {
             /* re-add chunk to list */
-            mk_list_add(&chunk->_head);
+            mk_list_add(&chunk->_head, &ctx->store.chunks);
             return -1;
         }
 
@@ -485,7 +485,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     flb_free(buffer);
     if (ret < 0) {
         /* re-add chunk to list */
-        mk_list_add(&chunk->_head);
+        mk_list_add(&chunk->_head, &ctx->store.chunks);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
