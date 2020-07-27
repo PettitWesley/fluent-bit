@@ -80,7 +80,7 @@ int init_from_file_system(struct local_buffer *store)
     if (d) {
         while ((dir = readdir(d)) != NULL) {
             if (dir->d_type == DT_REG) {
-                if (is_tag_file(dir->d_name)) {
+                if (is_tag_file(dir->d_name) == 0) {
                     continue;
                 }
                 /* create a new chunk */
