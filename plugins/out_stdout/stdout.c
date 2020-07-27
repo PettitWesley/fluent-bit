@@ -357,7 +357,7 @@ static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
         if (c->resp.status == 200) {
             flb_plg_info(ctx->ins, "Successfully uploaded object %s", uri);
             flb_sds_destroy(uri);
-            flb_free(body);
+            flb_http_client_destroy(c);
             return 0;
         }
         flb_aws_print_xml_error(c->resp.payload, c->resp.payload_size,
@@ -365,11 +365,11 @@ static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
         if (c->resp.data != NULL) {
             flb_plg_debug(ctx->ins, "Raw PutObject response: %s", c->resp.data);
         }
+        flb_http_client_destroy(c);
     }
 
     flb_plg_error(ctx->ins, "PutObject request failed");
     flb_sds_destroy(uri);
-    flb_free(body);
     return -1;
 }
 
