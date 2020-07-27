@@ -30,6 +30,12 @@
 
 #include "stdout.h"
 
+static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
+                                    struct local_chunk *chunk,
+                                    char **out_buf, size_t *out_size);
+
+static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size);
+
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
 {
@@ -307,7 +313,6 @@ static int put_all_chunks(struct flb_stdout *ctx)
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not construct request buffer %s",
                           chunk->file_path);
-            flb_sds_destroy(json);
             return -1;
         }
 
@@ -318,7 +323,6 @@ static int put_all_chunks(struct flb_stdout *ctx)
         mk_list_del(&chunk->_head);
 
         ret = s3_put_object(ctx, buffer, buffer_size);
-        flb_sds_destroy(json);
         flb_free(buffer);
         if (ret < 0) {
             /* re-add chunk to list */
@@ -467,10 +471,10 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     ret = construct_request_buffer(ctx, json, chunk, &buffer, &buffer_size);
+    flb_sds_destroy(json);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not construct request buffer %s",
                       chunk->file_path);
-        flb_sds_destroy(json);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
@@ -481,7 +485,6 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     mk_list_del(&chunk->_head);
 
     ret = s3_put_object(ctx, buffer, buffer_size);
-    flb_sds_destroy(json);
     flb_free(buffer);
     if (ret < 0) {
         /* re-add chunk to list */
