@@ -284,6 +284,60 @@ static flb_sds_t get_s3_key(struct flb_stdout *ctx)
     return uri;
 }
 
+/*
+ * Attempts to send all chunks to S3 using PutObject
+ * Used on shut down to try to send all buffered data
+ * Used on start up to try to send any leftover buffers from previous executions
+ */
+static int put_all_chunks(struct flb_stdout *ctx)
+{
+    struct local_chunk *chunk;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    char *buffer = NULL;
+    size_t buffer_size;
+    int ret;
+
+    flb_plg_info(ctx->ins, "Sending all locally buffered data to S3");
+
+    mk_list_foreach_safe(head, tmp, &ctx->store->chunks) {
+        chunk = mk_list_entry(head, struct local_chunk, _head);
+
+        ret = construct_request_buffer(ctx, NULL, chunk, &buffer, &buffer_size);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not construct request buffer %s",
+                          chunk->file_path);
+            flb_sds_destroy(json);
+            return -1;
+        }
+
+        /*
+         * remove chunk from buffer list- needed for async http so that the
+         * same chunk won't be sent more than once
+         */
+        mk_list_del(&chunk->_head);
+
+        ret = s3_put_object(ctx, buffer, buffer_size);
+        flb_sds_destroy(json);
+        flb_free(buffer);
+        if (ret < 0) {
+            /* re-add chunk to list */
+            mk_list_add(&chunk->_head);
+            return -1;
+        }
+
+        /* data was sent successfully- delete the local buffer */
+        ret = remove_chunk(chunk);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
+                          chunk->file_path);
+        }
+        free_chunk(chunk);
+    }
+
+    return 0;
+}
+
 static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
                                     struct local_chunk *chunk,
                                     char **out_buf, size_t *out_size)
@@ -430,6 +484,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     flb_sds_destroy(json);
     flb_free(buffer);
     if (ret < 0) {
+        /* re-add chunk to list */
+        mk_list_add(&chunk->_head);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
@@ -445,14 +501,19 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
 static int cb_stdout_exit(void *data, struct flb_config *config)
 {
+    int ret;
     struct flb_stdout *ctx = data;
 
     if (!ctx) {
         return 0;
     }
 
-    flb_free(ctx);
-    return 0;
+    ret = put_all_chunks(ctx);
+    if (ret == 0) {
+        flb_free(ctx);
+        //TODO: destroy function
+    }
+    return -1;
 }
 
 /* Configuration properties map */
