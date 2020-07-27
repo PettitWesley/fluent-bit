@@ -222,7 +222,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 
     /* read any remaining buffers from previous (failed) executions */
     ctx->has_old_buffers = FLB_FALSE;
-    ret = init_from_file_system(struct local_buffer *store)
+    ret = init_from_file_system(ctx->store);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to read existing local buffers at %s",
                       ctx->store.dir);
