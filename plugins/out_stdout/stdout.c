@@ -511,6 +511,8 @@ static int cb_stdout_exit(void *data, struct flb_config *config)
         return 0;
     }
 
+    /* exit must run in sync mode */
+    ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
     ret = put_all_chunks(ctx);
     if (ret == 0) {
         flb_free(ctx);
