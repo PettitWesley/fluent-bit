@@ -51,9 +51,7 @@ void free_chunk(struct local_chunk *c)
 
 static int is_tag_file(char *string)
 {
-    flb_info("file: %s", string);
     string = strrchr(string, '.');
-    flb_info("ending: %s", string);
 
     if (string != NULL) {
         return (strcmp(string, ".tag"));
