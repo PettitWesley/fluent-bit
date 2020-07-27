@@ -284,15 +284,63 @@ static flb_sds_t get_s3_key(struct flb_stdout *ctx)
     return uri;
 }
 
-static int s3_put_object(struct flb_stdout *ctx, char *buffered_data,
-                         size_t buffer_size, flb_sds_t json)
+static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
+                                    struct local_chunk *chunk,
+                                    char **out_buf, size_t *out_size)
+{
+    char *body;
+    char *tmp;
+    size_t body_size;
+    char *buffered_data = NULL;
+    size_t buffer_size;
+    int ret;
+
+    ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not read locally buffered data %s",
+                      chunk->file_path);
+        return -1;
+    }
+
+    body_size = buffer_size;
+    if (new_data) {
+        body_size += flb_sds_len(new_data);
+    }
+
+    body = flb_malloc(body_size + 1);
+    if (!body) {
+        flb_errno();
+        flb_free(buffered_data);
+        return -1;
+    }
+    tmp = memcpy(body, buffered_data, buffer_size);
+    if (!tmp) {
+        flb_errno();
+        flb_free(body);
+        flb_free(buffered_data);
+        return -1;
+    }
+    flb_free(buffered_data);
+    if (new_data) {
+        tmp = memcpy(body + buffer_size, new_data, flb_sds_len(new_data));
+        if (!tmp) {
+            flb_errno();
+            flb_free(body);
+            return -1;
+        }
+    }
+    body[body_len] = '\0';
+
+    *out_buf = body;
+    *out_size = body_size;
+    return 0;
+}
+
+static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
 {
     flb_sds_t uri = NULL;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
-    char *body;
-    char *tmp;
-    size_t body_len = buffer_size + flb_sds_len(json);
 
     uri = get_s3_key(ctx);
     if (!uri) {
@@ -300,31 +348,9 @@ static int s3_put_object(struct flb_stdout *ctx, char *buffered_data,
         return -1;
     }
 
-    body = flb_malloc(body_len + 1);
-    if (!body) {
-        flb_errno();
-        flb_sds_destroy(uri);
-        return -1;
-    }
-    tmp = memcpy(body, buffered_data, buffer_size);
-    if (!tmp) {
-        flb_errno();
-        flb_free(body);
-        flb_sds_destroy(uri);
-        return -1;
-    }
-    tmp = memcpy(body + buffer_size, json, flb_sds_len(json));
-    if (!tmp) {
-        flb_errno();
-        flb_free(body);
-        flb_sds_destroy(uri);
-        return -1;
-    }
-    body[body_len] = '\0';
-
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
-                                          uri, body, body_len,
+                                          uri, body, body_size,
                                           NULL, 0);
     if (c) {
         flb_plg_debug(ctx->ins, "PutObject http status=%d", c->resp.status);
@@ -356,7 +382,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_stdout *ctx = out_context;
     flb_sds_t json = NULL;
     struct local_chunk *chunk;
-    char *buffered_data = NULL;
+    char *buffer = NULL;
     size_t buffer_size;
     int ret;
     int len;
@@ -386,19 +412,23 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_OK);
     }
 
-    /* remove chunk from buffer list- needed for async http so that the
+    ret = construct_request_buffer(ctx, json, chunk, &buffer, buffer_size);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not construct request buffer %s",
+                      chunk->file_path);
+        flb_sds_destroy(json);
+        return FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    /*
+     * remove chunk from buffer list- needed for async http so that the
      * same chunk won't be sent more than once
      */
     mk_list_del(&chunk->_head);
 
-    ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
-    if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not read locally buffered data %s",
-                      chunk->file_path);
-    }
-
-    ret = s3_put_object(ctx, buffered_data, buffer_size, json);
+    ret = s3_put_object(ctx, buffer, buffer_size);
     flb_sds_destroy(json);
+    flb_free(buffer);
     if (ret < 0) {
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
