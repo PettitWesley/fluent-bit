@@ -130,9 +130,9 @@ int init_from_file_system(struct local_buffer *store)
                 mk_list_add(&c->_head, &store->chunks);
             }
         }
-    closedir(d);
-  }
-
+        closedir(d);
+    }
+  return 0
 }
 
 /*

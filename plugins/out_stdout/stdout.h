@@ -55,6 +55,12 @@ struct flb_stdout {
     struct local_buffer store;
     char *buffer_dir;
 
+    /*
+     * used to track that unset buffers were found on startup that have not
+     * been sent
+     */
+    int has_old_buffers;
+
     struct flb_output_instance *ins;
 };
 
