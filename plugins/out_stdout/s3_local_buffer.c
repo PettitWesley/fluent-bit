@@ -20,6 +20,7 @@
 
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_output_plugin.h>
+#include <fluent-bit/flb_aws_util.h>
 #include <monkey/mk_core/mk_list.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -70,6 +71,8 @@ int init_from_file_system(struct local_buffer *store)
     struct dirent *dir;
     struct local_chunk *c;
     char *tag;
+    flb_sds_t path;
+    flb_sds_t tmp_sds;
 
     d = opendir(store->dir);
     if (d) {
@@ -132,7 +135,7 @@ int init_from_file_system(struct local_buffer *store)
         }
         closedir(d);
     }
-  return 0
+  return 0;
 }
 
 /*
