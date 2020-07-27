@@ -535,53 +535,6 @@ time_t flb_aws_cred_expiration(const char *timestamp)
      return expiration;
 }
 
-int flb_read_file(const char *path, char **out_buf, size_t *out_size)
-{
-    int ret;
-    long bytes;
-    char *buf = NULL;
-    FILE *fp = NULL;
-    struct stat st;
-    int fd;
-
-    fp = fopen(path, "r");
-    if (!fp) {
-        return -1;
-    }
-
-    fd = fileno(fp);
-    ret = fstat(fd, &st);
-    if (ret == -1) {
-        flb_errno();
-        fclose(fp);
-        return -1;
-    }
-
-    buf = flb_malloc(st.st_size + sizeof(char));
-    if (!buf) {
-        flb_errno();
-        fclose(fp);
-        return -1;
-    }
-
-    bytes = fread(buf, st.st_size, 1, fp);
-    if (bytes != 1) {
-        flb_errno();
-        flb_free(buf);
-        fclose(fp);
-        return -1;
-    }
-
-    /* fread does not add null byte */
-    buf[st.st_size] = '\0';
-
-    fclose(fp);
-    *out_buf = buf;
-    *out_size = st.st_size;
-
-    return 0;
-}
-
 /*
  * Fluent Bit is single-threaded but asynchonous. Only one co-routine will
  * be running at a time, and they only pause/resume for IO.
