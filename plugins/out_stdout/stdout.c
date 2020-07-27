@@ -232,18 +232,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     if (mk_list_size(&ctx->store.chunks) > 0) {
-        flb_plg_info(ctx->ins, "Sending locally buffered data from previous executions to S3");
-        /* init must run in sync mode */
-        ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
-        ret = put_all_chunks(ctx);
-        if (ret < 0) {
-            flb_plg_error(ctx->ins, "Failed to send locally buffered data left over"
-                          " from previous executions; will retry. Buffer=%s", ctx->store.dir);
-            /* note that these should be retried on first flush */
-            ctx->has_old_buffers = FLB_TRUE;
-        }
-        /* set back to async */
-        ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
+        /* note that these should be sent on first flush */
+        ctx->has_old_buffers = FLB_TRUE;
     }
 
     /* create S3 client */
@@ -477,6 +467,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     /* first, clean up any old buffers found on startup */
     if (ctx->has_old_buffers == FLB_TRUE) {
+        flb_plg_info(ctx->ins, "Sending locally buffered data from previous "
+                     "executions to S3; buffer=%s", ctx->store.dir);
         ret = put_all_chunks(ctx);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Failed to send locally buffered data left over"
