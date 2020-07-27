@@ -36,6 +36,8 @@ static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
 
 static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size);
 
+static int put_all_chunks(struct flb_stdout *ctx);
+
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
 {
@@ -222,14 +224,14 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 
     /* read any remaining buffers from previous (failed) executions */
     ctx->has_old_buffers = FLB_FALSE;
-    ret = init_from_file_system(ctx->store);
+    ret = init_from_file_system(&ctx->store);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to read existing local buffers at %s",
                       ctx->store.dir);
         goto error;
     }
 
-    if (mk_list_size(ctx->store.chunks) > 0) {
+    if (mk_list_size(&ctx->store.chunks) > 0) {
         flb_plg_info(ctx->ins, "Sending locally buffered data from previous executions to S3");
         /* init must run in sync mode */
         ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
@@ -548,7 +550,7 @@ static int cb_stdout_exit(void *data, struct flb_config *config)
         return 0;
     }
 
-    if (mk_list_size(ctx->store.chunks) > 0) {
+    if (mk_list_size(&ctx->store.chunks) > 0) {
         /* exit must run in sync mode */
         ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
         flb_plg_info(ctx->ins, "Sending all locally buffered data to S3");
