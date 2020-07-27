@@ -304,6 +304,8 @@ static int put_all_chunks(struct flb_stdout *ctx)
     size_t buffer_size;
     int ret;
 
+    //TODO: clean up flush must have non-conflicting S3 key names with normal data
+    // append something like "-partial-chunk" or "-fluent-bit-recovered-chunk"
     flb_plg_info(ctx->ins, "Sending all locally buffered data to S3");
 
     mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {

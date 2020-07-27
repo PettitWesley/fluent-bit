@@ -22,7 +22,10 @@
 #define FLB_OUT_S3_LOCAL_BUFFER_H
 
 struct local_chunk {
+    /* identifies this chunk in the buffer dir; created with simple_hash fn */
     flb_sds_t key;
+    /* the original fluent tag for this data */
+    flb_sds_t tag;
     flb_sds_t file_path;
     size_t size;
     time_t create_time;
@@ -40,9 +43,9 @@ struct local_buffer {
 /*
  * "Initializes" the local buffer from the file system
  * Reads buffer directory and finds any existing files
- * This ensures the plugin will still send data even if FB is restarted
+ * This ensures the plugin will still send buffered data even if FB is restarted
  */
-// int init_from_file_system(struct local_buffer *store);
+int init_from_file_system(struct local_buffer *store);
 
 /*
  * Stores data in the local file system

@@ -25,9 +25,11 @@
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
+#include <dirent.h>
 
 #include "s3_local_buffer.h"
 
+static char *read_tag(char *buffer_path);
 
 void free_chunk(struct local_chunk *c)
 {
@@ -40,7 +42,97 @@ void free_chunk(struct local_chunk *c)
     if (c->file_path) {
         flb_sds_destroy(c->file_path);
     }
+    if (c->tag) {
+        flb_sds_destroy(c->tag);
+    }
     flb_free(c);
+}
+
+static int is_tag_file(char *string)
+{
+  string = strrchr(string, '.');
+
+    if (string != NULL) {
+        return (strcmp(string, ".tag"));
+    }
+
+  return -1;
+}
+
+/*
+ * "Initializes" the local buffer from the file system
+ * Reads buffer directory and finds any existing files
+ * This ensures the plugin will still send buffered data even if FB is restarted
+ */
+int init_from_file_system(struct local_buffer *store)
+{
+    DIR *d;
+    struct dirent *dir;
+    struct local_chunk *c
+    char *tag;
+
+    d = opendir(store->dir);
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if (dir->d_type == DT_REG) {
+                if (is_tag_file(dir->d_name)) {
+                    continue;
+                }
+                /* create a new chunk */
+                flb_plg_debug(store->ins, "Found existing local buffer file %s",
+                              dir->d_name);
+                c = flb_calloc(1, sizeof(struct local_chunk));
+                if (!c) {
+                    flb_errno();
+                    return -1;
+                }
+                c->create_time = time(NULL);
+                c->key = flb_sds_create(dir->d_name);
+                if (!c->key) {
+                    flb_errno();
+                    free_chunk(c);
+                    return -1;
+                }
+                path = flb_sds_create_size(strlen(store->dir) + strlen(dir->d_name));
+                if (!path) {
+                    flb_errno();
+                    free_chunk(c);
+                    flb_errno();
+                    return -1;
+                }
+                tmp_sds = flb_sds_printf(&path, "%s/%s", store->dir, dir->d_name);
+                if (!tmp_sds) {
+                    flb_errno();
+                    free_chunk(c);
+                    flb_sds_destroy(path);
+                    return -1;
+                }
+                path = tmp_sds;
+                c->file_path = path;
+                /* get the fluent tag */
+                tag = read_tag(path);
+                if (!tag) {
+                    flb_plg_error(store->ins, "Could not read Fluent tag from file system; buffer dir=%s",
+                                  store->dir);
+                    flb_errno();
+                    free_chunk(c);
+                    return -1;
+                }
+                c->tag = flb_sds_create(tag);
+                flb_free(tag);
+                if (!c->tag) {
+                    flb_errno();
+                    free_chunk(c);
+                    return -1;
+                }
+                flb_plg_info(store->ins, "Found existing local buffer %s",
+                             path);
+                mk_list_add(&c->_head, &store->chunks);
+            }
+        }
+    closedir(d);
+  }
+
 }
 
 /*
@@ -104,6 +196,22 @@ static int write_tag(char *buffer_path, char *tag)
     return 0;
 }
 
+/* we store the Fluent tag in a file "<hash_key>.tag" */
+static char *read_tag(char *buffer_path)
+{
+    char tmp[PATH_MAX];
+    size_t ret;
+    char *data;
+    size_t data_size;
+
+    snprintf(tmp, sizeof(tmp), "%s.tag", buffer_path);
+    ret = flb_read_file(tmp, &data, &data_size);
+    if (ret <= 0) {
+        return NULL;
+    }
+    return data;
+}
+
 /*
  * Stores data in the local file system
  * 'c' should be NULL if no local chunk suitable for this data has been created yet
@@ -137,6 +245,12 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
         c->key = flb_sds_create(hash_key);
         flb_sds_destroy(hash_key);
         if (!c->key) {
+            flb_errno();
+            free_chunk(c);
+            return -1;
+        }
+        c->tag = flb_sds_create(tag);
+        if (!c->tag) {
             flb_errno();
             free_chunk(c);
             return -1;
