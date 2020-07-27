@@ -115,8 +115,8 @@ int init_from_file_system(struct local_buffer *store)
                 /* get the fluent tag */
                 tag = read_tag(path);
                 if (!tag) {
-                    flb_plg_error(store->ins, "Could not read Fluent tag from file system; buffer dir=%s",
-                                  store->dir);
+                    flb_plg_error(store->ins, "Could not read Fluent tag from file system; file path=%s.tag",
+                                  path);
                     flb_errno();
                     free_chunk(c);
                     return -1;
