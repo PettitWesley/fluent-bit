@@ -329,7 +329,7 @@ static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
             return -1;
         }
     }
-    body[body_len] = '\0';
+    body[body_size] = '\0';
 
     *out_buf = body;
     *out_size = body_size;
