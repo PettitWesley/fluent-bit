@@ -210,6 +210,7 @@ static char *read_tag(char *buffer_path)
     size_t data_size;
 
     snprintf(tmp, sizeof(tmp), "%s.tag", buffer_path);
+    flb_info("Reading tag from %s", tmp);
     ret = flb_read_file(tmp, &data, &data_size);
     if (ret <= 0) {
         return NULL;
