@@ -3,7 +3,6 @@
 /*  Fluent Bit
  *  ==========
  *  Copyright (C) 2019-2020 The Fluent Bit Authors
- *  Copyright (C) 2015-2018 Treasure Data Inc.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,6 +20,7 @@
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_s3_local_buffer.h>
 #include <monkey/mk_core/mk_list.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -28,7 +28,6 @@
 #include <limits.h>
 #include <dirent.h>
 
-#include "s3_local_buffer.h"
 
 static char *read_tag(char *buffer_path);
 

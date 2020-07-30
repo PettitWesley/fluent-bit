@@ -3,7 +3,6 @@
 /*  Fluent Bit
  *  ==========
  *  Copyright (C) 2019-2020 The Fluent Bit Authors
- *  Copyright (C) 2015-2018 Treasure Data Inc.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,8 +17,10 @@
  *  limitations under the License.
  */
 
-#ifndef FLB_OUT_S3_LOCAL_BUFFER_H
-#define FLB_OUT_S3_LOCAL_BUFFER_H
+#ifdef FLB_HAVE_AWS
+
+#ifndef FLB_S3_LOCAL_BUFFER_H
+#define FLB_S3_LOCAL_BUFFER_H
 
 struct local_chunk {
     /* identifies this chunk in the buffer dir; created with simple_hash fn */
@@ -75,3 +76,4 @@ int remove_chunk(struct local_chunk *c);
 void free_chunk(struct local_chunk *c);
 
 #endif
+#endif /* FLB_HAVE_AWS */

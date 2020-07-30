@@ -26,8 +26,7 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
-
-#include "s3_local_buffer.h"
+#include <fluent-bit/flb_s3_local_buffer.h>
 
 /* Upload data to S3 in 5MB chunks */
 #define CHUNKED_UPLOAD_SIZE 5000000

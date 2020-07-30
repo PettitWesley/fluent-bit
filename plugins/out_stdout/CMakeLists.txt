@@ -1,5 +1,4 @@
 set(src
-  stdout.c
-  s3_local_buffer.c)
+  stdout.c)
 
 FLB_PLUGIN(out_stdout "${src}" "")
