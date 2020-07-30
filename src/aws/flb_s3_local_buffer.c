@@ -20,7 +20,7 @@
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_aws_util.h>
-#include <fluent-bit/flb_local_buffer.h>
+#include <fluent-bit/flb_s3_local_buffer.h>
 #include <monkey/mk_core/mk_list.h>
 #include <sys/stat.h>
 #include <stdio.h>
