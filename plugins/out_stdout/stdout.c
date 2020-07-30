@@ -31,7 +31,7 @@
 #include "stdout.h"
 
 static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
-                                    struct local_chunk *chunk,
+                                    struct flb_local_chunk *chunk,
                                     char **out_buf, size_t *out_size);
 
 static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size);
@@ -215,7 +215,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     ctx->store.ins = ctx->ins;
     ctx->store.dir = ctx->buffer_dir;
     mk_list_init(&ctx->store.chunks);
-    ret = mkdir_all(ctx->store.dir);
+    ret = flb_mkdir_all(ctx->store.dir);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to create directories for local buffer: %s",
                       ctx->store.dir);
@@ -224,7 +224,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 
     /* read any remaining buffers from previous (failed) executions */
     ctx->has_old_buffers = FLB_FALSE;
-    ret = init_from_file_system(&ctx->store);
+    ret = flb_init_local_buffer(&ctx->store);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to read existing local buffers at %s",
                       ctx->store.dir);
@@ -314,7 +314,7 @@ static flb_sds_t get_s3_key(struct flb_stdout *ctx)
  */
 static int put_all_chunks(struct flb_stdout *ctx)
 {
-    struct local_chunk *chunk;
+    struct flb_local_chunk *chunk;
     struct mk_list *tmp;
     struct mk_list *head;
     char *buffer = NULL;
@@ -325,7 +325,7 @@ static int put_all_chunks(struct flb_stdout *ctx)
     // append something like "-partial-chunk" or "-fluent-bit-recovered-chunk"
 
     mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
-        chunk = mk_list_entry(head, struct local_chunk, _head);
+        chunk = mk_list_entry(head, struct flb_local_chunk, _head);
 
         ret = construct_request_buffer(ctx, NULL, chunk, &buffer, &buffer_size);
         if (ret < 0) {
@@ -349,19 +349,19 @@ static int put_all_chunks(struct flb_stdout *ctx)
         }
 
         /* data was sent successfully- delete the local buffer */
-        ret = remove_chunk(chunk);
+        ret = flb_remove_chunk_files(chunk);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
                           chunk->file_path);
         }
-        free_chunk(chunk);
+        flb_chunk_destroy(chunk);
     }
 
     return 0;
 }
 
 static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
-                                    struct local_chunk *chunk,
+                                    struct flb_local_chunk *chunk,
                                     char **out_buf, size_t *out_size)
 {
     char *body;
@@ -457,7 +457,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 {
     struct flb_stdout *ctx = out_context;
     flb_sds_t json = NULL;
-    struct local_chunk *chunk;
+    struct flb_local_chunk *chunk;
     char *buffer = NULL;
     size_t buffer_size;
     int ret;
@@ -489,11 +489,11 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     len = flb_sds_len(json);
-    chunk = get_chunk(&ctx->store, tag);
+    chunk = flb_chunk_get(&ctx->store, tag);
 
     if (chunk == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
         /* add data to local buffer */
-        ret = buffer_data(&ctx->store, chunk, tag, json, (size_t) len);
+        ret = flb_buffer_put(&ctx->store, chunk, tag, json, (size_t) len);
         flb_sds_destroy(json);
         if (ret < 0) {
             FLB_OUTPUT_RETURN(FLB_RETRY);
@@ -524,12 +524,12 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     /* data was sent successfully- delete the local buffer */
-    ret = remove_chunk(chunk);
+    ret = flb_remove_chunk_files(chunk);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
                       chunk->file_path);
     }
-    free_chunk(chunk);
+    flb_chunk_destroy(chunk);
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 

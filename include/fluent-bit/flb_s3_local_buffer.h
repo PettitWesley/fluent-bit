@@ -19,10 +19,10 @@
 
 #ifdef FLB_HAVE_AWS
 
-#ifndef FLB_S3_LOCAL_BUFFER_H
-#define FLB_S3_LOCAL_BUFFER_H
+#ifndef flb_local_buffer_H
+#define flb_local_buffer_H
 
-struct local_chunk {
+struct flb_local_chunk {
     /* identifies this chunk in the buffer dir; created with simple_hash fn */
     flb_sds_t key;
     /* the original fluent tag for this data */
@@ -34,7 +34,7 @@ struct local_chunk {
     struct mk_list _head;
 };
 
-struct local_buffer {
+struct flb_local_buffer {
     char *dir;
     struct flb_output_instance *ins;
 
@@ -46,34 +46,29 @@ struct local_buffer {
  * Reads buffer directory and finds any existing files
  * This ensures the plugin will still send buffered data even if FB is restarted
  */
-int init_from_file_system(struct local_buffer *store);
+int flb_init_local_buffer(struct flb_local_buffer *store);
 
 /*
  * Stores data in the local file system
  * 'c' should be NULL if no local chunk suitable for this data has been created yet
  */
-int buffer_data(struct local_buffer *store, struct local_chunk *c,
-                char *tag, char *data, size_t bytes);
+int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
+                   char *tag, char *data, size_t bytes);
 
 /*
  * Returns the chunk associated with the given tag
  */
-struct local_chunk *get_chunk(struct local_buffer *store, char *tag);
+struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, char *tag);
 
 /*
  * Recursively creates directories
  */
-int mkdir_all(const char *dir);
-
-/*
- * Simple and fast hashing algorithm to create keys in the local buffer
- */
-flb_sds_t simple_hash(char *str);
+int flb_mkdir_all(const char *dir);
 
 /* Removes all files associated with a chunk once it has been removed */
-int remove_chunk(struct local_chunk *c);
+int flb_remove_chunk_files(struct flb_local_chunk *c);
 
-void free_chunk(struct local_chunk *c);
+void flb_chunk_destroy(struct flb_local_chunk *c);
 
 #endif
 #endif /* FLB_HAVE_AWS */

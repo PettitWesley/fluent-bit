@@ -20,7 +20,7 @@
 #include <fluent-bit/flb_sds.h>
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_aws_util.h>
-#include <fluent-bit/flb_s3_local_buffer.h>
+#include <fluent-bit/flb_local_buffer.h>
 #include <monkey/mk_core/mk_list.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -28,10 +28,14 @@
 #include <limits.h>
 #include <dirent.h>
 
+/*
+ * Simple and fast hashing algorithm to create keys in the local buffer
+ */
+flb_sds_t simple_hash(char *str);
 
 static char *read_tag(char *buffer_path);
 
-void free_chunk(struct local_chunk *c)
+void flb_chunk_destroy(struct flb_local_chunk *c)
 {
     if (!c) {
         return;
@@ -64,11 +68,11 @@ static int is_tag_file(char *string)
  * Reads buffer directory and finds any existing files
  * This ensures the plugin will still send buffered data even if FB is restarted
  */
-int init_from_file_system(struct local_buffer *store)
+int flb_init_local_buffer(struct flb_local_buffer *store)
 {
     DIR *d;
     struct dirent *dir;
-    struct local_chunk *c;
+    struct flb_local_chunk *c;
     char *tag;
     flb_sds_t path;
     flb_sds_t tmp_sds;
@@ -83,7 +87,7 @@ int init_from_file_system(struct local_buffer *store)
                 /* create a new chunk */
                 flb_plg_debug(store->ins, "Found existing local buffer file %s",
                               dir->d_name);
-                c = flb_calloc(1, sizeof(struct local_chunk));
+                c = flb_calloc(1, sizeof(struct flb_local_chunk));
                 if (!c) {
                     flb_errno();
                     return -1;
@@ -92,20 +96,20 @@ int init_from_file_system(struct local_buffer *store)
                 c->key = flb_sds_create(dir->d_name);
                 if (!c->key) {
                     flb_errno();
-                    free_chunk(c);
+                    flb_chunk_destroy(c);
                     return -1;
                 }
                 path = flb_sds_create_size(strlen(store->dir) + strlen(dir->d_name));
                 if (!path) {
                     flb_errno();
-                    free_chunk(c);
+                    flb_chunk_destroy(c);
                     flb_errno();
                     return -1;
                 }
                 tmp_sds = flb_sds_printf(&path, "%s/%s", store->dir, dir->d_name);
                 if (!tmp_sds) {
                     flb_errno();
-                    free_chunk(c);
+                    flb_chunk_destroy(c);
                     flb_sds_destroy(path);
                     return -1;
                 }
@@ -117,14 +121,14 @@ int init_from_file_system(struct local_buffer *store)
                     flb_plg_error(store->ins, "Could not read Fluent tag from file system; file path=%s.tag",
                                   path);
                     flb_errno();
-                    free_chunk(c);
+                    flb_chunk_destroy(c);
                     return -1;
                 }
                 c->tag = flb_sds_create(tag);
                 flb_free(tag);
                 if (!c->tag) {
                     flb_errno();
-                    free_chunk(c);
+                    flb_chunk_destroy(c);
                     return -1;
                 }
                 flb_plg_info(store->ins, "Found existing local buffer %s",
@@ -140,7 +144,7 @@ int init_from_file_system(struct local_buffer *store)
 /*
  * Recursively creates directories
  */
-int mkdir_all(const char *dir) {
+int flb_mkdir_all(const char *dir) {
     char tmp[PATH_MAX];
     char *p = NULL;
     int ret;
@@ -218,8 +222,8 @@ static char *read_tag(char *buffer_path)
  * Stores data in the local file system
  * 'c' should be NULL if no local chunk suitable for this data has been created yet
  */
-int buffer_data(struct local_buffer *store, struct local_chunk *c,
-                char *tag, char *data, size_t bytes)
+int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
+                   char *tag, char *data, size_t bytes)
 {
     size_t written;
     flb_sds_t path;
@@ -237,7 +241,7 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
     if (c == NULL) {
         /* create a new chunk */
         flb_plg_debug(store->ins, "Creating new local buffer for %s", tag);
-        c = flb_calloc(1, sizeof(struct local_chunk));
+        c = flb_calloc(1, sizeof(struct flb_local_chunk));
         if (!c) {
             flb_sds_destroy(hash_key);
             flb_errno();
@@ -248,26 +252,26 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
         flb_sds_destroy(hash_key);
         if (!c->key) {
             flb_errno();
-            free_chunk(c);
+            flb_chunk_destroy(c);
             return -1;
         }
         c->tag = flb_sds_create(tag);
         if (!c->tag) {
             flb_errno();
-            free_chunk(c);
+            flb_chunk_destroy(c);
             return -1;
         }
         path = flb_sds_create_size(strlen(store->dir) + strlen(hash_key));
         if (!path) {
             flb_errno();
-            free_chunk(c);
+            flb_chunk_destroy(c);
             flb_errno();
             return -1;
         }
         tmp_sds = flb_sds_printf(&path, "%s/%s", store->dir, hash_key);
         if (!tmp_sds) {
             flb_errno();
-            free_chunk(c);
+            flb_chunk_destroy(c);
             flb_sds_destroy(path);
             return -1;
         }
@@ -302,12 +306,12 @@ int buffer_data(struct local_buffer *store, struct local_chunk *c,
 /*
  * Returns the chunk associated with the given key
  */
-struct local_chunk *get_chunk(struct local_buffer *store, char *tag)
+struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, char *tag)
 {
     struct mk_list *tmp;
     struct mk_list *head;
-    struct local_chunk *c = NULL;
-    struct local_chunk *tmp_chunk;
+    struct flb_local_chunk *c = NULL;
+    struct flb_local_chunk *tmp_chunk;
     flb_sds_t hash_key;
 
     hash_key = simple_hash(tag);
@@ -318,7 +322,7 @@ struct local_chunk *get_chunk(struct local_buffer *store, char *tag)
     }
 
     mk_list_foreach_safe(head, tmp, &store->chunks) {
-        tmp_chunk = mk_list_entry(head, struct local_chunk, _head);
+        tmp_chunk = mk_list_entry(head, struct flb_local_chunk, _head);
         if (strcmp(tmp_chunk->key, hash_key) == 0) {
             c = tmp_chunk;
             break;
@@ -360,7 +364,7 @@ flb_sds_t simple_hash(char *str)
 }
 
 /* Removes all files associated with a chunk once it has been removed */
-int remove_chunk(struct local_chunk *c)
+int flb_remove_chunk_files(struct flb_local_chunk *c)
 {
     int ret;
     char tmp[PATH_MAX];
