@@ -29,6 +29,7 @@
 #include <msgpack.h>
 
 #include "stdout.h"
+#include "s3_multipart.h"
 
 
 int create_multipart_upload(struct flb_stdout *ctx,

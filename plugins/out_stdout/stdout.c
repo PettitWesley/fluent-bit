@@ -29,6 +29,7 @@
 #include <msgpack.h>
 
 #include "stdout.h"
+#include "s3_multipart.h"
 
 static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
                                     struct flb_local_chunk *chunk,
@@ -267,6 +268,9 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     /* set back to async */
     ctx->provider->provider_vtable->async(ctx->provider);
 
+    ctx->m_upload.upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
+    ctx->m_upload.part_number = 1;
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -483,6 +487,22 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         }
     }
 
+    /* initiate upload if needed */
+    if (ctx->m_upload.upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
+        ctx->m_upload.s3_key = get_s3_key(ctx);
+        if (!ctx->m_upload.s3_key) {
+            flb_plg_error(ctx->ins, "Failed to construct S3 Object Key");
+            FLB_OUTPUT_RETURN(FLB_ERROR);
+        }
+
+        ret = create_multipart_upload(ctx, ctx->m_upload);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not initiate multipart upload");
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        ctx->m_upload.upload_state = MULTIPART_UPLOAD_STATE_CREATED;
+    }
+
     json = flb_pack_msgpack_to_json_format(data, bytes,
                                            FLB_PACK_JSON_FORMAT_LINES,
                                            ctx->json_date_format,
@@ -520,8 +540,15 @@ static void cb_stdout_flush(const void *data, size_t bytes,
      */
     mk_list_del(&chunk->_head);
 
-    ret = s3_put_object(ctx, buffer, buffer_size);
-    flb_free(buffer);
+    // ret = s3_put_object(ctx, buffer, buffer_size);
+    // flb_free(buffer);
+    // if (ret < 0) {
+    //     /* re-add chunk to list */
+    //     mk_list_add(&chunk->_head, &ctx->store.chunks);
+    //     return FLB_OUTPUT_RETURN(FLB_RETRY);
+    // }
+
+    ret = upload_part(ctx, ctx->m_upload, buffer, buffer_size);
     if (ret < 0) {
         /* re-add chunk to list */
         mk_list_add(&chunk->_head, &ctx->store.chunks);

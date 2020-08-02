@@ -33,6 +33,7 @@
 struct multipart_upload {
     flb_sds_t s3_key;
     flb_sds_t upload_id;
+    int upload_state;
 
     /*
      * maximum of 10,000 parts in an upload, for each we need to store mapping
@@ -41,5 +42,11 @@ struct multipart_upload {
     flb_sds_t *etags[10000];
     int part_number;
 };
+
+int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
+                char *body, size_t body_size);
+
+int create_multipart_upload(struct flb_stdout *ctx,
+                            struct multipart_upload *m_upload);
 
 #endif
