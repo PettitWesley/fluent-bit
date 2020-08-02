@@ -25,6 +25,7 @@
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_signv4.h>
 #include <ctype.h>
 #include <msgpack.h>
 
