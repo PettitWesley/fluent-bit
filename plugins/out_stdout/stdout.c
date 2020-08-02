@@ -29,7 +29,6 @@
 #include <msgpack.h>
 
 #include "stdout.h"
-#include "s3_multipart.h"
 
 static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
                                     struct flb_local_chunk *chunk,

@@ -31,6 +31,11 @@
 /* Upload data to S3 in 5MB chunks */
 #define CHUNKED_UPLOAD_SIZE 5000000
 
+
+#define MULTIPART_UPLOAD_STATE_NOT_CREATED   0
+#define MULTIPART_UPLOAD_STATE_CREATED       1
+#define MULTIPART_UPLOAD_STATE_COMPLETED     2
+
 struct flb_stdout {
     char *bucket;
     char *region;
@@ -64,5 +69,24 @@ struct flb_stdout {
 
     struct flb_output_instance *ins;
 };
+
+struct multipart_upload {
+    flb_sds_t s3_key;
+    flb_sds_t upload_id;
+    int upload_state;
+
+    /*
+     * maximum of 10,000 parts in an upload, for each we need to store mapping
+     * of Part Number to ETag
+     */
+    flb_sds_t *etags[10000];
+    int part_number;
+};
+
+int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
+                char *body, size_t body_size);
+
+int create_multipart_upload(struct flb_stdout *ctx,
+                            struct multipart_upload *m_upload);
 
 #endif
