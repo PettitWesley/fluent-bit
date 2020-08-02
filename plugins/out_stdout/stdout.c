@@ -250,7 +250,6 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     ctx->s3_client->port = 443;
     ctx->s3_client->flags = 0;
     ctx->s3_client->proxy = NULL;
-    ctx->s3_client->s3_mode = S3_MODE_SIGNED_PAYLOAD;
 
     ctx->s3_client->upstream = flb_upstream_create(config, ctx->endpoint, 443,
                                                    FLB_IO_TLS, &ctx->client_tls);
@@ -433,6 +432,8 @@ static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
     }
 
     s3_client = ctx->s3_client;
+    /* put object requires S3 signed payload mode */
+    s3_client->s3_mode = S3_MODE_SIGNED_PAYLOAD;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
                                           uri, body, body_size,
                                           NULL, 0);

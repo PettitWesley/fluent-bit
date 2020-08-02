@@ -27,7 +27,7 @@
 #ifndef FLB_SIGNV4_H
 #define FLB_SIGNV4_H
 
-/* Request is not to Amazon S3 */
+/* Request is not Amazon S3 PutObject */
 #define S3_MODE_NONE             0
 /* Set the x-amz-content-sha256 header with the sha value */
 #define S3_MODE_SIGNED_PAYLOAD   1
