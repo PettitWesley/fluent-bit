@@ -45,7 +45,7 @@ struct multipart_upload {
      * maximum of 10,000 parts in an upload, for each we need to store mapping
      * of Part Number to ETag
      */
-    flb_sds_t *etags[10000];
+    flb_sds_t etags[10000];
     int part_number;
 };
 

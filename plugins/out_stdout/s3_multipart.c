@@ -48,7 +48,7 @@ int create_multipart_upload(struct flb_stdout *ctx,
     tmp = flb_sds_printf(&uri, "%s?uploads", m_upload->s3_key);
     if (!tmp) {
         flb_sds_destroy(uri);
-        return NULL;
+        return -1;
     }
     uri = tmp;
 
@@ -108,12 +108,12 @@ flb_sds_t get_etag(char *response)
     tmp += 5;
 
     /* advance across any whitespace */
-    while (tmp != '\0' && isspace(tmp) != 0) {
+    while (*tmp != '\0' && isspace(tmp) != 0) {
         tmp++;
     }
     start = tmp;
     /* advance until we hit whitespace or end of string */
-    while (tmp != '\0' && isspace(tmp) == 0) {
+    while (*tmp != '\0' && isspace(tmp) == 0) {
         tmp++;
     }
     end = tmp;
