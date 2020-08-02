@@ -26,7 +26,10 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_s3_local_buffer.h>
 
+/* Upload data to S3 in 5MB chunks */
+#define CHUNKED_UPLOAD_SIZE 5000000
 
 struct flb_stdout {
     char *bucket;
@@ -45,9 +48,18 @@ struct flb_stdout {
     struct flb_tls client_tls;
 
     struct flb_aws_client *s3_client;
-    int out_format;
     int json_date_format;
     flb_sds_t json_date_key;
+
+    struct flb_local_buffer store;
+    char *buffer_dir;
+
+    /*
+     * used to track that unset buffers were found on startup that have not
+     * been sent
+     */
+    int has_old_buffers;
+
     struct flb_output_instance *ins;
 };
 
