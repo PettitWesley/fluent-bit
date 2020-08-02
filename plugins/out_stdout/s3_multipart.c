@@ -54,8 +54,6 @@ int create_multipart_upload(struct flb_stdout *ctx,
     uri = tmp;
 
     s3_client = ctx->s3_client;
-    /* client should be in 'normal' signature mode for this S3 request */
-    s3_client->s3_mode = S3_MODE_NONE;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_POST,
                                           uri, NULL, 0, NULL, 0);
     flb_sds_destroy(uri);
@@ -156,8 +154,6 @@ int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
     uri = tmp;
 
     s3_client = ctx->s3_client;
-    /* UploadPart requires S3 signed payload mode */
-    s3_client->s3_mode = S3_MODE_SIGNED_PAYLOAD;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
                                           uri, body, body_size,
                                           NULL, 0);
