@@ -26,11 +26,11 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_aws_util.h>
 
-#include "stdout.h"
-
 #define MULTIPART_UPLOAD_STATE_NOT_CREATED   0
 #define MULTIPART_UPLOAD_STATE_CREATED       1
 #define MULTIPART_UPLOAD_STATE_COMPLETED     2
+
+#include "stdout.h"
 
 struct multipart_upload {
     flb_sds_t s3_key;
