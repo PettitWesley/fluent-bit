@@ -25,7 +25,7 @@
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_aws_util.h>
-#include <fluent-bit/flb_signv4.h>
+#include <ctype.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -90,6 +90,44 @@ int create_multipart_upload(struct flb_stdout *ctx,
     return -1;
 }
 
+/* gets the ETag value from response headers */
+flb_sds_t get_etag(char *response)
+{
+    char *tmp;
+    char *start;
+    char *end;
+    int len;
+    flb_sds_t etag;
+
+    tmp = strstr(response, "ETag:");
+    if (!tmp) {
+        return NULL;
+    }
+
+    /* advance to end of ETag key */
+    tmp += 5;
+
+    /* advance across any whitespace */
+    while (tmp != '\0' && isspace(tmp) != 0) {
+        tmp++;
+    }
+    start = tmp;
+    /* advance until we hit whitespace or end of string */
+    while (tmp != '\0' && isspace(tmp) == 0) {
+        tmp++;
+    }
+    end = tmp;
+    len = end - start;
+
+    etag = flb_sds_create_len(start, len);
+    if (!etag) {
+        flb_errno();
+        return NULL;
+    }
+
+    return etag;
+}
+
 int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
                 char *body, size_t body_size)
 {
@@ -122,20 +160,19 @@ int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
         flb_plg_debug(ctx->ins, "UploadPart http status=%d",
                       c->resp.status);
         if (c->resp.status == 200) {
-            tmp = flb_xml_get_val(c->resp.payload, c->resp.payload_size,
-                                  "<code>");
+            tmp = get_etag(c->resp.data);
             if (!tmp) {
-                flb_plg_error(ctx->ins, "Could not find upload ID in "
+                flb_plg_error(ctx->ins, "Could not find ETag in "
                               "UploadPart response");
                 flb_plg_debug(ctx->ins, "Raw UploadPart response: %s",
                               c->resp.data);
                 flb_http_client_destroy(c);
                 return -1;
             }
-            m_upload->upload_id = tmp;
+            m_upload->etags[m_upload->part_number - 1] = tmp;
             flb_plg_info(ctx->ins, "Successfully uploaded part #%d"
-                         "for %s, UploadId=%s", m_upload->part_number,
-                         m_upload->s3_key, m_upload->upload_id);
+                         "for %s, UploadId=%s, ETag=%s", m_upload->part_number,
+                         m_upload->s3_key, m_upload->upload_id, tmp);
             flb_http_client_destroy(c);
             return 0;
         }
