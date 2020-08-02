@@ -36,6 +36,19 @@
 #define MULTIPART_UPLOAD_STATE_CREATED       1
 #define MULTIPART_UPLOAD_STATE_COMPLETED     2
 
+struct multipart_upload {
+    flb_sds_t s3_key;
+    flb_sds_t upload_id;
+    int upload_state;
+
+    /*
+     * maximum of 10,000 parts in an upload, for each we need to store mapping
+     * of Part Number to ETag
+     */
+    flb_sds_t *etags[10000];
+    int part_number;
+};
+
 struct flb_stdout {
     char *bucket;
     char *region;
@@ -68,19 +81,6 @@ struct flb_stdout {
     int has_old_buffers;
 
     struct flb_output_instance *ins;
-};
-
-struct multipart_upload {
-    flb_sds_t s3_key;
-    flb_sds_t upload_id;
-    int upload_state;
-
-    /*
-     * maximum of 10,000 parts in an upload, for each we need to store mapping
-     * of Part Number to ETag
-     */
-    flb_sds_t *etags[10000];
-    int part_number;
 };
 
 int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
