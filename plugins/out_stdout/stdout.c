@@ -296,10 +296,15 @@ static flb_sds_t get_s3_key(struct flb_stdout *ctx)
     strftime(datestamp, sizeof(datestamp) - 1, "%Y/%m/%d/%H/%M:%S", &gmt);
 
     uri = flb_sds_create_size(strlen(ctx->prefix) + 50);
+    if (!uri) {
+        flb_errno();
+        return NULL;
+    }
 
     tmp = flb_sds_printf(&uri, "/%s/%s", ctx->prefix, datestamp);
     if (!tmp) {
         flb_sds_destroy(uri);
+        flb_errno();
         return NULL;
     }
     uri = tmp;

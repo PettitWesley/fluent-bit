@@ -461,7 +461,7 @@ flb_sds_t flb_xml_get_val(char *response, size_t response_len, char *tag)
     }
     node = strstr(response, tag);
     if (!node) {
-        flb_debug("[aws] Could not find <code> tag in API response");
+        flb_debug("[aws] Could not find '%s' tag in API response", tag);
         return NULL;
     }
 
