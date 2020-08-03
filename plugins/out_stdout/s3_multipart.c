@@ -31,15 +31,157 @@
 
 #include "stdout.h"
 
-#define test_string "HTTP/1.1 200 OK\n\
-x-amz-id-2: vGw1GPYlObTYTq3/4WhiSExDnuRepNreM8kZGYFat4YRguhYlfb/bun5qYINQWMetKpTgL8D1Jk=\n\
-x-amz-request-id: 00317059A354DBAB\n\
-Date: Mon, 03 Aug 2020 05:26:49 GMT\n\
-ETag: \"ad2ffdf7a78e961025f742bb70d7b506\"\n\
-Content-Length: 0\n\
-Server: AmazonS3"
+#define COMPLETE_MULTIPART_UPLOAD_BASE_LEN 100
+#define COMPLETE_MULTIPART_UPLOAD_PART_LEN 124
 
 flb_sds_t get_etag(char *response, size_t size);
+
+static inline int try_to_write(char *buf, int *off, size_t left,
+                               const char *str, size_t str_len)
+{
+    if (str_len <= 0){
+        str_len = strlen(str);
+    }
+    if (left <= *off+str_len) {
+        return FLB_FALSE;
+    }
+    memcpy(buf+*off, str, str_len);
+    *off += str_len;
+    return FLB_TRUE;
+}
+
+/*
+ * https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html
+ */
+static int complete_multipart_upload_payload(struct flb_stdout *ctx,
+                                             struct multipart_upload *m_upload,
+                                             char **out_buf, size_t *out_size)
+{
+    char *buf;
+    int i;
+    int offset = 0;
+    flb_sds_t etag;
+    size_t size = COMPLETE_MULTIPART_UPLOAD_BASE_LEN;
+    char part_num[7];
+
+    size = size + (COMPLETE_MULTIPART_UPLOAD_PART_LEN * m_upload->part_number);
+
+    buf = flb_malloc(size + 1);
+    if (!buf) {
+        flb_errno();
+        return -1;
+    }
+
+    if (!try_to_write(buf, &offset, size,
+                      "<CompleteMultipartUpload xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">", 73)) {
+        goto error;
+    }
+
+    for (i = 0; i < m_upload->part_number; i++) {
+        etag = m_upload->etags[i];
+        if (!try_to_write(buf, &offset, size,
+                          "<Part><ETag>", 12)) {
+            goto error;
+        }
+
+        if (!try_to_write(buf, &offset, size,
+                          etag, 0)) {
+            goto error;
+        }
+
+        if (!try_to_write(buf, &offset, size,
+                          "</ETag><PartNumber>", 19)) {
+            goto error;
+        }
+
+        if (!sprintf(part_num, "%d", i + 1)) {
+            goto error;
+        }
+
+        if (!try_to_write(buf, &offset, size,
+                          part_num, 0)) {
+            goto error;
+        }
+
+        if (!try_to_write(buf, &offset, size,
+                          "</PartNumber></Part>", 20)) {
+            goto error;
+        }
+    }
+
+    if (!try_to_write(buf, &offset, size,
+                      "</CompleteMultipartUpload>", 12)) {
+        goto error;
+    }
+
+    buf[offset] = '\0';
+    flb_info("Raw request: \n%s", buf);
+
+    *out_buf = buf;
+    *out_size = offset;
+    return 0;
+
+error:
+    flb_free(buf);
+    flb_plg_error(ctx->ins, "Failed to construct CompleteMultipartUpload "
+                  "request body");
+    return -1;
+}
+
+int complete_multipart_upload(struct flb_stdout *ctx,
+                              struct multipart_upload *m_upload)
+{
+    char *body;
+    size_t size;
+    flb_sds_t uri = NULL;
+    flb_sds_t tmp;
+    int ret;
+    struct flb_http_client *c = NULL;
+    struct flb_aws_client *s3_client;
+
+    uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 11 +
+                              flb_sds_len(m_upload->upload_id));
+    if (!uri) {
+        flb_errno();
+        return -1;
+    }
+
+    tmp = flb_sds_printf(&uri, "%s?uploadId=%s", m_upload->s3_key,
+                         m_upload->upload_id);
+    if (!tmp) {
+        flb_sds_destroy(uri);
+        return -1;
+    }
+    uri = tmp;
+
+    ret = complete_multipart_upload_payload(ctx, m_upload, &body, &size);
+    if (ret < 0) {
+        flb_sds_destroy(uri);
+        return -1;
+    }
+
+    s3_client = ctx->s3_client;
+    c = s3_client->client_vtable->request(s3_client, FLB_HTTP_POST,
+                                          uri, body, size,
+                                          NULL, 0);
+    flb_sds_destroy(uri);
+    flb_free(body);
+    if (c) {
+        flb_plg_debug(ctx->ins, "CompleteMultipartUpload http status=%d",
+                      c->resp.status);
+        if (c->resp.status == 200) {
+            flb_plg_info(ctx->ins, "Successfully completed multipart upload "
+                         "for %s, UploadId=%s", m_upload->s3_key,
+                         m_upload->upload_id);
+            flb_http_client_destroy(c);
+            return 0;
+        }
+        flb_http_client_destroy(c);
+    }
+
+    flb_plg_error(ctx->ins, "CompleteMultipartUpload request failed");
+    return -1;
+}
 
 
 int create_multipart_upload(struct flb_stdout *ctx,
@@ -49,10 +191,6 @@ int create_multipart_upload(struct flb_stdout *ctx,
     flb_sds_t tmp;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
-
-    tmp = get_etag(test_string, strlen(test_string));
-    flb_info("Found etag: %s", tmp);
-
 
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 8);
     if (!uri) {
