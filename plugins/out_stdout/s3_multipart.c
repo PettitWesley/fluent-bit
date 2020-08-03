@@ -110,6 +110,7 @@ flb_sds_t get_etag(char *response)
     /* advance to end of ETag key */
     tmp += 5;
     flb_info("tmp: %s", tmp);
+    flb_info("*tmp: %c", *tmp);
 
     /* advance across any whitespace */
     while (*tmp != '\0' && isspace(tmp) != 0) {
