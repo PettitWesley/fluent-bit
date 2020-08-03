@@ -129,13 +129,14 @@ flb_sds_t get_etag(char *response, size_t size)
 
     /* advance across any whitespace and the opening quote */
     while (i < size && (response[i] == '\"' || isspace(response[i]) != 0)) {
-        flb_info("response[i]: %c", *tmp);
+        flb_info("response[i]: %c", response[i]);
         i++;
     }
     start = i;
     flb_info("response + i (start): %s", response + i);
     /* advance until we hit whitespace or the end quote */
     while (i < size && (response[i] != '\"' || isspace(response[i]) == 0)) {
+        flb_info("response[i]: %c", response[i]);
         i++;
     }
     flb_info("response + i (end): %s", response + i);
