@@ -553,15 +553,15 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         mk_list_add(&chunk->_head, &ctx->store.chunks);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
-    ctx->m_upload.part_number += 1;
 
-    if (ctx->m_upload.part_number >= 10) {
+    if (ctx->m_upload.part_number >= 3) {
         ret = complete_multipart_upload(ctx, &ctx->m_upload);
         if (ret == 0) {
             ctx->m_upload.upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
             ctx->m_upload.part_number = 1;
         }
     }
+    ctx->m_upload.part_number += 1;
 
     /* data was sent successfully- delete the local buffer */
     ret = flb_remove_chunk_files(chunk);
