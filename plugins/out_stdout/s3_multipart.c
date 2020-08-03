@@ -31,13 +31,13 @@
 
 #include "stdout.h"
 
-#define test_string "HTTP/1.1 200 OK"
-"x-amz-id-2: vGw1GPYlObTYTq3/4WhiSExDnuRepNreM8kZGYFat4YRguhYlfb/bun5qYINQWMetKpTgL8D1Jk="
-"x-amz-request-id: 00317059A354DBAB"
-"Date: Mon, 03 Aug 2020 05:26:49 GMT"
-"ETag: \"ad2ffdf7a78e961025f742bb70d7b506\""
-"Content-Length: 0"
-"Server: AmazonS3"
+#define test_string "HTTP/1.1 200 OK\
+x-amz-id-2: vGw1GPYlObTYTq3/4WhiSExDnuRepNreM8kZGYFat4YRguhYlfb/bun5qYINQWMetKpTgL8D1Jk=\
+x-amz-request-id: 00317059A354DBAB\
+Date: Mon, 03 Aug 2020 05:26:49 GMT\
+ETag: \"ad2ffdf7a78e961025f742bb70d7b506\"\
+Content-Length: 0\
+Server: AmazonS3"
 
 
 int create_multipart_upload(struct flb_stdout *ctx,
