@@ -39,6 +39,8 @@ ETag: \"ad2ffdf7a78e961025f742bb70d7b506\"\
 Content-Length: 0\
 Server: AmazonS3"
 
+flb_sds_t get_etag(char *response);
+
 
 int create_multipart_upload(struct flb_stdout *ctx,
                             struct multipart_upload *m_upload)
