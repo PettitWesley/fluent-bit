@@ -306,10 +306,8 @@ static flb_sds_t url_params_format(char *params)
 
         /* URI encode every key and value */
         key = uri_encode_params(e->str, len);
-        flb_info("[signv4] Query key: %s", key);
         len++;
         val = uri_encode_params(p, flb_sds_len(e->str) - len);
-        flb_info("[signv4] Query value: %s", val);
         if (!key || !val) {
             flb_error("[signv4] error encoding uri for query string");
             if (key) {
@@ -371,7 +369,6 @@ static flb_sds_t url_params_format(char *params)
 
     for (i = 0; i < items; i++) {
         kv = (struct flb_kv *) arr[i];
-        flb_info("[signv4] key=%s, value=%s", kv->key, kv->val);
         if (i + 1 < items) {
             tmp = flb_sds_printf(&buf, "%s=%s&",
                                  kv->key, kv->val);
@@ -569,9 +566,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
 
     /* Our URI already contains the query string, so do the proper adjustments */
     if (c->query_string) {
-        flb_info("[signv4] We have a query string: %s", c->query_string);
         len = (c->query_string - c->uri) - 1;
-        flb_info("[signv4] query str len: %d", len);
     }
     else {
         len = strlen(c->uri);
@@ -632,7 +627,6 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
             flb_sds_destroy(cr);
             return NULL;
         }
-        flb_info("[signv4] query str formatted: %s", params);
         tmp = flb_sds_cat(cr, params, flb_sds_len(params));
         if (!tmp) {
             flb_error("[signv4] error concatenating query string");
@@ -1093,7 +1087,6 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         flb_aws_credentials_destroy(creds);
         return NULL;
     }
-    flb_info("Canonical Request: \n%s\n____", cr);
 
     /* Task 2: string to sign */
     string_to_sign = flb_signv4_string_to_sign(c, cr, amzdate,
@@ -1105,7 +1098,6 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         flb_aws_credentials_destroy(creds);
         return NULL;
     }
-    flb_info("String to Sign: \n%s\n____", string_to_sign);
     flb_sds_destroy(cr);
 
     /* Task 3: calculate the signature */
@@ -1120,7 +1112,6 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
     flb_sds_destroy(string_to_sign);
-    flb_info("Signature: \n%s\n____", signature);
 
     /* Task 4: add signature to HTTP request */
     auth_header = flb_signv4_add_authorization(c,
