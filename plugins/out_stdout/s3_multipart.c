@@ -144,7 +144,7 @@ int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
         return -1;
     }
 
-    tmp = flb_sds_printf(&uri, "%s?partNumber=%s&uploadId=%s",
+    tmp = flb_sds_printf(&uri, "%s?partNumber=%d&uploadId=%s",
                          m_upload->s3_key, m_upload->part_number,
                          m_upload->upload_id);
     if (!tmp) {
