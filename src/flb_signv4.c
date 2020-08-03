@@ -306,8 +306,10 @@ static flb_sds_t url_params_format(char *params)
 
         /* URI encode every key and value */
         key = uri_encode_params(e->str, len);
+        flb_info("[signv4] Query key: %s", key);
         len++;
         val = uri_encode_params(p, flb_sds_len(e->str) - len);
+        flb_info("[signv4] Query value: %s", val);
         if (!key || !val) {
             flb_error("[signv4] error encoding uri for query string");
             if (key) {
