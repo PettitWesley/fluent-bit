@@ -46,7 +46,7 @@ int create_multipart_upload(struct flb_stdout *ctx,
         return -1;
     }
 
-    tmp = flb_sds_printf(&uri, "%s?uploads", m_upload->s3_key);
+    tmp = flb_sds_printf(&uri, "%s?uploads=", m_upload->s3_key);
     if (!tmp) {
         flb_sds_destroy(uri);
         return -1;
