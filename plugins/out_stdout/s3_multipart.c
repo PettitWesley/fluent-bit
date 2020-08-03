@@ -52,6 +52,7 @@ int create_multipart_upload(struct flb_stdout *ctx,
         return -1;
     }
     uri = tmp;
+    flb_info("Request URI: %s", uri)
 
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_POST,

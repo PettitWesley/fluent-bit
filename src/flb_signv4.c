@@ -558,7 +558,9 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
 
     /* Our URI already contains the query string, so do the proper adjustments */
     if (c->query_string) {
+        flb_info("[signv4] We have a query string: %s", c->query_string);
         len = (c->query_string - c->uri) - 1;
+        flb_info("[signv4] query str len: %d", len);
     }
     else {
         len = strlen(c->uri);
@@ -619,6 +621,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
             flb_sds_destroy(cr);
             return NULL;
         }
+        flb_info("[signv4] query str formatted: %s", params);
         tmp = flb_sds_cat(cr, params, flb_sds_len(params));
         if (!tmp) {
             flb_error("[signv4] error concatenating query string");
