@@ -31,6 +31,14 @@
 
 #include "stdout.h"
 
+#define test_string "HTTP/1.1 200 OK"
+"x-amz-id-2: vGw1GPYlObTYTq3/4WhiSExDnuRepNreM8kZGYFat4YRguhYlfb/bun5qYINQWMetKpTgL8D1Jk="
+"x-amz-request-id: 00317059A354DBAB"
+"Date: Mon, 03 Aug 2020 05:26:49 GMT"
+"ETag: \"ad2ffdf7a78e961025f742bb70d7b506\""
+"Content-Length: 0"
+"Server: AmazonS3"
+
 
 int create_multipart_upload(struct flb_stdout *ctx,
                             struct multipart_upload *m_upload)
@@ -39,6 +47,10 @@ int create_multipart_upload(struct flb_stdout *ctx,
     flb_sds_t tmp;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
+
+    tmp = get_etag(test_string);
+    flb_info(tmp);
+
 
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 8);
     if (!uri) {
@@ -115,6 +127,7 @@ flb_sds_t get_etag(char *response)
     /* advance across any whitespace */
     while (*tmp != '\0' && isspace(tmp) != 0) {
         flb_info("*tmp: %c", *tmp);
+        sleep(1);
         tmp++;
     }
     start = tmp;
