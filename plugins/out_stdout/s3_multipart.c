@@ -27,7 +27,6 @@
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
 #include <ctype.h>
-#include <unistd.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -108,12 +107,13 @@ int create_multipart_upload(struct flb_stdout *ctx,
 }
 
 /* gets the ETag value from response headers */
-flb_sds_t get_etag(char *response)
+flb_sds_t get_etag(char *response, size_t size)
 {
     char *tmp;
-    char *start;
-    char *end;
+    int start;
+    int end;
     int len;
+    int i = 0;
     flb_sds_t etag;
     flb_info("response: %s", response);
     tmp = strstr(response, "ETag:");
@@ -121,27 +121,26 @@ flb_sds_t get_etag(char *response)
         return NULL;
     }
     flb_info("tmp: %s", tmp);
+    i = tmp - response;
 
     /* advance to end of ETag key */
-    tmp += 5;
-    flb_info("tmp: %s", tmp);
-    flb_info("*tmp: %c", *tmp);
+    i += 5;
+    flb_info("response + i: %s", response + i);
 
     /* advance across any whitespace */
-    while (*tmp != '\0' && isspace(tmp) != 0) {
+    while (i < size && response[i] != '\0' && isspace(response[i]) != 0) {
         flb_info("*tmp: %c", *tmp);
-        sleep(1);
-        tmp++;
+        i++;
     }
-    start = tmp;
+    start = i;
     /* advance until we hit whitespace or end of string */
-    while (*tmp != '\0' && isspace(tmp) == 0) {
-        tmp++;
+    while (i < size && response[i] != '\0' && isspace(response[i]) == 0) {
+        i++;
     }
-    end = tmp;
+    end = i;
     len = end - start;
 
-    etag = flb_sds_create_len(start, len);
+    etag = flb_sds_create_len(response + start, len);
     if (!etag) {
         flb_errno();
         return NULL;
