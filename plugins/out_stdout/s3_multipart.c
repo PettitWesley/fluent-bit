@@ -63,7 +63,7 @@ int create_multipart_upload(struct flb_stdout *ctx,
                       c->resp.status);
         if (c->resp.status == 200) {
             tmp = flb_xml_get_val(c->resp.payload, c->resp.payload_size,
-                                  "<code>");
+                                  "<UploadId>");
             if (!tmp) {
                 flb_plg_error(ctx->ins, "Could not find upload ID in "
                               "CreateMultipartUpload response");
