@@ -553,6 +553,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         mk_list_add(&chunk->_head, &ctx->store.chunks);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
+    ctx->m_upload.part_number += 1;
 
     if (ctx->m_upload.part_number >= 10) {
         ret = complete_multipart_upload(ctx, &ctx->m_upload);

@@ -325,7 +325,7 @@ int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
                 return -1;
             }
             m_upload->etags[m_upload->part_number - 1] = tmp;
-            flb_plg_info(ctx->ins, "Successfully uploaded part #%d"
+            flb_plg_info(ctx->ins, "Successfully uploaded part #%d "
                          "for %s, UploadId=%s, ETag=%s", m_upload->part_number,
                          m_upload->s3_key, m_upload->upload_id, tmp);
             flb_http_client_destroy(c);
