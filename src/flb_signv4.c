@@ -371,6 +371,7 @@ static flb_sds_t url_params_format(char *params)
 
     for (i = 0; i < items; i++) {
         kv = (struct flb_kv *) arr[i];
+        flb_info("[signv4] key=%s, value=%s", kv->key, kv->val);
         if (i + 1 < items) {
             tmp = flb_sds_printf(&buf, "%s=%s&",
                                  kv->key, kv->val);
