@@ -31,12 +31,12 @@
 
 #include "stdout.h"
 
-#define test_string "HTTP/1.1 200 OK\
-x-amz-id-2: vGw1GPYlObTYTq3/4WhiSExDnuRepNreM8kZGYFat4YRguhYlfb/bun5qYINQWMetKpTgL8D1Jk=\
-x-amz-request-id: 00317059A354DBAB\
-Date: Mon, 03 Aug 2020 05:26:49 GMT\
-ETag: \"ad2ffdf7a78e961025f742bb70d7b506\"\
-Content-Length: 0\
+#define test_string "HTTP/1.1 200 OK\n\
+x-amz-id-2: vGw1GPYlObTYTq3/4WhiSExDnuRepNreM8kZGYFat4YRguhYlfb/bun5qYINQWMetKpTgL8D1Jk=\n\
+x-amz-request-id: 00317059A354DBAB\n\
+Date: Mon, 03 Aug 2020 05:26:49 GMT\n\
+ETag: \"ad2ffdf7a78e961025f742bb70d7b506\"\n\
+Content-Length: 0\n\
 Server: AmazonS3"
 
 flb_sds_t get_etag(char *response, size_t size);
@@ -127,15 +127,15 @@ flb_sds_t get_etag(char *response, size_t size)
     i += 5;
     flb_info("response + i (tmp): %s", response + i);
 
-    /* advance across any whitespace */
-    while (i < size && response[i] != '\0' && isspace(response[i]) != 0) {
+    /* advance across any whitespace and the opening quote */
+    while (i < size && (response[i] == '\"' || isspace(response[i]) != 0)) {
         flb_info("response[i]: %c", *tmp);
         i++;
     }
     start = i;
     flb_info("response + i (start): %s", response + i);
-    /* advance until we hit whitespace or end of string */
-    while (i < size && response[i] != '\0' && isspace(response[i]) == 0) {
+    /* advance until we hit whitespace or the end quote */
+    while (i < size && (response[i] != '\"' || isspace(response[i]) == 0)) {
         i++;
     }
     flb_info("response + i (end): %s", response + i);
