@@ -51,7 +51,7 @@ int create_multipart_upload(struct flb_stdout *ctx,
     struct flb_aws_client *s3_client;
 
     tmp = get_etag(test_string, strlen(test_string));
-    flb_info(tmp);
+    flb_info("Found etag: %s", tmp);
 
 
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 8);
@@ -125,7 +125,7 @@ flb_sds_t get_etag(char *response, size_t size)
 
     /* advance to end of ETag key */
     i += 5;
-    flb_info("response + i: %s", response + i);
+    flb_info("response + i (tmp): %s", response + i);
 
     /* advance across any whitespace */
     while (i < size && response[i] != '\0' && isspace(response[i]) != 0) {
@@ -133,10 +133,12 @@ flb_sds_t get_etag(char *response, size_t size)
         i++;
     }
     start = i;
+    flb_info("response + i (start): %s", response + i);
     /* advance until we hit whitespace or end of string */
     while (i < size && response[i] != '\0' && isspace(response[i]) == 0) {
         i++;
     }
+    flb_info("response + i (end): %s", response + i);
     end = i;
     len = end - start;
 
