@@ -115,7 +115,7 @@ static int complete_multipart_upload_payload(struct flb_stdout *ctx,
     }
 
     buf[offset] = '\0';
-    printf("Raw request: %s", buf);
+    flb_info("Raw request: %s", buf);
 
     *out_buf = buf;
     *out_size = offset;
