@@ -66,7 +66,6 @@ int create_multipart_upload(struct flb_stdout *ctx,
         return -1;
     }
     uri = tmp;
-    flb_info("Request URI: %s", uri);
 
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_POST,
@@ -115,31 +114,24 @@ flb_sds_t get_etag(char *response, size_t size)
     int len;
     int i = 0;
     flb_sds_t etag;
-    flb_info("response: %s", response);
     tmp = strstr(response, "ETag:");
     if (!tmp) {
         return NULL;
     }
-    flb_info("tmp: %s", tmp);
     i = tmp - response;
 
     /* advance to end of ETag key */
     i += 5;
-    flb_info("response + i (tmp): %s", response + i);
 
     /* advance across any whitespace and the opening quote */
     while (i < size && (response[i] == '\"' || isspace(response[i]) != 0)) {
-        flb_info("response[i]: %c", response[i]);
         i++;
     }
     start = i;
-    flb_info("response + i (start): %s", response + i);
     /* advance until we hit whitespace or the end quote */
     while (i < size && (response[i] != '\"' && isspace(response[i]) == 0)) {
-        flb_info("response[i]: %c", response[i]);
         i++;
     }
-    flb_info("response + i (end): %s", response + i);
     end = i;
     len = end - start;
 
