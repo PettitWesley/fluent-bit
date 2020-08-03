@@ -39,7 +39,7 @@ ETag: \"ad2ffdf7a78e961025f742bb70d7b506\"\
 Content-Length: 0\
 Server: AmazonS3"
 
-flb_sds_t get_etag(char *response);
+flb_sds_t get_etag(char *response, size_t size);
 
 
 int create_multipart_upload(struct flb_stdout *ctx,
@@ -50,7 +50,7 @@ int create_multipart_upload(struct flb_stdout *ctx,
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
 
-    tmp = get_etag(test_string);
+    tmp = get_etag(test_string, strlen(test_string));
     flb_info(tmp);
 
 
@@ -182,7 +182,7 @@ int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
         flb_plg_debug(ctx->ins, "UploadPart http status=%d",
                       c->resp.status);
         if (c->resp.status == 200) {
-            tmp = get_etag(c->resp.data);
+            tmp = get_etag(c->resp.data, c->resp.data_size);
             if (!tmp) {
                 flb_plg_error(ctx->ins, "Could not find ETag in "
                               "UploadPart response");
