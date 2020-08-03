@@ -27,6 +27,7 @@
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
 #include <ctype.h>
+#include <unistd.h>
 #include <msgpack.h>
 
 #include "stdout.h"
