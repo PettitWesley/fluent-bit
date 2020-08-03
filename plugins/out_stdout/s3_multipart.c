@@ -110,7 +110,7 @@ static int complete_multipart_upload_payload(struct flb_stdout *ctx,
     }
 
     if (!try_to_write(buf, &offset, size,
-                      "</CompleteMultipartUpload>", 12)) {
+                      "</CompleteMultipartUpload>", 26)) {
         goto error;
     }
 
