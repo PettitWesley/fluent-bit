@@ -26,8 +26,6 @@
 #include <jsmn/jsmn.h>
 #include <stdlib.h>
 #include <time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 
 #define TEN_MINUTES    600
 #define TWELVE_HOURS   43200
