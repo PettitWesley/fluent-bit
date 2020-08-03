@@ -89,4 +89,7 @@ int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
 int create_multipart_upload(struct flb_stdout *ctx,
                             struct multipart_upload *m_upload);
 
+int complete_multipart_upload(struct flb_stdout *ctx,
+                              struct multipart_upload *m_upload);
+
 #endif
