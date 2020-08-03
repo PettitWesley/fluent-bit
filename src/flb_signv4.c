@@ -376,6 +376,14 @@ static flb_sds_t url_params_format(char *params)
             tmp = flb_sds_printf(&buf, "%s=%s&",
                                  kv->key, kv->val);
         }
+        else if (kv->val == NULL) {
+            /*
+             * special/edge case- last query param has a null value
+             * This happens in the S3 CreateMultipartUpload request
+             */
+            tmp = flb_sds_printf(&buf, "%s=",
+                                 kv->key, kv->val);
+        }
         else {
             tmp = flb_sds_printf(&buf, "%s=%s",
                                  kv->key, kv->val);
