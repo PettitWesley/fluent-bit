@@ -176,6 +176,12 @@ int complete_multipart_upload(struct flb_stdout *ctx,
             flb_http_client_destroy(c);
             return 0;
         }
+        flb_aws_print_xml_error(c->resp.payload, c->resp.payload_size,
+                                "CompleteMultipartUpload", ctx->ins);
+        if (c->resp.data != NULL) {
+            flb_plg_debug(ctx->ins, "Raw CompleteMultipartUpload response: %s",
+                          c->resp.data);
+        }
         flb_http_client_destroy(c);
     }
 
