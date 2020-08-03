@@ -129,7 +129,7 @@ flb_sds_t get_etag(char *response, size_t size)
 
     /* advance across any whitespace */
     while (i < size && response[i] != '\0' && isspace(response[i]) != 0) {
-        flb_info("*tmp: %c", *tmp);
+        flb_info("response[i]: %c", *tmp);
         i++;
     }
     start = i;
