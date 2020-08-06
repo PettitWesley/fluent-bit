@@ -47,6 +47,8 @@ struct multipart_upload {
      */
     flb_sds_t etags[10000];
     int part_number;
+
+    struct mk_list _head;
 };
 
 struct flb_stdout {
@@ -72,13 +74,13 @@ struct flb_stdout {
     struct flb_local_buffer store;
     char *buffer_dir;
 
-    struct multipart_upload m_upload;
-
     /*
      * used to track that unset buffers were found on startup that have not
      * been sent
      */
     int has_old_buffers;
+
+    struct mk_list uploads;
 
     struct flb_output_instance *ins;
 };

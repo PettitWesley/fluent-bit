@@ -55,6 +55,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
     ctx->ins = ins;
 
+    mk_list_init(&ctx->uploads);
+
     ret = flb_output_config_map_set(ins, (void *) ctx);
     if (ret == -1) {
         flb_free(ctx);
@@ -283,7 +285,7 @@ error:
  * The S3 file name is
  * /<prefix>/-<datestamp>
  */
-static flb_sds_t get_s3_key(struct flb_stdout *ctx)
+static flb_sds_t get_s3_key(struct flb_stdout *ctx, char *tag, int tag_len)
 {
     flb_sds_t uri;
     flb_sds_t tmp;
@@ -298,13 +300,13 @@ static flb_sds_t get_s3_key(struct flb_stdout *ctx)
 
     strftime(datestamp, sizeof(datestamp) - 1, "%Y/%m/%d/%H/%M:%S", &gmt);
 
-    uri = flb_sds_create_size(strlen(ctx->prefix) + 50);
+    uri = flb_sds_create_size(strlen(ctx->prefix) + tag_len + 50);
     if (!uri) {
         flb_errno();
         return NULL;
     }
 
-    tmp = flb_sds_printf(&uri, "/%s/%s", ctx->prefix, datestamp);
+    tmp = flb_sds_printf(&uri, "/%s/%s/%s", ctx->prefix, tag, datestamp);
     if (!tmp) {
         flb_sds_destroy(uri);
         flb_errno();
@@ -426,9 +428,10 @@ static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
 
-    uri = get_s3_key(ctx);
+    //TODO
+    uri = get_s3_key(ctx, "todo", 4);
     if (!uri) {
-        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key");
+        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
         return -1;
     }
 
@@ -455,6 +458,35 @@ static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
     flb_plg_error(ctx->ins, "PutObject request failed");
     flb_sds_destroy(uri);
     return -1;
+}
+
+static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
+                                                     const char *tag, int tag_len)
+{
+    struct multipart_upload *m_upload = NULL;
+    struct multipart_upload *tmp_upload = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    flb_sds_t s3_key = NULL;
+
+    s3_key = get_s3_key(ctx, tag, tag_len);
+    if (!s3_key) {
+        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
+        return NULL;
+    }
+
+    mk_list_foreach_safe(head, tmp, &ctx->uploads) {
+        tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
+        if (strcmp(tmp_chunk->s3_key, s3_key) == 0) {
+            m_upload = tmp_upload;
+            break;
+        }
+    }
+
+    if (!m_upload) {
+        /* create new upload for this key */
+        m_upload = flb_calloc(1, sizeof(struct multipart_upload));
+    }
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
@@ -488,9 +520,9 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     /* initiate upload if needed */
     if (ctx->m_upload.upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
-        ctx->m_upload.s3_key = get_s3_key(ctx);
+        ctx->m_upload.s3_key = get_s3_key(ctx, tag, tag_len);
         if (!ctx->m_upload.s3_key) {
-            flb_plg_error(ctx->ins, "Failed to construct S3 Object Key");
+            flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
             FLB_OUTPUT_RETURN(FLB_ERROR);
         }
 
@@ -561,7 +593,9 @@ static void cb_stdout_flush(const void *data, size_t bytes,
             ctx->m_upload.part_number = 1;
         }
     }
-    ctx->m_upload.part_number += 1;
+    else {
+        ctx->m_upload.part_number += 1;
+    }
 
     /* data was sent successfully- delete the local buffer */
     ret = flb_remove_chunk_files(chunk);
