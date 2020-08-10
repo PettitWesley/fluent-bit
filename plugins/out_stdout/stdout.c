@@ -284,7 +284,7 @@ error:
  * The S3 file name is
  * /<prefix>/-<datestamp>
  */
-static flb_sds_t get_s3_key(struct flb_stdout *ctx, char *tag, int tag_len)
+static flb_sds_t get_s3_key(struct flb_stdout *ctx, const char *tag, int tag_len)
 {
     flb_sds_t uri;
     flb_sds_t tmp;
@@ -493,7 +493,7 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
         m_upload->s3_key = s3_key;
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
         m_upload->part_number = 1;
-        mk_list_add(m_upload->_head, &ctx->uploads);
+        mk_list_add(&m_upload->_head, &ctx->uploads);
     }
 
     flb_sds_destroy(s3_key);
