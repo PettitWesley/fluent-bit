@@ -105,7 +105,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             goto error;
         }
         if (ctx->file_size < 10000000) {
-            flb_plg_error(ctx->ins, "todo: fix: file size must be at least 10MB", tmp);
+            flb_plg_error(ctx->ins, "todo: fix: file size must be at least 10MB");
             goto error;
         }
         if (ctx->file_size > MAX_FILE_SIZE) {
@@ -113,7 +113,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             goto error;
         }
     } else {
-        ctx->file_size = DEFAULT_FILE_SIZE
+        ctx->file_size = DEFAULT_FILE_SIZE;
         flb_plg_error(ctx->ins, "Using default file size 100MB");
     }
 
