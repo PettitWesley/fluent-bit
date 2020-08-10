@@ -68,7 +68,7 @@ static int complete_multipart_upload_payload(struct flb_stdout *ctx,
     /* part_number on the upload will be set to next expected part number */
     last_part_num = m_upload->part_number - 1;
 
-    size = size + (COMPLETE_MULTIPART_UPLOAD_PART_LEN * part_num);
+    size = size + (COMPLETE_MULTIPART_UPLOAD_PART_LEN * last_part_num);
 
     buf = flb_malloc(size + 1);
     if (!buf) {
