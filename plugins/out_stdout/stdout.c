@@ -626,22 +626,14 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     //     return FLB_OUTPUT_RETURN(FLB_RETRY);
     // }
 
-    if (m_upload->bytes >= ctx->file_size || m_upload->part_number >= 10000) {
-        m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
-        ret = complete_multipart_upload(ctx, m_upload);
-        if (ret == 0) {
-            mk_list_del(&m_upload->_head);
-        }
+    ret = upload_part(ctx, m_upload, buffer, buffer_size);
+    if (ret < 0) {
+        /* re-add chunk to list */
+        mk_list_add(&chunk->_head, &ctx->store.chunks);
+        return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
-    else {
-        ret = upload_part(ctx, m_upload, buffer, buffer_size);
-        if (ret < 0) {
-            /* re-add chunk to list */
-            mk_list_add(&chunk->_head, &ctx->store.chunks);
-            return FLB_OUTPUT_RETURN(FLB_RETRY);
-        }
-        m_upload->part_number += 1;
-    }
+    m_upload->part_number += 1;
+
 
     /* data was sent successfully- delete the local buffer */
     ret = flb_remove_chunk_files(chunk);
@@ -650,6 +642,20 @@ static void cb_stdout_flush(const void *data, size_t bytes,
                       chunk->file_path);
     }
     flb_chunk_destroy(chunk);
+
+    /* complete upload if needed */
+    if (m_upload->bytes >= ctx->file_size || m_upload->part_number >= 10000) {
+        m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+        ret = complete_multipart_upload(ctx, m_upload);
+        if (ret == 0) {
+            mk_list_del(&m_upload->_head);
+        } else {
+            /* we return FLB_OK in this case, since data was persisted */
+            flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
+                          chunk->file_path);
+        }
+    }
+
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 
