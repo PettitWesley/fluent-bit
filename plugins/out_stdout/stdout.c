@@ -633,14 +633,15 @@ static void cb_stdout_flush(const void *data, size_t bytes,
             mk_list_del(&m_upload->_head);
         }
     }
-
-    ret = upload_part(ctx, m_upload, buffer, buffer_size);
-    if (ret < 0) {
-        /* re-add chunk to list */
-        mk_list_add(&chunk->_head, &ctx->store.chunks);
-        return FLB_OUTPUT_RETURN(FLB_RETRY);
+    else {
+        ret = upload_part(ctx, m_upload, buffer, buffer_size);
+        if (ret < 0) {
+            /* re-add chunk to list */
+            mk_list_add(&chunk->_head, &ctx->store.chunks);
+            return FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        m_upload->part_number += 1;
     }
-    m_upload->part_number += 1;
 
     /* data was sent successfully- delete the local buffer */
     ret = flb_remove_chunk_files(chunk);
