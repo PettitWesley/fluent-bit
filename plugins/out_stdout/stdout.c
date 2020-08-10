@@ -269,8 +269,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     /* set back to async */
     ctx->provider->provider_vtable->async(ctx->provider);
 
-    ctx->m_upload.upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
-    ctx->m_upload.part_number = 1;
+
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -486,7 +485,19 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
     if (!m_upload) {
         /* create new upload for this key */
         m_upload = flb_calloc(1, sizeof(struct multipart_upload));
+        if (!m_upload) {
+            flb_errno();
+            flb_sds_destroy(s3_key);
+            return NULL;
+        }
+        m_upload->s3_key = s3_key;
+        m_upload->upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
+        m_upload->part_number = 1;
+        mk_list_add(&m_upload->_head, &ctx->uploads);
     }
+
+    flb_sds_destroy(s3_key);
+    return m_upload;
 }
 
 static void cb_stdout_flush(const void *data, size_t bytes,
@@ -496,6 +507,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
                             struct flb_config *config)
 {
     struct flb_stdout *ctx = out_context;
+    struct multipart_upload *m_upload = NULL;
     flb_sds_t json = NULL;
     struct flb_local_chunk *chunk;
     char *buffer = NULL;
@@ -504,6 +516,12 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     int len;
     (void) i_ins;
     (void) config;
+
+    m_upload = get_or_create_upload(ctx, tag, tag_len);
+    if (!m_upload) {
+        flb_plg_error(ctx->ins, "Could not find or create upload for tag %s", tag);
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
 
     /* first, clean up any old buffers found on startup */
     if (ctx->has_old_buffers == FLB_TRUE) {
@@ -519,19 +537,19 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     /* initiate upload if needed */
-    if (ctx->m_upload.upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
-        ctx->m_upload.s3_key = get_s3_key(ctx, tag, tag_len);
-        if (!ctx->m_upload.s3_key) {
+    if (m_upload.upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
+        m_upload.s3_key = get_s3_key(ctx, tag, tag_len);
+        if (!m_upload.s3_key) {
             flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
             FLB_OUTPUT_RETURN(FLB_ERROR);
         }
 
-        ret = create_multipart_upload(ctx, &ctx->m_upload);
+        ret = create_multipart_upload(ctx, &m_upload);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not initiate multipart upload");
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
-        ctx->m_upload.upload_state = MULTIPART_UPLOAD_STATE_CREATED;
+        m_upload.upload_state = MULTIPART_UPLOAD_STATE_CREATED;
     }
 
     json = flb_pack_msgpack_to_json_format(data, bytes,
@@ -579,22 +597,22 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     //     return FLB_OUTPUT_RETURN(FLB_RETRY);
     // }
 
-    ret = upload_part(ctx, &ctx->m_upload, buffer, buffer_size);
+    ret = upload_part(ctx, &m_upload, buffer, buffer_size);
     if (ret < 0) {
         /* re-add chunk to list */
         mk_list_add(&chunk->_head, &ctx->store.chunks);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    if (ctx->m_upload.part_number >= 10) {
-        ret = complete_multipart_upload(ctx, &ctx->m_upload);
+    if (m_upload.part_number >= 10) {
+        ret = complete_multipart_upload(ctx, &m_upload);
         if (ret == 0) {
-            ctx->m_upload.upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
-            ctx->m_upload.part_number = 1;
+            m_upload.upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
+            m_upload.part_number = 1;
         }
     }
     else {
-        ctx->m_upload.part_number += 1;
+        m_upload.part_number += 1;
     }
 
     /* data was sent successfully- delete the local buffer */
