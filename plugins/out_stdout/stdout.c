@@ -430,7 +430,7 @@ static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
     //TODO
     uri = get_s3_key(ctx, "todo", 4);
     if (!uri) {
-        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
+        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", "todo");
         return -1;
     }
 
@@ -493,7 +493,7 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
         m_upload->s3_key = s3_key;
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
         m_upload->part_number = 1;
-        mk_list_add(&m_upload->_head, &ctx->uploads);
+        mk_list_add(m_upload->_head, &ctx->uploads);
     }
 
     flb_sds_destroy(s3_key);
@@ -537,19 +537,19 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 
     /* initiate upload if needed */
-    if (m_upload.upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
-        m_upload.s3_key = get_s3_key(ctx, tag, tag_len);
-        if (!m_upload.s3_key) {
+    if (m_upload->upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
+        m_upload->s3_key = get_s3_key(ctx, tag, tag_len);
+        if (!m_upload->s3_key) {
             flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
             FLB_OUTPUT_RETURN(FLB_ERROR);
         }
 
-        ret = create_multipart_upload(ctx, &m_upload);
+        ret = create_multipart_upload(ctx, m_upload);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not initiate multipart upload");
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
-        m_upload.upload_state = MULTIPART_UPLOAD_STATE_CREATED;
+        m_upload->upload_state = MULTIPART_UPLOAD_STATE_CREATED;
     }
 
     json = flb_pack_msgpack_to_json_format(data, bytes,
@@ -597,22 +597,22 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     //     return FLB_OUTPUT_RETURN(FLB_RETRY);
     // }
 
-    ret = upload_part(ctx, &m_upload, buffer, buffer_size);
+    ret = upload_part(ctx, m_upload, buffer, buffer_size);
     if (ret < 0) {
         /* re-add chunk to list */
         mk_list_add(&chunk->_head, &ctx->store.chunks);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    if (m_upload.part_number >= 10) {
-        ret = complete_multipart_upload(ctx, &m_upload);
+    if (m_upload->part_number >= 10) {
+        ret = complete_multipart_upload(ctx, m_upload);
         if (ret == 0) {
-            m_upload.upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
-            m_upload.part_number = 1;
+            m_upload->upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
+            m_upload->part_number = 1;
         }
     }
     else {
-        m_upload.part_number += 1;
+        m_upload->part_number += 1;
     }
 
     /* data was sent successfully- delete the local buffer */
