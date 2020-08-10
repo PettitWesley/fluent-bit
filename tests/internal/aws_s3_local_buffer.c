@@ -9,31 +9,25 @@
 
 #include "flb_tests_internal.h"
 
-#define DIRECTORY "/fluent-bit/buffer/s3"
-#define PLUGIN_NAME "flb_s3_plugin"
+#define BUFFER_DIRECTORY "/fluent-bit/buffer/s3"
+#define PLUGIN_NAME "s3_plugin"
 #define TEST_DATA "I love Fluent Bit"
 #define KEY_1 "key1"
 #define KEY_2 "key2"
 #define KEY_3 "key3"
 
-static void test_chunk_compare(struct flb_local_buffer *store, 
-                               struct flb_local_chunk *chunk,
-                               char *tag, char *data)
+static void check_chunk(struct flb_local_chunk *chunk, char *tag, char *data)
 {
     char *buffered_data = NULL;
     size_t buffer_size;
-    struct mk_list *tmp;
-    struct mk_list *head;
     int ret;
     /* Ensure data retreived is same as that which was stored. */
-    mk_list_foreach_safe(head, tmp, &store->chunks) {
-        chunk = mk_list_entry(head, struct flb_local_chunk, _head);
-        if (chunk->key == tag){
-            ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
-            TEST_CHECK(ret == 0);
-            TEST_CHECK(strcmp(buffered_data, data) == 0);
-        } 
-    }
+    if (chunk->tag == tag){
+        ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
+        TEST_CHECK(ret == 0);
+        TEST_CHECK(strcmp(buffered_data, data) == 0);
+    } 
+    
 }
 
 static void test_flb_buffer_put_create_chunk()
@@ -42,10 +36,11 @@ static void test_flb_buffer_put_create_chunk()
     struct flb_local_buffer *store = flb_calloc(1, sizeof(struct flb_local_buffer));
     struct flb_output_instance *out = flb_calloc(1, sizeof(struct flb_output_instance));
 
-    store->dir = DIRECTORY;
+    store->dir = BUFFER_DIRECTORY;
     memcpy(out->name, PLUGIN_NAME, strlen(PLUGIN_NAME));
     store->ins = out;
     mk_list_init(&store->chunks);
+    TEST_CHECK(mk_list_size(&store->chunks) == 0);
 
     char *data = TEST_DATA;
     char *key1 = KEY_1 ;
@@ -61,7 +56,8 @@ static void test_flb_buffer_put_create_chunk()
     TEST_CHECK(ret == 0);
 
     /* Ensure that the data stored and retrieved from the chunk is the same. */
-    test_chunk_compare(store, chunk, key1, data);
+    chunk = flb_chunk_get(store, key1);
+    check_chunk(chunk, key1, data);
 
     flb_chunk_destroy(chunk);
     flb_free(out);
@@ -74,10 +70,11 @@ static void test_flb_buffer_put_valid_chunk()
     struct flb_local_buffer *store = flb_calloc(1, sizeof(struct flb_local_buffer));
     struct flb_output_instance *out = flb_calloc(1, sizeof(struct flb_output_instance));
 
-    store->dir = DIRECTORY;
+    store->dir = BUFFER_DIRECTORY;
     memcpy(out->name, PLUGIN_NAME, strlen(PLUGIN_NAME));
     store->ins = out;
     mk_list_init(&store->chunks);
+    TEST_CHECK(mk_list_size(&store->chunks) == 0); 
 
     char *data = TEST_DATA;
     char *key2 = KEY_2;
@@ -99,7 +96,8 @@ static void test_flb_buffer_put_valid_chunk()
     chunk = flb_chunk_get(store,key2);
     TEST_CHECK(chunk != NULL);
 
-    test_chunk_compare(store, chunk, key2, data);
+    chunk = flb_chunk_get(store, key2);
+    check_chunk(chunk, key2, data);
 
     flb_chunk_destroy(chunk);
     flb_free(out);
@@ -111,6 +109,8 @@ static void test_flb_init_local_buffer()
     int ret;
     char *data = TEST_DATA;
     char *key3 = KEY_3;
+    struct mk_list *tmp;
+    struct mk_list *head;
     struct flb_local_chunk *chunk;
     struct flb_local_buffer *store = flb_calloc(1,sizeof(struct flb_local_buffer));
     struct flb_output_instance *out = flb_calloc(1,sizeof(struct flb_output_instance));
@@ -119,15 +119,17 @@ static void test_flb_init_local_buffer()
     struct flb_output_instance *new_out= flb_calloc(1, 
                                                     sizeof(struct flb_output_instance));
 
-    store->dir = DIRECTORY;
+    store->dir = BUFFER_DIRECTORY;
     memcpy(out->name, PLUGIN_NAME, strlen(PLUGIN_NAME));
     store->ins = out;
     mk_list_init(&store->chunks);
+    TEST_CHECK(mk_list_size(&store->chunks) == 0);
 
-    new_store->dir = DIRECTORY;
+    new_store->dir = BUFFER_DIRECTORY;
     memcpy(new_out->name, PLUGIN_NAME, strlen(PLUGIN_NAME));
     new_store->ins = new_out;
     mk_list_init(&new_store->chunks);
+    TEST_CHECK(mk_list_size(&new_store->chunks) == 0);
 
     chunk = flb_chunk_get(store, key3);
     TEST_CHECK(chunk == NULL);
@@ -136,7 +138,8 @@ static void test_flb_init_local_buffer()
     ret = flb_init_local_buffer(new_store);
     TEST_CHECK(ret == 0);
 
-    test_chunk_compare(new_store, chunk, key3, data);
+    chunk = flb_chunk_get(new_store, key3);
+    check_chunk(chunk, key3, data);
 
     flb_chunk_destroy(chunk);
     flb_free(out);
