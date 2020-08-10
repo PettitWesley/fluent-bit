@@ -63,8 +63,12 @@ static int complete_multipart_upload_payload(struct flb_stdout *ctx,
     flb_sds_t etag;
     size_t size = COMPLETE_MULTIPART_UPLOAD_BASE_LEN;
     char part_num[7];
+    int last_part_num;
 
-    size = size + (COMPLETE_MULTIPART_UPLOAD_PART_LEN * m_upload->part_number);
+    /* part_number on the upload will be set to next expected part number */
+    last_part_num = m_upload->part_number - 1;
+
+    size = size + (COMPLETE_MULTIPART_UPLOAD_PART_LEN * part_num);
 
     buf = flb_malloc(size + 1);
     if (!buf) {
@@ -77,7 +81,7 @@ static int complete_multipart_upload_payload(struct flb_stdout *ctx,
         goto error;
     }
 
-    for (i = 0; i < m_upload->part_number; i++) {
+    for (i = 0; i < last_part_num; i++) {
         etag = m_upload->etags[i];
         if (!try_to_write(buf, &offset, size,
                           "<Part><ETag>", 12)) {
