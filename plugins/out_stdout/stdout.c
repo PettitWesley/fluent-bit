@@ -114,7 +114,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     } else {
         ctx->file_size = DEFAULT_FILE_SIZE;
-        flb_plg_error(ctx->ins, "Using default file size 100MB");
+        flb_plg_info(ctx->ins, "Using default file size 100MB");
     }
 
     tmp = flb_output_get_property("region", ins);
@@ -678,6 +678,11 @@ static struct flb_config_map config_map[] = {
      FLB_CONFIG_MAP_STR, "json_date_format", NULL,
      0, FLB_FALSE, 0,
     "Specifies the format of the date. Supported formats are double, iso8601 and epoch."
+    },
+    {
+     FLB_CONFIG_MAP_STR, "file_size", NULL,
+     0, FLB_FALSE, 0,
+    "Specifies the size of files in S3. Maximum size is 50GB, minimim is 1MB"
     },
     {
      FLB_CONFIG_MAP_STR, "json_date_key", "date",
