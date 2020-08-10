@@ -491,12 +491,12 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
 
     mk_list_foreach_safe(head, tmp, &ctx->uploads) {
         tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
+        if (tmp_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
+            continue;
+        }
         if (strcmp(tmp_upload->tag, tag) == 0) {
             m_upload = tmp_upload;
             break;
-        }
-        if (tmp_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
-            continue;
         }
     }
 
