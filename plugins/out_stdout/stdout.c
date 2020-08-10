@@ -476,7 +476,7 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
 
     mk_list_foreach_safe(head, tmp, &ctx->uploads) {
         tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
-        if (strcmp(tmp_chunk->s3_key, s3_key) == 0) {
+        if (strcmp(tmp_upload->s3_key, s3_key) == 0) {
             m_upload = tmp_upload;
             break;
         }
