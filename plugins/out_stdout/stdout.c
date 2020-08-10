@@ -97,6 +97,26 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         ctx->prefix = "fluent-bit";
     }
 
+    tmp = flb_output_get_property("file_size", ins);
+    if (tmp) {
+        ctx->file_size = (size_t) flb_utils_size_to_bytes(tmp);
+        if (ctx->file_size <= 0) {
+            flb_plg_error(ctx->ins, "Failed to parse file_size %s", tmp);
+            goto error;
+        }
+        if (ctx->file_size < 10000000) {
+            flb_plg_error(ctx->ins, "todo: fix: file size must be at least 10MB", tmp);
+            goto error;
+        }
+        if (ctx->file_size > MAX_FILE_SIZE) {
+            flb_plg_error(ctx->ins, "Max file_size is %s bytes", MAX_FILE_SIZE_STR);
+            goto error;
+        }
+    } else {
+        ctx->file_size = DEFAULT_FILE_SIZE
+        flb_plg_error(ctx->ins, "Using default file size 100MB");
+    }
+
     tmp = flb_output_get_property("region", ins);
     if (tmp) {
         ctx->region = (char *) tmp;
@@ -603,23 +623,20 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     //     return FLB_OUTPUT_RETURN(FLB_RETRY);
     // }
 
+    if (m_upload->bytes >= ctx->file_size || m_upload->part_number >= 10000) {
+        ret = complete_multipart_upload(ctx, m_upload);
+        if (ret == 0) {
+            mk_list_del(&m_upload->_head);
+        }
+    }
+
     ret = upload_part(ctx, m_upload, buffer, buffer_size);
     if (ret < 0) {
         /* re-add chunk to list */
         mk_list_add(&chunk->_head, &ctx->store.chunks);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
-
-    if (m_upload->part_number >= 10) {
-        ret = complete_multipart_upload(ctx, m_upload);
-        if (ret == 0) {
-            m_upload->upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
-            m_upload->part_number = 1;
-        }
-    }
-    else {
-        m_upload->part_number += 1;
-    }
+    m_upload->part_number += 1;
 
     /* data was sent successfully- delete the local buffer */
     ret = flb_remove_chunk_files(chunk);

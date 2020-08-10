@@ -36,6 +36,10 @@
 #define MULTIPART_UPLOAD_STATE_CREATED       1
 #define MULTIPART_UPLOAD_STATE_COMPLETED     2
 
+#define DEFAULT_FILE_SIZE     100000000
+#define MAX_FILE_SIZE         50000000000
+#define MAX_FILE_SIZE_STR     "50,000,000,000"
+
 struct multipart_upload {
     flb_sds_t s3_key;
     flb_sds_t tag;
@@ -48,6 +52,9 @@ struct multipart_upload {
      */
     flb_sds_t etags[10000];
     int part_number;
+
+    /* ongoing tracker of how much data has been sent for this upload */
+    size_t bytes;
 
     struct mk_list _head;
 };
@@ -82,6 +89,8 @@ struct flb_stdout {
     int has_old_buffers;
 
     struct mk_list uploads;
+
+    size_t file_size;
 
     struct flb_output_instance *ins;
 };

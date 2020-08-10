@@ -335,6 +335,8 @@ int upload_part(struct flb_stdout *ctx, struct multipart_upload *m_upload,
                          "for %s, UploadId=%s, ETag=%s", m_upload->part_number,
                          m_upload->s3_key, m_upload->upload_id, tmp);
             flb_http_client_destroy(c);
+            /* track how many bytes are have gone toward this upload */
+            m_upload->bytes += body_size;
             return 0;
         }
         flb_aws_print_xml_error(c->resp.payload, c->resp.payload_size,
