@@ -38,6 +38,7 @@
 
 struct multipart_upload {
     flb_sds_t s3_key;
+    flb_sds_t tag;
     flb_sds_t upload_id;
     int upload_state;
 

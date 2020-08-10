@@ -467,16 +467,11 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
     struct mk_list *tmp;
     struct mk_list *head;
     flb_sds_t s3_key = NULL;
-
-    s3_key = get_s3_key(ctx, tag, tag_len);
-    if (!s3_key) {
-        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
-        return NULL;
-    }
+    flb_sds_t tmp = NULL;
 
     mk_list_foreach_safe(head, tmp, &ctx->uploads) {
         tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
-        if (strcmp(tmp_upload->s3_key, s3_key) == 0) {
+        if (strcmp(tmp_upload->tag, tag) == 0) {
             m_upload = tmp_upload;
             break;
         }
@@ -487,16 +482,27 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
         m_upload = flb_calloc(1, sizeof(struct multipart_upload));
         if (!m_upload) {
             flb_errno();
-            flb_sds_destroy(s3_key);
+            return NULL;
+        }
+        s3_key = get_s3_key(ctx, tag, tag_len);
+        if (!s3_key) {
+            flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
+            flb_free(m_upload);
             return NULL;
         }
         m_upload->s3_key = s3_key;
+        tmp = flb_sds_create_len(tag, tag_len);
+        if (!tmp) {
+            flb_errno();
+            flb_free(m_upload);
+            return NULL;
+        }
+        m_upload->tag = tmp;
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
         m_upload->part_number = 1;
         mk_list_add(&m_upload->_head, &ctx->uploads);
     }
 
-    flb_sds_destroy(s3_key);
     return m_upload;
 }
 
