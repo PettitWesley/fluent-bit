@@ -495,6 +495,9 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
             m_upload = tmp_upload;
             break;
         }
+        if (tmp_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
+            continue;
+        }
     }
 
     if (!m_upload) {
@@ -624,6 +627,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     // }
 
     if (m_upload->bytes >= ctx->file_size || m_upload->part_number >= 10000) {
+        m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
         ret = complete_multipart_upload(ctx, m_upload);
         if (ret == 0) {
             mk_list_del(&m_upload->_head);
@@ -713,8 +717,8 @@ static struct flb_config_map config_map[] = {
 
 /* Plugin registration */
 struct flb_output_plugin out_stdout_plugin = {
-    .name         = "stdout",
-    .description  = "Prints events to STDOUT",
+    .name         = "s3",
+    .description  = "Send to S3",
     .cb_init      = cb_stdout_init,
     .cb_flush     = cb_stdout_flush,
     .cb_exit      = cb_stdout_exit,
