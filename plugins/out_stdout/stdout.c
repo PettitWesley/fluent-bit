@@ -467,7 +467,7 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
     struct mk_list *tmp;
     struct mk_list *head;
     flb_sds_t s3_key = NULL;
-    flb_sds_t tmp = NULL;
+    flb_sds_t tmp_sds = NULL;
 
     mk_list_foreach_safe(head, tmp, &ctx->uploads) {
         tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
@@ -491,13 +491,13 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
             return NULL;
         }
         m_upload->s3_key = s3_key;
-        tmp = flb_sds_create_len(tag, tag_len);
-        if (!tmp) {
+        tmp_sds = flb_sds_create_len(tag, tag_len);
+        if (!tmp_sds) {
             flb_errno();
             flb_free(m_upload);
             return NULL;
         }
-        m_upload->tag = tmp;
+        m_upload->tag = tmp_sds;
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
         m_upload->part_number = 1;
         mk_list_add(&m_upload->_head, &ctx->uploads);
