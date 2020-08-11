@@ -9,7 +9,7 @@
 
 #include "flb_tests_internal.h"
 
-#define BUFFER_DIRECTORY "/fluent-bit/buffer/s3"
+#define BUFFER_DIRECTORY FLB_TESTS_DATA_PATH "data/s3_local_buffer/"
 #define PLUGIN_NAME "s3_plugin"
 #define TEST_DATA "I love Fluent Bit"
 #define KEY_1 "key1"
@@ -26,8 +26,8 @@ static void check_chunk(struct flb_local_chunk *chunk, char *tag, char *data)
         ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
         TEST_CHECK(ret == 0);
         TEST_CHECK(strcmp(buffered_data, data) == 0);
-    } 
-    
+    }
+
 }
 
 static void test_flb_buffer_put_create_chunk()
@@ -47,7 +47,7 @@ static void test_flb_buffer_put_create_chunk()
     size_t data_len = strlen(data);
     struct flb_local_chunk *chunk;
 
-    /* No local chunk suitable for this data has been created yet, 
+    /* No local chunk suitable for this data has been created yet,
      * hence chunk should be NULL.
      */
     chunk = flb_chunk_get(store, key1);
@@ -59,6 +59,8 @@ static void test_flb_buffer_put_create_chunk()
     chunk = flb_chunk_get(store, key1);
     check_chunk(chunk, key1, data);
 
+    ret = flb_remove_chunk_files(chunk);
+    TEST_CHECK(ret == 0);
     flb_chunk_destroy(chunk);
     flb_free(out);
     flb_free(store);
@@ -74,14 +76,14 @@ static void test_flb_buffer_put_valid_chunk()
     memcpy(out->name, PLUGIN_NAME, strlen(PLUGIN_NAME));
     store->ins = out;
     mk_list_init(&store->chunks);
-    TEST_CHECK(mk_list_size(&store->chunks) == 0); 
+    TEST_CHECK(mk_list_size(&store->chunks) == 0);
 
     char *data = TEST_DATA;
     char *key2 = KEY_2;
     size_t data_len = strlen(data);
     struct flb_local_chunk *chunk;
 
-    /* No local chunk suitable for this data has been created yet, 
+    /* No local chunk suitable for this data has been created yet,
      * hence chunk should be NULL.
      */
     chunk = flb_chunk_get(store, key2);
@@ -90,15 +92,15 @@ static void test_flb_buffer_put_valid_chunk()
     ret = flb_buffer_put(store, chunk, key2, data, data_len);
     TEST_CHECK(ret == 0);
 
-    /* A new chunk associated with key2 was created in the above statement, 
-     * hence this time, chunk should not be NULL. 
+    /* A new chunk associated with key2 was created in the above statement,
+     * hence this time, chunk should not be NULL.
      */
-    chunk = flb_chunk_get(store,key2);
-    TEST_CHECK(chunk != NULL);
-
     chunk = flb_chunk_get(store, key2);
+    TEST_CHECK(chunk != NULL);
     check_chunk(chunk, key2, data);
 
+    ret = flb_remove_chunk_files(chunk);
+    TEST_CHECK(ret == 0);
     flb_chunk_destroy(chunk);
     flb_free(out);
     flb_free(store);
@@ -114,9 +116,9 @@ static void test_flb_init_local_buffer()
     struct flb_local_chunk *chunk;
     struct flb_local_buffer *store = flb_calloc(1,sizeof(struct flb_local_buffer));
     struct flb_output_instance *out = flb_calloc(1,sizeof(struct flb_output_instance));
-    struct flb_local_buffer *new_store = flb_calloc(1, 
+    struct flb_local_buffer *new_store = flb_calloc(1,
                                                     sizeof(struct flb_local_buffer));
-    struct flb_output_instance *new_out= flb_calloc(1, 
+    struct flb_output_instance *new_out= flb_calloc(1,
                                                     sizeof(struct flb_output_instance));
 
     store->dir = BUFFER_DIRECTORY;
@@ -141,6 +143,8 @@ static void test_flb_init_local_buffer()
     chunk = flb_chunk_get(new_store, key3);
     check_chunk(chunk, key3, data);
 
+    ret = flb_remove_chunk_files(chunk);
+    TEST_CHECK(ret == 0);
     flb_chunk_destroy(chunk);
     flb_free(out);
     flb_free(store);

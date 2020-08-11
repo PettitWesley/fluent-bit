@@ -95,15 +95,23 @@ int flb_init_local_buffer(struct flb_local_buffer *store)
     flb_sds_t path;
     flb_sds_t tmp_sds;
 
+    flb_info("flb_init_local_buffer()");
+
     d = opendir(store->dir);
     if (d) {
         while ((dir = readdir(d)) != NULL) {
+            flb_info("Found file %s", dir->d_name);
+            if (strlen(dir->d_name) > 0 && dir->d_name[0] == '.') {
+                /* ignore hidden files */
+                flb_info("ignoring hidden file");
+                continue;
+            }
             if (dir->d_type == DT_REG) {
                 if (is_tag_file(dir->d_name) == 0) {
                     continue;
                 }
                 /* create a new chunk */
-                flb_plg_debug(store->ins, "Found existing local buffer file %s",
+                flb_info("Found existing local buffer file %s",
                               dir->d_name);
                 c = flb_calloc(1, sizeof(struct flb_local_chunk));
                 if (!c) {
@@ -136,7 +144,7 @@ int flb_init_local_buffer(struct flb_local_buffer *store)
                 /* get the fluent tag */
                 tag = read_tag(path);
                 if (!tag) {
-                    flb_plg_error(store->ins, "Could not read Fluent tag from file system; file path=%s.tag",
+                    flb_info("Could not read Fluent tag from file system; file path=%s.tag",
                                   path);
                     flb_errno();
                     flb_chunk_destroy(c);
@@ -149,14 +157,17 @@ int flb_init_local_buffer(struct flb_local_buffer *store)
                     flb_chunk_destroy(c);
                     return -1;
                 }
-                flb_plg_info(store->ins, "Found existing local buffer %s",
+                flb_info("Found existing local buffer %s",
                              path);
                 mk_list_add(&c->_head, &store->chunks);
             }
         }
         closedir(d);
     }
-  return 0;
+    else {
+        flb_error("Could not open buffer directory %s", store->dir);
+    }
+    return 0;
 }
 
 /*
