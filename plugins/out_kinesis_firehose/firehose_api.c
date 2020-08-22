@@ -42,7 +42,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "cloudwatch_api.h"
+#include "firehose_api.h"
 
 #define ERR_CODE_SERVICE_UNAVAILABLE "ServiceUnavailableException"
 

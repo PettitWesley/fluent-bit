@@ -285,7 +285,6 @@ static void cb_firehose_flush(const void *data, size_t bytes,
                                 struct flb_config *config)
 {
     struct flb_firehose *ctx = out_context;
-    int ret;
     int event_count;
     struct flush *buf;
     (void) i_ins;
@@ -310,10 +309,6 @@ static void cb_firehose_flush(const void *data, size_t bytes,
 
 void flb_firehose_ctx_destroy(struct flb_firehose *ctx)
 {
-    struct log_stream *stream;
-    struct mk_list *tmp;
-    struct mk_list *head;
-
     if (ctx != NULL) {
         if (ctx->base_aws_provider) {
             flb_aws_provider_destroy(ctx->base_aws_provider);
