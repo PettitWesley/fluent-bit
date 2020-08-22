@@ -267,6 +267,20 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         return 0;
     }
 
+    /* alloc out_buf if needed */
+    if (buf->out_buf == NULL || buf->out_buf_size < buf->data_size) {
+        if (buf->out_buf != NULL) {
+            flb_free(buf->out_buf);
+        }
+        buf->out_buf = flb_malloc(buf->data_size);
+        if (!buf->out_buf) {
+            flb_errno();
+            flush_destroy(buf);
+            return NULL;
+        }
+        buf->out_buf_size = buf->data_size;
+    }
+
     offset = 0;
     ret = init_put_payload(ctx, buf, &offset);
     if (ret < 0) {
