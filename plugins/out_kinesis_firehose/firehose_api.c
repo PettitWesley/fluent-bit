@@ -275,8 +275,7 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         buf->out_buf = flb_malloc(buf->data_size);
         if (!buf->out_buf) {
             flb_errno();
-            flush_destroy(buf);
-            return NULL;
+            return -1;
         }
         buf->out_buf_size = buf->data_size;
     }
