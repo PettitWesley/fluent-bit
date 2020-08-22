@@ -278,7 +278,7 @@ struct flush *new_flush_buffer()
     return buf;
 }
 
-static void cb_cloudwatch_flush(const void *data, size_t bytes,
+static void cb_firehose_flush(const void *data, size_t bytes,
                                 const char *tag, int tag_len,
                                 struct flb_input_instance *i_ins,
                                 void *out_context,
@@ -287,29 +287,23 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     struct flb_firehose *ctx = out_context;
     int ret;
     int event_count;
-    struct log_stream *stream = NULL;
+    struct flush *buf;
     (void) i_ins;
     (void) config;
 
-    if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
-        ret = create_log_group(ctx);
-        if (ret < 0) {
-            FLB_OUTPUT_RETURN(FLB_RETRY);
-        }
-    }
-
-    stream = get_log_stream(ctx, tag, tag_len);
-    if (!stream) {
+    buf = new_flush_buffer();
+    if (!buf) {
+        flb_plg_error(ctx->ins, "Failed to construct flush buffer");
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    event_count = process_and_send(ctx, ctx->buf, stream, data, bytes);
+    event_count = process_and_send(ctx, buf, data, bytes);
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send events");
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    flb_plg_info(ctx->ins, "Sent %d events to CloudWatch", event_count);
+    flb_plg_info(ctx->ins, "Sent %d events to Firehose", event_count);
 
     FLB_OUTPUT_RETURN(FLB_OK);
 }
@@ -323,10 +317,6 @@ void flb_firehose_ctx_destroy(struct flb_firehose *ctx)
     if (ctx != NULL) {
         if (ctx->base_aws_provider) {
             flb_aws_provider_destroy(ctx->base_aws_provider);
-        }
-
-        if (ctx->buf) {
-            flush_destroy(ctx->buf);
         }
 
         if (ctx->aws_provider) {
@@ -353,25 +343,11 @@ void flb_firehose_ctx_destroy(struct flb_firehose *ctx)
             flb_free(ctx->endpoint);
         }
 
-        if (ctx->log_stream_name) {
-            if (ctx->stream.name) {
-                flb_sds_destroy(ctx->stream.name);
-            }
-            if (ctx->stream.sequence_token) {
-                flb_sds_destroy(ctx->stream.sequence_token);
-            }
-        } else {
-            mk_list_foreach_safe(head, tmp, &ctx->streams) {
-                stream = mk_list_entry(head, struct log_stream, _head);
-                mk_list_del(&stream->_head);
-                log_stream_destroy(stream);
-            }
-        }
         flb_free(ctx);
     }
 }
 
-static int cb_cloudwatch_exit(void *data, struct flb_config *config)
+static int cb_firehose_exit(void *data, struct flb_config *config)
 {
     struct flb_firehose *ctx = data;
 
@@ -379,62 +355,35 @@ static int cb_cloudwatch_exit(void *data, struct flb_config *config)
     return 0;
 }
 
-void log_stream_destroy(struct log_stream *stream)
-{
-    if (stream) {
-        if (stream->name) {
-            flb_sds_destroy(stream->name);
-        }
-        if (stream->sequence_token) {
-            flb_sds_destroy(stream->sequence_token);
-        }
-        flb_free(stream);
-    }
-}
-
 /* Configuration properties map */
 static struct flb_config_map config_map[] = {
     {
      FLB_CONFIG_MAP_STR, "region", NULL,
      0, FLB_FALSE, 0,
-     "The AWS region to send logs to"
+     "The AWS region of your delivery stream"
     },
 
     {
-     FLB_CONFIG_MAP_STR, "log_group_name", NULL,
+     FLB_CONFIG_MAP_STR, "delivery_stream", NULL,
      0, FLB_FALSE, 0,
-     "CloudWatch Log Group Name"
+     "Firehose delivery stream name"
     },
 
     {
-     FLB_CONFIG_MAP_STR, "log_stream_name", NULL,
+     FLB_CONFIG_MAP_STR, "time_key", NULL,
      0, FLB_FALSE, 0,
-     "CloudWatch Log Stream Name; not compatible with `log_stream_prefix`"
-    },
-
-    {
-     FLB_CONFIG_MAP_STR, "log_stream_prefix", NULL,
-     0, FLB_FALSE, 0,
-     "Prefix for CloudWatch Log Stream Name; the tag is appended to the prefix"
-     " to form the stream name"
+     "Add the timestamp to the record under this key. By default the timestamp "
+     "from Fluent Bit will not be added to records sent to Kinesis."
     },
 
     {
      FLB_CONFIG_MAP_STR, "log_key", NULL,
      0, FLB_FALSE, 0,
-     "By default, the whole log record will be sent to CloudWatch. "
+     "By default, the whole log record will be sent to Firehose. "
      "If you specify a key name with this option, then only the value of "
-     "that key will be sent to CloudWatch. For example, if you are using "
+     "that key will be sent to Firehose. For example, if you are using "
      "the Fluentd Docker log driver, you can specify log_key log and only "
      "the log message will be sent to CloudWatch."
-    },
-
-    {
-     FLB_CONFIG_MAP_STR, "log_format", NULL,
-     0, FLB_FALSE, 0,
-     "An optional parameter that can be used to tell CloudWatch the format "
-     "of the data. A value of json/emf enables CloudWatch to extract custom "
-     "metrics embedded in a JSON payload."
     },
 
     {
@@ -444,16 +393,9 @@ static struct flb_config_map config_map[] = {
     },
 
     {
-     FLB_CONFIG_MAP_BOOL, "auto_create_group", "false",
-     0, FLB_FALSE, 0,
-     "Automatically create the log group (log streams will always automatically"
-     " be created)"
-    },
-
-    {
      FLB_CONFIG_MAP_STR, "endpoint", NULL,
      0, FLB_FALSE, 0,
-     "Specify a custom endpoint for the CloudWatch Logs API"
+     "Specify a custom endpoint for the Firehose API"
     },
 
     /* EOF */
@@ -462,11 +404,11 @@ static struct flb_config_map config_map[] = {
 
 /* Plugin registration */
 struct flb_output_plugin out_cloudwatch_logs_plugin = {
-    .name         = "cloudwatch_logs",
-    .description  = "Send logs to Amazon CloudWatch",
+    .name         = "kinesis_firehose",
+    .description  = "Send logs to Amazon Kinesis Firehose",
     .cb_init      = cb_firehose_init,
-    .cb_flush     = cb_cloudwatch_flush,
-    .cb_exit      = cb_cloudwatch_exit,
+    .cb_flush     = cb_firehose_flush,
+    .cb_exit      = cb_firehose_exit,
     .flags        = 0,
 
     /* Configuration */

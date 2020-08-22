@@ -588,7 +588,6 @@ send:
  * return value is the number of events processed
  */
 int process_and_send(struct flb_cloudwatch *ctx, struct flush *buf,
-                     struct log_stream *stream,
                      const char *data, size_t bytes)
 {
     size_t off = 0;
