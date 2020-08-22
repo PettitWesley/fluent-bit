@@ -141,8 +141,8 @@ static int end_put_payload(struct flb_firehose *ctx, struct flush *buf,
  * and 1 if we ran out of space to write the event
  * which means a send must occur
  */
-int process_event(struct flb_firehose *ctx, struct flush *buf,
-                  const msgpack_object *obj, struct flb_time *tms)
+static int process_event(struct flb_firehose *ctx, struct flush *buf,
+                         const msgpack_object *obj, struct flb_time *tms)
 {
     size_t written;
     int ret;
@@ -248,7 +248,7 @@ int process_event(struct flb_firehose *ctx, struct flush *buf,
 }
 
 /* Resets or inits a flush struct */
-void reset_flush_buf(struct flb_firehose *ctx, struct flush *buf) {
+static void reset_flush_buf(struct flb_firehose *ctx, struct flush *buf) {
     buf->event_index = 0;
     buf->tmp_buf_offset = 0;
     buf->event_index = 0;
@@ -257,7 +257,7 @@ void reset_flush_buf(struct flb_firehose *ctx, struct flush *buf) {
 }
 
 /* constructs a put payload, and then sends */
-int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
+static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
     int ret;
     int offset;
     int i;
@@ -310,8 +310,8 @@ int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
 /*
  * Processes the msgpack object, sends the current batch if needed
  */
-int add_event(struct flb_firehose *ctx, struct flush *buf,
-              const msgpack_object *obj, struct flb_time *tms)
+static int add_event(struct flb_firehose *ctx, struct flush *buf,
+                     const msgpack_object *obj, struct flb_time *tms)
 {
     int ret;
     struct event *event;
@@ -374,8 +374,8 @@ send:
  * Main routine- processes msgpack and sends in batches
  * return value is the number of events processed
  */
-int process_and_send(struct flb_firehose *ctx, struct flush *buf,
-                     const char *data, size_t bytes)
+int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
+                             const char *data, size_t bytes)
 {
     size_t off = 0;
     int i = 0;

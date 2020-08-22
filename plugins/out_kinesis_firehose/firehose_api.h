@@ -36,8 +36,8 @@
 
 void flush_destroy(struct flush *buf);
 
-int process_and_send(struct flb_firehose *ctx, struct flush *buf,
-                     const char *data, size_t bytes);
+int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
+                             const char *data, size_t bytes);
 
 int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                      size_t payload_size);
