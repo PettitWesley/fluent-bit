@@ -25,26 +25,21 @@
 #define MAX_EVENTS_PER_PUT               500
 #define MAX_EVENT_SIZE                   1024000
 
-/* number of characters needed to 'start' a PutLogEvents payload */
-#define PUT_LOG_EVENTS_HEADER_LEN      72
-/* number of characters needed per event in a PutLogEvents payload */
-#define PUT_LOG_EVENTS_PER_EVENT_LEN   42
-/* number of characters needed to 'end' a PutLogEvents payload */
-#define PUT_LOG_EVENTS_FOOTER_LEN      4
+/* number of characters needed to 'start' a PutRecordBatch payload */
+#define PUT_RECORD_BATCH_HEADER_LEN      42
+/* number of characters needed per record in a PutRecordBatch payload */
+#define PUT_RECORD_BATCH_PER_RECORD_LEN   12
+/* number of characters needed to 'end' a PutRecordBatch payload */
+#define PUT_RECORD_BATCH_FOOTER_LEN      4
 
-#include "cloudwatch_logs.h"
+#include "firehose.h"
 
 void flush_destroy(struct flush *buf);
 
-int process_and_send(struct flb_cloudwatch *ctx, struct flush *buf,
+int process_and_send(struct flb_firehose *ctx, struct flush *buf,
                      const char *data, size_t bytes);
-int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream);
-struct log_stream *get_log_stream(struct flb_cloudwatch *ctx,
-                                  const char *tag, int tag_len);
-int put_log_events(struct flb_cloudwatch *ctx, struct flush *buf,
-                   struct log_stream *stream,
-                   size_t payload_size);
-int create_log_group(struct flb_cloudwatch *ctx);
-int compare_events(const void *a_arg, const void *b_arg);
+
+int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
+                     size_t payload_size);
 
 #endif
