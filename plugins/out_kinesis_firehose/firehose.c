@@ -398,7 +398,7 @@ static struct flb_config_map config_map[] = {
 };
 
 /* Plugin registration */
-struct flb_output_plugin out_cloudwatch_logs_plugin = {
+struct flb_output_plugin out_kinesis_firehose_plugin = {
     .name         = "kinesis_firehose",
     .description  = "Send logs to Amazon Kinesis Firehose",
     .cb_init      = cb_firehose_init,
