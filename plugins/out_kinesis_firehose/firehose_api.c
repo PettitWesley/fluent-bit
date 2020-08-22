@@ -320,7 +320,7 @@ int add_event(struct flb_firehose *ctx, struct flush *buf,
 
     if (buf->event_index == 0) {
         /* init */
-        reset_flush_buf(ctx, buf, stream);
+        reset_flush_buf(ctx, buf);
     }
 
 retry_add_event:
@@ -339,7 +339,7 @@ retry_add_event:
     event = &buf->events[buf->event_index];
     event_bytes = event->len + PUT_RECORD_BATCH_PER_RECORD_LEN;
 
-    if ((buf->data_size + event_bytes) > PUT_LOG_EVENTS_PAYLOAD_SIZE) {
+    if ((buf->data_size + event_bytes) > PUT_RECORD_BATCH_PAYLOAD_SIZE) {
         /* do not send this event */
         buf->event_index--;
         retry_add = FLB_TRUE;
@@ -357,8 +357,8 @@ retry_add_event:
     return 0;
 
 send:
-    ret = send_log_events(ctx, buf, stream);
-    reset_flush_buf(ctx, buf, stream);
+    ret = send_log_events(ctx, buf);
+    reset_flush_buf(ctx, buf);
     if (ret < 0) {
         return -1;
     }
@@ -484,7 +484,7 @@ error:
  * Returns -1 on failure, 0 on success
  */
 int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
-                     struct log_stream *stream, size_t payload_size)
+                     size_t payload_size)
 {
 
     struct flb_http_client *c = NULL;
@@ -498,7 +498,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     firehose_client = ctx->firehose_client;
     c = firehose_client->client_vtable->request(firehose_client, FLB_HTTP_POST,
                                                 "/", buf->out_buf, payload_size,
-                                                put_record_batch_header, 1);
+                                                &put_record_batch_header, 1);
 
     if (c) {
         flb_plg_debug(ctx->ins, "PutRecordBatch http status=%d", c->resp.status);
