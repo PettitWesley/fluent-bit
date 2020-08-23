@@ -87,7 +87,7 @@ static int init_put_payload(struct flb_firehose *ctx, struct flush *buf,
                       "\",\"Records\":[", 13)) {
         goto error;
     }
-
+    flb_info("offset=%d, buf=%.*s", offset, offset, buf->out_buf);
     return 0;
 
 error:
@@ -114,6 +114,7 @@ static int write_event(struct flb_firehose *ctx, struct flush *buf,
                       "\"}", 2)) {
         goto error;
     }
+    flb_info("offset=%d, buf=%.*s", offset, offset, buf->out_buf);
 
     return 0;
 
@@ -130,6 +131,7 @@ static int end_put_payload(struct flb_firehose *ctx, struct flush *buf,
         return -1;
     }
     buf->out_buf[*offset] = '\0';
+    flb_info("offset=%d, buf=%.*s", offset, offset, buf->out_buf);
 
     return 0;
 }
