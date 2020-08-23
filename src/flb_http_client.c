@@ -1068,7 +1068,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     }
 #endif
 
-    flb_info("[http request] \n%.*s\n%.*s", c->header_len, c->header_buf,
+    flb_info("[http request] \n%.*s%.*s", c->header_len, c->header_buf,
              c->body_len, c->body_buf);
     /* Write the header */
     ret = flb_io_net_write(c->u_conn,
