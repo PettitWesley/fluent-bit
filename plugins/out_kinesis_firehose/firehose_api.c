@@ -558,7 +558,8 @@ static int process_api_response(struct flb_firehose *ctx,
             goto done;
         }
 
-        if (strncmp(key.via.str.ptr, "FailedPutCount", 14) == 0) {
+        if (key.via.str.size >= 14 &&
+            strncmp(key.via.str.ptr, "FailedPutCount", 14) == 0) {
             val = root.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_POSITIVE_INTEGER) {
                 flb_plg_error(ctx->ins, "unexpected 'FailedPutCount' value type=%i",
@@ -574,7 +575,8 @@ static int process_api_response(struct flb_firehose *ctx,
             }
         }
 
-        if (strncmp(key.via.str.ptr, "RequestResponses", 16) == 0) {
+        if (key.via.str.size >= 14 &&
+            strncmp(key.via.str.ptr, "RequestResponses", 16) == 0) {
             val = root.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_ARRAY) {
                 flb_plg_error(ctx->ins, "unexpected 'RequestResponses' value type=%i",
