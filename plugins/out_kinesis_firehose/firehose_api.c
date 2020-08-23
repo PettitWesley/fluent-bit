@@ -579,7 +579,7 @@ static int process_api_response(struct flb_firehose *ctx,
             }
 
             if (val.via.array.size == 0) {
-                flb_plg_error(ctx->ins, "'RequestResponses' field in response is empty";
+                flb_plg_error(ctx->ins, "'RequestResponses' field in response is empty");
                 failed_records = -1;
                 goto done;
             }
