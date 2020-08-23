@@ -101,7 +101,7 @@ static int write_event(struct flb_firehose *ctx, struct flush *buf,
                        struct event *event, int *offset)
 {
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
-                      "{\"Data\":\"", 8)) {
+                      "{\"Data\":\"", 9)) {
         goto error;
     }
 
