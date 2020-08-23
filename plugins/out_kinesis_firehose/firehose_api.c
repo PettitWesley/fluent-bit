@@ -33,7 +33,6 @@
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_mem.h>
-#include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_utils.h>
 
@@ -88,7 +87,6 @@ static int init_put_payload(struct flb_firehose *ctx, struct flush *buf,
                       "\",\"Records\":[", 13)) {
         goto error;
     }
-    flb_info("offset=%d, buf=%.*s", *offset, *offset, buf->out_buf);
     return 0;
 
 error:
@@ -115,7 +113,6 @@ static int write_event(struct flb_firehose *ctx, struct flush *buf,
                       "\"}", 2)) {
         goto error;
     }
-    flb_info("offset=%d, buf=%.*s", *offset, *offset, buf->out_buf);
 
     return 0;
 
@@ -132,7 +129,6 @@ static int end_put_payload(struct flb_firehose *ctx, struct flush *buf,
         return -1;
     }
     buf->out_buf[*offset] = '\0';
-    flb_info("offset=%d, buf=%.*s", *offset, *offset, buf->out_buf);
 
     return 0;
 }
@@ -197,10 +193,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
                 return -1;
             }
         }
-        // if (!flb_utils_write_str(buf->event_buf, &offset, size,
-        //                          tmp_buf_ptr, written)) {
-        //     return -1;
-        // }
+
         ret = mbedtls_base64_encode((unsigned char *) buf->event_buf, size, &b64_len,
                                     (unsigned char *) tmp_buf_ptr, written);
         if (ret != 0) {
@@ -318,7 +311,6 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         flb_plg_error(ctx->ins, "Could not complete PutRecordBatch payload");
         return -1;
     }
-    flb_info("final offset=%d", offset);
     flb_plg_debug(ctx->ins, "Sending %d records", i);
     ret = put_record_batch(ctx, buf, (size_t) offset);
     if (ret < 0) {
@@ -515,9 +507,6 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
 
     flb_plg_debug(ctx->ins, "Sending log records to delivery stream %s",
                   ctx->delivery_stream);
-
-    flb_info("Raw request body: \n%.*s", payload_size, buf->out_buf);
-    flb_info("payload_size=%d, strlen(out_buf)=%d", payload_size, strlen(buf->out_buf));
 
     firehose_client = ctx->firehose_client;
     c = firehose_client->client_vtable->request(firehose_client, FLB_HTTP_POST,
