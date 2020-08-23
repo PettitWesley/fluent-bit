@@ -501,17 +501,22 @@ static int process_api_response(struct flb_firehose *ctx,
                                 struct flb_http_client *c)
 {
     int i;
+    int k;
+    int w;
     int ret;
     int failed_records = -1;
     int root_type;
     char *out_buf;
+    int throughput_exceeded = FLB_FALSE;
     size_t off = 0;
     size_t out_size;
     msgpack_unpacked result;
-    msgpack_unpacked responses;
     msgpack_object root;
     msgpack_object key;
     msgpack_object val;
+    msgpack_object response;
+    msgpack_object response_key;
+    msgpack_object response_val;
 
     if (strstr(c->resp.payload, "\"FailedPutCount\":0")) {
         return 0;
@@ -584,7 +589,48 @@ static int process_api_response(struct flb_firehose *ctx,
                 goto done;
             }
 
-            msgpack_unpacked_init(&responses);
+            for (k = 0; k < val.via.array.size; k++) {
+                /* iterate through the responses */
+                response = val.via.array.ptr[i].val;
+                if (response.type != MSGPACK_OBJECT_MAP) {
+                    flb_plg_error(ctx->ins, "unexpected 'RequestResponses[%d]' value type=%i",
+                                  k, response.type);
+                    failed_records = -1;
+                    goto done;
+                }
+                for (w = 0; w < response.via.map.size; w++) {
+                    /* iterate through the response's keys */
+                    response_key = response.via.map.ptr[i].key;
+                    if (response_key.type != MSGPACK_OBJECT_STR) {
+                        flb_plg_error(ctx->ins, "unexpected key type=%i",
+                                      response_key.type);
+                        failed_records = -1;
+                        goto done;
+                    }
+                    if (response_key.via.str.size >= 9 &&
+                        strncmp(response_key.via.str.ptr, "ErrorCode", 9) == 0) {
+                        response_val = response.via.map.ptr[i].val;
+                        if (!throughput_exceeded &&
+                            response_val.via.str.size >= 27 &&
+                            (strncmp(response_val.via.str.ptr,
+                                    ERR_CODE_SERVICE_UNAVAILABLE, 27) == 0)) {
+                                        throughput_exceeded = FLB_TRUE;
+                                        flb_plg_error(ctx->ins, "Thoughput limits may have been exceeded, %s",
+                                                      ctx->delivery_stream);
+                        }
+                        flb_plg_debug(ctx->ins, "Record %i failed with %.*s",
+                                      k, response_val.via.str.size,
+                                      response_val.via.str.ptr);
+                    }
+                    if (response_key.via.str.size >= 12 &&
+                        strncmp(response_key.via.str.ptr, "ErrorMessage", 12) == 0) {
+                        response_val = response.via.map.ptr[i].val;
+                        flb_plg_debug(ctx->ins, "Record %i failed with %.*s",
+                                      k, response_val.via.str.size,
+                                      response_val.via.str.ptr);
+                    }
+                }
+            }
         }
     }
 
