@@ -561,7 +561,7 @@ static int process_api_response(struct flb_firehose *ctx,
                 goto done;
             }
 
-            failed_records = val.via.u64
+            failed_records = val.via.u64;
             goto done;
         }
     }
@@ -569,7 +569,7 @@ static int process_api_response(struct flb_firehose *ctx,
  done:
     flb_free(out_buf);
     msgpack_unpacked_destroy(&result);
-    return check;
+    return failed_records;
 }
 
 /*

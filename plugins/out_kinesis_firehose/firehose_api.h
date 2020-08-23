@@ -40,6 +40,6 @@ int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
                              const char *data, size_t bytes);
 
 int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
-                     size_t payload_size);
+                     size_t payload_size, int num_records);
 
 #endif
