@@ -507,6 +507,8 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     flb_plg_debug(ctx->ins, "Sending log records to delivery stream %s",
                   ctx->delivery_stream);
 
+    flb_info("Raw request body: \n%s", buf->out_buf);
+
     firehose_client = ctx->firehose_client;
     c = firehose_client->client_vtable->request(firehose_client, FLB_HTTP_POST,
                                                 "/", buf->out_buf, payload_size,
@@ -546,7 +548,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
         }
     }
 
-    flb_plg_error(ctx->ins, "Failed to send log events");
+    flb_plg_error(ctx->ins, "Failed to send log records to %s", ctx->delivery_stream);
     if (c) {
         flb_http_client_destroy(c);
     }
