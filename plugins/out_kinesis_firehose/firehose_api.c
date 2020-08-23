@@ -312,7 +312,7 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         return -1;
     }
     flb_plg_debug(ctx->ins, "Sending %d records", i);
-    ret = put_record_batch(ctx, buf, (size_t) offset);
+    ret = put_record_batch(ctx, buf, (size_t) offset, i);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send log records");
         return -1;
@@ -495,15 +495,94 @@ error:
 }
 
 /*
+ * Returns number of failed records on success, -1 on failure
+ */
+static int process_api_response(struct flb_firehose *ctx,
+                                struct flb_http_client *c)
+{
+    int i;
+    int ret;
+    int failed_records = 0;
+    int root_type;
+    char *out_buf;
+    size_t off = 0;
+    size_t out_size;
+    msgpack_unpacked result;
+    msgpack_object root;
+    msgpack_object key;
+    msgpack_object val;
+
+    if (strstr(c->resp.payload, "\"FailedPutCount\":0")) {
+        return 0;
+    }
+
+    /* Convert JSON payload to msgpack */
+    ret = flb_pack_json(c->resp.payload, c->resp.payload_size,
+                        &out_buf, &out_size, &root_type);
+    if (ret == -1) {
+        flb_plg_error(ctx->ins, "could not pack/validate JSON API response\n%s",
+                      c->resp.payload);
+        return -1;
+    }
+
+    /* Lookup error field */
+    msgpack_unpacked_init(&result);
+    ret = msgpack_unpack_next(&result, out_buf, out_size, &off);
+    if (ret != MSGPACK_UNPACK_SUCCESS) {
+        flb_plg_error(ctx->ins, "Cannot unpack response to find error\n%s",
+                      c->resp.payload);
+        failed_records = -1;
+        goto done;
+    }
+
+    root = result.data;
+    if (root.type != MSGPACK_OBJECT_MAP) {
+        flb_plg_error(ctx->ins, "unexpected payload type=%i",
+                      root.type);
+        failed_records = -1;
+        goto done;
+    }
+
+    for (i = 0; i < root.via.map.size; i++) {
+        key = root.via.map.ptr[i].key;
+        if (key.type != MSGPACK_OBJECT_STR) {
+            flb_plg_error(ctx->ins, "unexpected key type=%i",
+                          key.type);
+            failed_records = -1;
+            goto done;
+        }
+
+        if (strncmp(key.via.str.ptr, "FailedPutCount", 14) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_POSITIVE_INTEGER) {
+                flb_plg_error(ctx->ins, "unexpected 'FailedPutCount' value type=%i",
+                              val.type);
+                failed_records = -1;
+                goto done;
+            }
+
+            failed_records = val.via.u64
+            goto done;
+        }
+    }
+
+ done:
+    flb_free(out_buf);
+    msgpack_unpacked_destroy(&result);
+    return check;
+}
+
+/*
  * Returns -1 on failure, 0 on success
  */
 int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
-                     size_t payload_size)
+                     size_t payload_size, int num_records)
 {
 
     struct flb_http_client *c = NULL;
     struct flb_aws_client *firehose_client;
     flb_sds_t error;
+    int failed_records = 0;
 
     flb_plg_debug(ctx->ins, "Sending log records to delivery stream %s",
                   ctx->delivery_stream);
@@ -517,11 +596,25 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
         flb_plg_debug(ctx->ins, "PutRecordBatch http status=%d", c->resp.status);
 
         if (c->resp.status == 200) {
-            /* success */
-            flb_plg_debug(ctx->ins, "Sent events to %s", ctx->delivery_stream);
+            /* Firehose API can return partial success- check response */
             if (c->resp.payload_size > 0) {
+                failed_records = process_api_response(ctx, c);
+                if (failed_records == num_records) {
+                    flb_plg_error(ctx->ins, "PutRecordBatch request returned "
+                                  "with no records successfully recieved %s",
+                                  ctx->delivery_stream);
+                    flb_http_client_destroy(c);
+                    return -1;
+                }
+                if (failed_records > 0) {
+                    flb_plg_error(ctx->ins, "%d out of %d records failed to be "
+                                  "delivered, will retry, %s",
+                                  failed_records, num_records,
+                                  ctx->delivery_stream);
+                }
                 flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
             }
+            flb_plg_debug(ctx->ins, "Sent events to %s", ctx->delivery_stream);
             flb_http_client_destroy(c);
             return 0;
         }
