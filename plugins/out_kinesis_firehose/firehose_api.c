@@ -620,14 +620,14 @@ static int process_api_response(struct flb_firehose *ctx,
                                         flb_plg_error(ctx->ins, "Thoughput limits may have been exceeded, %s",
                                                       ctx->delivery_stream);
                         }
-                        flb_plg_debug(ctx->ins, "Record %i failed with %.*s",
+                        flb_plg_debug(ctx->ins, "Record %i failed with err_code=%.*s",
                                       k, response_val.via.str.size,
                                       response_val.via.str.ptr);
                     }
                     if (response_key.via.str.size >= 12 &&
                         strncmp(response_key.via.str.ptr, "ErrorMessage", 12) == 0) {
                         response_val = response.via.map.ptr[i].val;
-                        flb_plg_debug(ctx->ins, "Record %i failed with %.*s",
+                        flb_plg_debug(ctx->ins, "Record %i failed with err_msg=%.*s",
                                       k, response_val.via.str.size,
                                       response_val.via.str.ptr);
                     }
