@@ -486,6 +486,7 @@ int flb_io_tls_net_write_async(struct flb_thread *th, struct flb_upstream_conn *
     int ret;
     size_t total = 0;
     struct flb_upstream *u = u_conn->u;
+    flb_info("Using async");
 
     u_conn->thread = th;
 
