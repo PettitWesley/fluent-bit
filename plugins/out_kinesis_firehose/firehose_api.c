@@ -600,6 +600,8 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
         if (c->resp.status == 200) {
             /* Firehose API can return partial success- check response */
             if (c->resp.payload_size > 0) {
+                c->resp.payload = response;
+                c->resp.payload_size = strlen(response);
                 failed_records = process_api_response(ctx, c);
                 if (failed_records == num_records) {
                     flb_plg_error(ctx->ins, "PutRecordBatch request returned "
