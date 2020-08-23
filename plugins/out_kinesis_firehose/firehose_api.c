@@ -272,7 +272,7 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         if (buf->out_buf != NULL) {
             flb_free(buf->out_buf);
         }
-        buf->out_buf = flb_malloc(buf->data_size);
+        buf->out_buf = flb_malloc(buf->data_size + 1);
         if (!buf->out_buf) {
             flb_errno();
             return -1;
@@ -309,7 +309,7 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         flb_plg_error(ctx->ins, "Could not complete PutRecordBatch payload");
         return -1;
     }
-
+    flb_info("final offset=%d", offset);
     flb_plg_debug(ctx->ins, "Sending %d records", i);
     ret = put_record_batch(ctx, buf, (size_t) offset);
     if (ret < 0) {
