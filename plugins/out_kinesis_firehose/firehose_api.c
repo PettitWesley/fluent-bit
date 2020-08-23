@@ -593,7 +593,7 @@ static int process_api_response(struct flb_firehose *ctx,
 
             for (k = 0; k < val.via.array.size; k++) {
                 /* iterate through the responses */
-                response = val.via.array.ptr[i];
+                response = val.via.array.ptr[k];
                 if (response.type != MSGPACK_OBJECT_MAP) {
                     flb_plg_error(ctx->ins, "unexpected 'RequestResponses[%d]' value type=%i",
                                   k, response.type);
@@ -602,7 +602,7 @@ static int process_api_response(struct flb_firehose *ctx,
                 }
                 for (w = 0; w < response.via.map.size; w++) {
                     /* iterate through the response's keys */
-                    response_key = response.via.map.ptr[i].key;
+                    response_key = response.via.map.ptr[w].key;
                     if (response_key.type != MSGPACK_OBJECT_STR) {
                         flb_plg_error(ctx->ins, "unexpected key type=%i",
                                       response_key.type);
@@ -611,7 +611,7 @@ static int process_api_response(struct flb_firehose *ctx,
                     }
                     if (response_key.via.str.size >= 9 &&
                         strncmp(response_key.via.str.ptr, "ErrorCode", 9) == 0) {
-                        response_val = response.via.map.ptr[i].val;
+                        response_val = response.via.map.ptr[w].val;
                         if (!throughput_exceeded &&
                             response_val.via.str.size >= 27 &&
                             (strncmp(response_val.via.str.ptr,
@@ -626,7 +626,7 @@ static int process_api_response(struct flb_firehose *ctx,
                     }
                     if (response_key.via.str.size >= 12 &&
                         strncmp(response_key.via.str.ptr, "ErrorMessage", 12) == 0) {
-                        response_val = response.via.map.ptr[i].val;
+                        response_val = response.via.map.ptr[w].val;
                         flb_plg_debug(ctx->ins, "Record %i failed with err_msg=%.*s",
                                       k, response_val.via.str.size,
                                       response_val.via.str.ptr);
