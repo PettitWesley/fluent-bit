@@ -593,7 +593,7 @@ static int process_api_response(struct flb_firehose *ctx,
 
             for (k = 0; k < val.via.array.size; k++) {
                 /* iterate through the responses */
-                response = val.via.array.ptr[i].val;
+                response = val.via.array.ptr[i];
                 if (response.type != MSGPACK_OBJECT_MAP) {
                     flb_plg_error(ctx->ins, "unexpected 'RequestResponses[%d]' value type=%i",
                                   k, response.type);
