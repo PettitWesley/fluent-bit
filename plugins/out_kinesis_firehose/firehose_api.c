@@ -502,12 +502,13 @@ static int process_api_response(struct flb_firehose *ctx,
 {
     int i;
     int ret;
-    int failed_records = 0;
+    int failed_records = -1;
     int root_type;
     char *out_buf;
     size_t off = 0;
     size_t out_size;
     msgpack_unpacked result;
+    msgpack_unpacked responses;
     msgpack_object root;
     msgpack_object key;
     msgpack_object val;
@@ -562,7 +563,28 @@ static int process_api_response(struct flb_firehose *ctx,
             }
 
             failed_records = val.via.u64;
-            goto done;
+            if (failed_records == 0) {
+                /* no need to check RequestResponses field */
+                goto done;
+            }
+        }
+
+        if (strncmp(key.via.str.ptr, "RequestResponses", 16) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_ARRAY) {
+                flb_plg_error(ctx->ins, "unexpected 'RequestResponses' value type=%i",
+                              val.type);
+                failed_records = -1;
+                goto done;
+            }
+
+            if (val.via.array.size == 0) {
+                flb_plg_error(ctx->ins, "'RequestResponses' field in response is empty";
+                failed_records = -1;
+                goto done;
+            }
+
+            msgpack_unpacked_init(&responses);
         }
     }
 
@@ -584,7 +606,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     flb_sds_t error;
     int failed_records = 0;
 
-    char *response = "{\"Encrypted\":false,\"FailedPutCount\":4,\"RequestResponses\":[{\"RecordId\":\"Me0CqhxK3BK3MiBWgy/AydQrVUg7vbc40Z4zNds3jiiJDscqGtWFz9bJugbrAoN70YCaxpXgmyR9R+LFxS2rleDepqFljYArBtXnRmVzSMOAzTJZlwsO84+757kBvA5RUycF3wC3XZjFtUFP0Q4QTdhuD8HMJBvKGiBY9Yy5jBUmZuKhXxCLQ/YTwKQaQKn4fnc5iISxaErPXsWMI7OApHZ1eFGvcHVZ\"},{\"RecordId\":\"NRAZVkblYgWWDSvTAF/9jBR4MlciEUFV+QIjb1D8uar7YbC3wqeLQuSZ0GEopGlE/8JAK9h9aAyTub5lH5V+bZuR3SeKKABWoJ788/tI455Kup9oRzmXTKWiXeklxmAe9MtsSz0y4t3oIrSLq8e3QVH9DJKWdhDkIXd8lXK1wuJi8tKmnNgxFob/Cz398kQFXPc4JwKj3Dv3Ou0qibZiusko6f7yBUve\"},{\"RecordId\":\"InFGTFvML/MGCLtnC3moI/zCISrKSScu/D8oCGmeIIeVaYUfywHpr2NmsQiZsxUL9+4ThOm2ypxqFGudZvgXQ45gUWMG+R4Y5xzS03N+vQ71+UaL392jY6HUs2SxYkZQe6vpdK+xHaJJ1b8uE++Laxg9rmsXtNt193WjmH3FhU1veu9pnSiGZgqC7czpyVgvZBNeWc+hTjEVicj3VAHBg/9yRN0sC30C\"},{\"RecordId\":\"KufmrRJ2z8zAgYAYGz6rm4BQC8SA7g87lQJQl2DQ+Be5EiEpr5bG33ilnQVvo1Q05BJuQBnjbw2cm919Ya72awapxfOBdZcPPKJN7KDZV/n1DFCDDrJ2vgyNK4qhKdo3Mr7nyrBpkLIs93PdxOdrTh11Y9HHEaFtim0cHJYpKCSZBjNObfWjfjHx5TuB7L3PHQqMKMu0MT5L9gPgVXHElGalqKZGTcfB\"}]}";
+    char *response = "{\"Encrypted\": false,\"FailedPutCount\": 4,\"RequestResponses\":[{\"RecordId\": \"Me0CqhxK3BK3MiBWgy/AydQrVUg7vbc40Z4zNds3jiiJDscqGtWFz9bJugbrAoN70YCaxpXgmyR9R+LFxS2rleDepqFljYArBtXnRmVzSMOAzTJZlwsO84+757kBvA5RUycF3wC3XZjFtUFP0Q4QTdhuD8HMJBvKGiBY9Yy5jBUmZuKhXxCLQ/YTwKQaQKn4fnc5iISxaErPXsWMI7OApHZ1eFGvcHVZ\"},{\"RecordId\": \"NRAZVkblYgWWDSvTAF/9jBR4MlciEUFV+QIjb1D8uar7YbC3wqeLQuSZ0GEopGlE/8JAK9h9aAyTub5lH5V+bZuR3SeKKABWoJ788/tI455Kup9oRzmXTKWiXeklxmAe9MtsSz0y4t3oIrSLq8e3QVH9DJKWdhDkIXd8lXK1wuJi8tKmnNgxFob/Cz398kQFXPc4JwKj3Dv3Ou0qibZiusko6f7yBUve\",\"ErrorCode\":\"ServiceUnavailableException\",\"ErrorMessage\": \"Catsssss\"},{\"RecordId\": \"InFGTFvML/MGCLtnC3moI/zCISrKSScu/D8oCGmeIIeVaYUfywHpr2NmsQiZsxUL9+4ThOm2ypxqFGudZvgXQ45gUWMG+R4Y5xzS03N+vQ71+UaL392jY6HUs2SxYkZQe6vpdK+xHaJJ1b8uE++Laxg9rmsXtNt193WjmH3FhU1veu9pnSiGZgqC7czpyVgvZBNeWc+hTjEVicj3VAHBg/9yRN0sC30C\",\"ErrorCode\":\"ServiceUnavailableException\",\"ErrorMessage\": \"Catsssss 2\"},{\"RecordId\":\"KufmrRJ2z8zAgYAYGz6rm4BQC8SA7g87lQJQl2DQ+Be5EiEpr5bG33ilnQVvo1Q05BJuQBnjbw2cm919Ya72awapxfOBdZcPPKJN7KDZV/n1DFCDDrJ2vgyNK4qhKdo3Mr7nyrBpkLIs93PdxOdrTh11Y9HHEaFtim0cHJYpKCSZBjNObfWjfjHx5TuB7L3PHQqMKMu0MT5L9gPgVXHElGalqKZGTcfB\"}]}";
 
     flb_plg_debug(ctx->ins, "Sending log records to delivery stream %s",
                   ctx->delivery_stream);
@@ -603,9 +625,16 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                 c->resp.payload = response;
                 c->resp.payload_size = strlen(response);
                 failed_records = process_api_response(ctx, c);
+                if (failed_records < 0) {
+                    flb_plg_error(ctx->ins, "PutRecordBatch response "
+                                  "could not be parsed, %s",
+                                  c->resp.payload);
+                    flb_http_client_destroy(c);
+                    return -1;
+                }
                 if (failed_records == num_records) {
                     flb_plg_error(ctx->ins, "PutRecordBatch request returned "
-                                  "with no records successfully recieved %s",
+                                  "with no records successfully recieved, %s",
                                   ctx->delivery_stream);
                     flb_http_client_destroy(c);
                     return -1;
@@ -616,7 +645,6 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                                   failed_records, num_records,
                                   ctx->delivery_stream);
                 }
-                flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
             }
             flb_plg_debug(ctx->ins, "Sent events to %s", ctx->delivery_stream);
             flb_http_client_destroy(c);
