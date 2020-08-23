@@ -372,16 +372,6 @@ static struct flb_config_map config_map[] = {
     },
 
     {
-     FLB_CONFIG_MAP_STR, "log_key", NULL,
-     0, FLB_FALSE, 0,
-     "By default, the whole log record will be sent to Firehose. "
-     "If you specify a key name with this option, then only the value of "
-     "that key will be sent to Firehose. For example, if you are using "
-     "the Fluentd Docker log driver, you can specify log_key log and only "
-     "the log message will be sent to CloudWatch."
-    },
-
-    {
      FLB_CONFIG_MAP_STR, "role_arn", NULL,
      0, FLB_FALSE, 0,
      "ARN of an IAM role to assume (ex. for cross account access)."

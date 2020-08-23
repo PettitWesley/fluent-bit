@@ -38,6 +38,7 @@
 #include <fluent-bit/flb_utils.h>
 
 #include <monkey/mk_core.h>
+#include <mbedtls/base64.h>
 #include <msgpack.h>
 #include <string.h>
 #include <stdio.h>
@@ -149,7 +150,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     size_t written;
     int ret;
     size_t size;
-    int offset = 0;
+    size_t b64_len;
     struct event *event;
     char *tmp_buf_ptr;
 
@@ -180,14 +181,13 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
         return 0;
     }
 
-    /* the json string must be escaped, unless the log_key option is used */
+    /* different handling is required if log key is or is not enabled */
     if (ctx->log_key == NULL) {
         /*
          * check if event_buf is initialized and big enough
-         * If all chars need to be hex encoded (impossible), 6x space would be
-         * needed
+         * Base64 encoding will increase size by ~4/3
          */
-        size = written * 6;
+        size = (written * 1.5) + 4;
         if (buf->event_buf == NULL || buf->event_buf_size < size) {
             flb_free(buf->event_buf);
             buf->event_buf = flb_malloc(size);
@@ -197,12 +197,17 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
                 return -1;
             }
         }
-        offset = 0;
-        if (!flb_utils_write_str(buf->event_buf, &offset, size,
-                                 tmp_buf_ptr, written)) {
+        // if (!flb_utils_write_str(buf->event_buf, &offset, size,
+        //                          tmp_buf_ptr, written)) {
+        //     return -1;
+        // }
+        ret = mbedtls_base64_encode((unsigned char *) buf->event_buf, size, &b64_len,
+                                    (unsigned char *) tmp_buf_ptr, written);
+        if (ret != 0) {
+            flb_errno();
             return -1;
         }
-        written = offset;
+        written = b64_len;
 
         if (written >= MAX_EVENT_SIZE) {
             flb_plg_warn(ctx->ins, "Discarding record which is larger than "
@@ -234,6 +239,8 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
          * flb_msgpack_to_json will encase the value in quotes
          * We don't want that for log_key, so we ignore the first
          * and last character
+         *
+         * TODO: This needs to be changed to use base64 encoding
          */
         written--;
         tmp_buf_ptr++;
