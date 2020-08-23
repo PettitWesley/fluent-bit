@@ -508,6 +508,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                   ctx->delivery_stream);
 
     flb_info("Raw request body: \n%.*s", payload_size, buf->out_buf);
+    flb_info("payload_size=%d, strlen(out_buf)=%d", payload_size, strlen(buf->out_buf));
 
     firehose_client = ctx->firehose_client;
     c = firehose_client->client_vtable->request(firehose_client, FLB_HTTP_POST,
