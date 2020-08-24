@@ -368,7 +368,7 @@ retry_add_event:
     if (ret < 0) {
         return -1;
     }
-    else if (ret = 1) {
+    else if (ret == 1) {
         /* send logs and then retry the add */
         buf->event_index--;
         retry_add = FLB_TRUE;
