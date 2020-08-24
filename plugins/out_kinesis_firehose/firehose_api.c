@@ -225,6 +225,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
         event->len = written;
         event->timestamp.tv_sec = tms->tm.tv_sec;
         event->timestamp.tv_nsec = tms->tm.tv_nsec;
+        buf->event_index++;
 
     }
     else {
@@ -244,6 +245,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
         event->len = written;
         event->timestamp.tv_sec = tms->tm.tv_sec;
         event->timestamp.tv_nsec = tms->tm.tv_nsec;
+        buf->event_index++;
     }
 
     return 0;
@@ -366,7 +368,6 @@ retry_add_event:
 
     /* send is not needed yet, return to caller */
     buf->data_size += event_bytes;
-    buf->event_index++;
 
     return 0;
 
