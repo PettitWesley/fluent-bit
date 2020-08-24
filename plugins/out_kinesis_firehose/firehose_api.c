@@ -60,6 +60,7 @@ static inline int try_to_write(char *buf, int *off, size_t left,
         str_len = strlen(str);
     }
     if (left <= *off+str_len) {
+        flb_info("%d <= %d + %d", left, *off, str_len);
         return FLB_FALSE;
     }
     memcpy(buf+*off, str, str_len);
