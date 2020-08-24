@@ -335,6 +335,7 @@ static int add_event(struct flb_firehose *ctx, struct flush *buf,
         /* init */
         reset_flush_buf(ctx, buf);
     }
+    flb_info("In add_event(): event_index=%d", buf->event_index);
 
 retry_add_event:
     retry_add = FLB_FALSE;
