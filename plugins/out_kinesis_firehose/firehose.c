@@ -88,6 +88,13 @@ static int cb_firehose_init(struct flb_output_instance *ins,
         ctx->time_key = tmp;
     }
 
+    tmp = flb_output_get_property("time_key_format", ins);
+    if (tmp) {
+        ctx->time_key_format = tmp;
+    } else {
+        ctx->time_key_format = DEFAULT_TIME_KEY_FORMAT;
+    }
+
     tmp = flb_output_get_property("endpoint", ins);
     if (tmp) {
         ctx->custom_endpoint = FLB_TRUE;
@@ -370,6 +377,13 @@ static struct flb_config_map config_map[] = {
      0, FLB_FALSE, 0,
      "Add the timestamp to the record under this key. By default the timestamp "
      "from Fluent Bit will not be added to records sent to Kinesis."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "time_key_format", NULL,
+     0, FLB_FALSE, 0,
+     "strftime compliant format string for the timestamp; for example, "
+     "the default is '%Y-%m-%dT%H:%M:%S'. This option is used with time_key. "
     },
 
     {

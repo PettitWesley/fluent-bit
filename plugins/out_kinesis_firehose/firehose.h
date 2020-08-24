@@ -28,6 +28,8 @@
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
 
+#define DEFAULT_TIME_KEY_FORMAT "%Y-%m-%dT%H:%M:%S"
+
 /* buffers used for each flush */
 struct flush {
     /* temporary buffer for storing the serialized event messages */
@@ -77,6 +79,7 @@ struct flb_firehose {
     /* configuration options */
     const char *delivery_stream;
     const char *time_key;
+    const char *time_key_format;
     const char *region;
     const char *role_arn;
     const char *log_key;

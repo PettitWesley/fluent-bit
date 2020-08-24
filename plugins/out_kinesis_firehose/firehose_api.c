@@ -136,6 +136,10 @@ static int end_put_payload(struct flb_firehose *ctx, struct flush *buf,
 
 /*
  * Processes the msgpack object
+ * -1 = failure, record not added
+ * 0 = success, record added
+ * 1 = we ran out of space, send and retry
+ * 2 = record could not be processed, discard it
  * Returns 0 on success, -1 on general errors,
  * and 1 if we ran out of space to write the event
  * which means a send must occur
@@ -149,6 +153,11 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     size_t b64_len;
     struct event *event;
     char *tmp_buf_ptr;
+    char *time_key_ptr;
+    struct tm time_stamp;
+    struct tm *tmp;
+    size_t len;
+    size_t tmp_size;
 
     tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
     ret = flb_msgpack_to_json(tmp_buf_ptr,
@@ -168,13 +177,52 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     /* Discard empty messages (written == 2 means '""') */
     if (written <= 2) {
         flb_plg_debug(ctx->ins, "Found empty log message");
-        return 0;
+        return 2;
     }
 
     if (written >= MAX_EVENT_SIZE) {
         flb_plg_warn(ctx->ins, "Discarding record which is larger than "
                      "max size allowed by Firehose");
-        return 0;
+        return 2;
+    }
+
+    if (ctx->time_key) {
+        /* append time_key to end of json string */
+        tmp = gmtime_r(tms->tm.tv_sec, &time_stamp);
+        if (!tmp) {
+            flb_plg_error(ctx->ins, "Could not create time stamp for %d unix "
+                         "seconds, discarding record", tms->tm.tv_sec);
+            return 2;
+        }
+        /* guess space needed to write time_key */
+        len = 6 + strlen(ctx->time_key) + 6 * strlen(ctx->time_key_format);
+        /* how much space do we have left */
+        tmp_size = (buf->tmp_buf_size - buf->tmp_buf_offset) - written;
+        if (len > tmp_size) {
+            /* not enough space- tell caller to retry */
+            return 1;
+        }
+        time_key_ptr = tmp_buf_ptr + written - 1;
+        memcpy(time_key_ptr, ",", 1);
+        time_key_ptr++;
+        memcpy(time_key_ptr, "\"", 1);
+        time_key_ptr++;
+        memcpy(time_key_ptr, ctx->time_key, strlen(ctx->time_key));
+        time_key_ptr += strlen(ctx->time_key);
+        memcpy(time_key_ptr, "\":\"", 3);
+        time_key_ptr += 3;
+        tmp_size = buf->tmp_buf_size - buf->tmp_buf_offset;
+        tmp_size -= (time_key_ptr - tmp_buf_ptr);
+        len = strftime(time_key_ptr, tmp_size, ctx->time_key_format, &time_stamp);
+        if (len <= 0) {
+            /* ran out of space - should not happen because of check above */
+            return 1;
+        }
+        time_key_ptr += len;
+        memcpy(time_key_ptr, "\"}", 2);
+        time_key_ptr += 2;
+        written = (time_key_ptr - tmp_buf_ptr);
+        flb_info("with time: %.*s", written, tmp_buf_ptr);
     }
 
     /*
@@ -320,11 +368,14 @@ retry_add_event:
     if (ret < 0) {
         return -1;
     }
-    else if (ret > 0) {
+    else if (ret = 1) {
         /* send logs and then retry the add */
         buf->event_index--;
         retry_add = FLB_TRUE;
         goto send;
+    } else if (ret == 2) {
+        /* discard this record and return to caller */
+        return 0;
     }
 
     event = &buf->events[buf->event_index];
@@ -464,7 +515,7 @@ int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
     }
 
     /* return number of events */
-    return i + 1;
+    return i;
 
 error:
     msgpack_unpacked_destroy(&result);
