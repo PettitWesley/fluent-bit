@@ -253,7 +253,6 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
 static void reset_flush_buf(struct flb_firehose *ctx, struct flush *buf) {
     buf->event_index = 0;
     buf->tmp_buf_offset = 0;
-    buf->event_index = 0;
     buf->data_size = PUT_RECORD_BATCH_HEADER_LEN + PUT_RECORD_BATCH_FOOTER_LEN;
     buf->data_size += strlen(ctx->delivery_stream);
 }
@@ -689,9 +688,11 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                 }
                 if (failed_records > 0) {
                     flb_plg_error(ctx->ins, "%d out of %d records failed to be "
-                                  "delivered, will retry, %s",
+                                  "delivered, will retry this batch, %s",
                                   failed_records, num_records,
                                   ctx->delivery_stream);
+                    flb_http_client_destroy(c);
+                    return -1;
                 }
             }
             flb_plg_debug(ctx->ins, "Sent events to %s", ctx->delivery_stream);
