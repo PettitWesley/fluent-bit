@@ -298,10 +298,12 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     event_count = process_and_send_records(ctx, buf, data, bytes);
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send records");
+        flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     flb_plg_info(ctx->ins, "Sent %d records to Firehose", event_count);
+    flush_destroy(buf);
 
     FLB_OUTPUT_RETURN(FLB_OK);
 }
