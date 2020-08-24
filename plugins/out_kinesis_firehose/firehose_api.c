@@ -101,16 +101,19 @@ static int write_event(struct flb_firehose *ctx, struct flush *buf,
 {
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "{\"Data\":\"", 9)) {
+        flb_info("line 104");
         goto error;
     }
 
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       event->json, event->len)) {
+        flb_info("line 110");
         goto error;
     }
 
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "\"}", 2)) {
+        flb_info("line 116");
         goto error;
     }
 
