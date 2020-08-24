@@ -60,7 +60,6 @@ static inline int try_to_write(char *buf, int *off, size_t left,
         str_len = strlen(str);
     }
     if (left <= *off+str_len) {
-        flb_info("%d <= %d + %d", left, *off, str_len);
         return FLB_FALSE;
     }
     memcpy(buf+*off, str, str_len);
@@ -102,19 +101,16 @@ static int write_event(struct flb_firehose *ctx, struct flush *buf,
 {
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "{\"Data\":\"", 9)) {
-        flb_info("line 104");
         goto error;
     }
 
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       event->json, event->len)) {
-        flb_info("line 110");
         goto error;
     }
 
     if (!try_to_write(buf->out_buf, offset, buf->out_buf_size,
                       "\"}", 2)) {
-        flb_info("line 116");
         goto error;
     }
 
@@ -317,7 +313,6 @@ static int add_event(struct flb_firehose *ctx, struct flush *buf,
         /* init */
         reset_flush_buf(ctx, buf);
     }
-    flb_info("In add_event(): event_index=%d", buf->event_index);
 
 retry_add_event:
     retry_add = FLB_FALSE;
@@ -469,7 +464,7 @@ int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
     }
 
     /* return number of events */
-    return i;
+    return i + 1;
 
 error:
     msgpack_unpacked_destroy(&result);
