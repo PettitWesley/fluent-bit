@@ -181,76 +181,52 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
         return 0;
     }
 
-    /* different handling is required if log key is or is not enabled */
-    if (ctx->log_key == NULL) {
-        /*
-         * check if event_buf is initialized and big enough
-         * Base64 encoding will increase size by ~4/3
-         */
-        size = (written * 1.5) + 4;
-        if (buf->event_buf == NULL || buf->event_buf_size < size) {
-            flb_free(buf->event_buf);
-            buf->event_buf = flb_malloc(size);
-            buf->event_buf_size = size;
-            if (buf->event_buf == NULL) {
-                flb_errno();
-                return -1;
-            }
-        }
-
-        ret = mbedtls_base64_encode((unsigned char *) buf->event_buf, size, &b64_len,
-                                    (unsigned char *) tmp_buf_ptr, written);
-        if (ret != 0) {
+    /*
+     * check if event_buf is initialized and big enough
+     * Base64 encoding will increase size by ~4/3
+     */
+    size = (written * 1.5) + 4;
+    if (buf->event_buf == NULL || buf->event_buf_size < size) {
+        flb_free(buf->event_buf);
+        buf->event_buf = flb_malloc(size);
+        buf->event_buf_size = size;
+        if (buf->event_buf == NULL) {
             flb_errno();
             return -1;
         }
-        written = b64_len;
-
-        if (written >= MAX_EVENT_SIZE) {
-            flb_plg_warn(ctx->ins, "Discarding record which is larger than "
-                         "max size allowed by Firehose");
-            return 0;
-        }
-
-        tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
-        if ((buf->tmp_buf_size - buf->tmp_buf_offset) < written) {
-            /* not enough space, send logs */
-            return 1;
-        }
-
-        /* copy serialized json to tmp_buf */
-        if (!strncpy(tmp_buf_ptr, buf->event_buf, written)) {
-            return -1;
-        }
-
-        buf->tmp_buf_offset += written;
-        event = &buf->events[buf->event_index];
-        event->json = tmp_buf_ptr;
-        event->len = written;
-        event->timestamp.tv_sec = tms->tm.tv_sec;
-        event->timestamp.tv_nsec = tms->tm.tv_nsec;
-        buf->event_index++;
-
     }
-    else {
-        /*
-         * flb_msgpack_to_json will encase the value in quotes
-         * We don't want that for log_key, so we ignore the first
-         * and last character
-         *
-         * TODO: This needs to be changed to use base64 encoding
-         */
-        written--;
-        tmp_buf_ptr++;
-        buf->tmp_buf_offset += written;
-        written--;
-        event = &buf->events[buf->event_index];
-        event->json = tmp_buf_ptr;
-        event->len = written;
-        event->timestamp.tv_sec = tms->tm.tv_sec;
-        event->timestamp.tv_nsec = tms->tm.tv_nsec;
-        buf->event_index++;
+
+    ret = mbedtls_base64_encode((unsigned char *) buf->event_buf, size, &b64_len,
+                                (unsigned char *) tmp_buf_ptr, written);
+    if (ret != 0) {
+        flb_errno();
+        return -1;
     }
+    written = b64_len;
+
+    if (written >= MAX_EVENT_SIZE) {
+        flb_plg_warn(ctx->ins, "Discarding record which is larger than "
+                     "max size allowed by Firehose");
+        return 0;
+    }
+
+    tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
+    if ((buf->tmp_buf_size - buf->tmp_buf_offset) < written) {
+        /* not enough space, send logs */
+        return 1;
+    }
+
+    /* copy serialized json to tmp_buf */
+    if (!strncpy(tmp_buf_ptr, buf->event_buf, written)) {
+        return -1;
+    }
+
+    buf->tmp_buf_offset += written;
+    event = &buf->events[buf->event_index];
+    event->json = tmp_buf_ptr;
+    event->len = written;
+    event->timestamp.tv_sec = tms->tm.tv_sec;
+    event->timestamp.tv_nsec = tms->tm.tv_nsec;
 
     return 0;
 }
@@ -366,12 +342,13 @@ retry_add_event:
         goto send;
     }
 
-    if (buf->event_index == MAX_EVENTS_PER_PUT) {
+    if (buf->event_index == MAX_EVENTS_PER_PUT - 1) {
         goto send;
     }
 
     /* send is not needed yet, return to caller */
     buf->data_size += event_bytes;
+    buf->event_index++;
 
     return 0;
 
