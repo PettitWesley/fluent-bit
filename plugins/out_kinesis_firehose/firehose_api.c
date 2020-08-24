@@ -188,7 +188,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
 
     if (ctx->time_key) {
         /* append time_key to end of json string */
-        tmp = gmtime_r(tms->tm.tv_sec, &time_stamp);
+        tmp = gmtime_r(&tms->tm.tv_sec, &time_stamp);
         if (!tmp) {
             flb_plg_error(ctx->ins, "Could not create time stamp for %d unix "
                          "seconds, discarding record", tms->tm.tv_sec);
