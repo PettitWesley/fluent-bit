@@ -222,7 +222,6 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
         memcpy(time_key_ptr, "\"}", 2);
         time_key_ptr += 2;
         written = (time_key_ptr - tmp_buf_ptr);
-        flb_info("with time: %.*s", written, tmp_buf_ptr);
     }
 
     /*
