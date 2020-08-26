@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
+#include <stdlib.h>
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -43,6 +44,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 {
     int ret;
     const char *tmp;
+    int tmp_i;
     struct flb_stdout *ctx = NULL;
     (void) ins;
     (void) config;
@@ -116,6 +118,15 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         ctx->file_size = DEFAULT_FILE_SIZE;
         flb_plg_info(ctx->ins, "Using default file size 100MB");
     }
+
+    tmp = flb_output_get_property("upload_timeout", ins);
+    i = atoi(tmp);
+    if (i <= 0) {
+        flb_plg_error(ctx->ins, "upload_timeout %s is negative or could not be parsed",
+                      tmp);
+        goto error;
+    }
+    ctx->upload_timeout = (time_t) 60 * i;
 
     tmp = flb_output_get_property("region", ins);
     if (tmp) {
@@ -523,6 +534,7 @@ static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
         m_upload->tag = tmp_sds;
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_NOT_CREATED;
         m_upload->part_number = 1;
+        m_upload->init_time = time(NULL);
         mk_list_add(&m_upload->_head, &ctx->uploads);
     }
 
@@ -694,6 +706,14 @@ static struct flb_config_map config_map[] = {
      FLB_CONFIG_MAP_STR, "file_size", NULL,
      0, FLB_FALSE, 0,
     "Specifies the size of files in S3. Maximum size is 50GB, minimim is 1MB"
+    },
+    {
+     FLB_CONFIG_MAP_STR, "upload_timeout", 60,
+     0, FLB_FALSE, 0,
+    "Optionally specify a timeout for uploads using an integer number of minutes. "
+    "Whenever this amount of time has elapsed, Fluent Bit will complete an "
+    "upload and create a new file in S3. For example, set this value to 60 "
+    "and you will get a new file in S3 every hour. Default is 60."
     },
     {
      FLB_CONFIG_MAP_STR, "json_date_key", "date",

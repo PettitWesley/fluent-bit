@@ -45,6 +45,7 @@ struct multipart_upload {
     flb_sds_t tag;
     flb_sds_t upload_id;
     int upload_state;
+    time_t init_time;
 
     /*
      * maximum of 10,000 parts in an upload, for each we need to store mapping
@@ -91,6 +92,7 @@ struct flb_stdout {
     struct mk_list uploads;
 
     size_t file_size;
+    time_t upload_timeout;
 
     struct flb_output_instance *ins;
 };
