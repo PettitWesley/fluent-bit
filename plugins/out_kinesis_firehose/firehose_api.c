@@ -182,6 +182,10 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
         return 2;
     }
 
+    if (written > buf->largest_event) {
+        buf->largest_event = written;
+    }
+
     if (ctx->time_key) {
         /* append time_key to end of json string */
         tmp = gmtime_r(&tms->tm.tv_sec, &time_stamp);
@@ -855,6 +859,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                 }
                 if (strncmp(error, "SerializationException", 22) == 0) {
                     flb_plg_error(ctx->ins, "<<-------------->>");
+                    flb_warn("[debug] Largest event: %zu", buf->largest_event);
                     printf("Malformed request: %s", buf->out_buf);
                     exit_fb = FLB_TRUE;
                 }
