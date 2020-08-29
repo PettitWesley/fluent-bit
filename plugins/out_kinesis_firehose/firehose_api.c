@@ -310,6 +310,7 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
     struct event *event;
 
     if (buf->event_index <= 0) {
+        flb_warn("[send_log_events] No events");
         return 0;
     }
 
