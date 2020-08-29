@@ -230,7 +230,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     /* is (written + 1) because we still have to append newline */
     if ((written + 1) >= MAX_EVENT_SIZE) {
         flb_plg_warn(ctx->ins, "[size=%zu] Discarding record which is larger than "
-                     "max size allowed by Firehose", writen + 1);
+                     "max size allowed by Firehose", written + 1);
         return 2;
     }
 
@@ -271,7 +271,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
 
     if (written >= MAX_EVENT_SIZE) {
         flb_plg_warn(ctx->ins, "[size=%zu] Discarding record which is larger than "
-                     "max size allowed by Firehose", writen);
+                     "max size allowed by Firehose", written);
         return 2;
     }
 
