@@ -401,7 +401,7 @@ retry_add_event:
             return 0; /* discard this record and return to caller */
         }
         /* send logs and then retry the add */
-        buf->event_index--;
+        //buf->event_index--;
         retry_add = FLB_TRUE;
         flb_info("[process_event] will RETRY_ADD");
         goto send;
@@ -423,7 +423,7 @@ retry_add_event:
             return 0; /* discard this record and return to caller */
         }
         /* do not send this event */
-        buf->event_index--;
+        //buf->event_index--;
         flb_info("[process_event] will RETRY_ADD");
         retry_add = FLB_TRUE;
         goto send;
