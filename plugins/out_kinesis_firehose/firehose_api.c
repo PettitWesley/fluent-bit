@@ -357,6 +357,7 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         flb_plg_error(ctx->ins, "Could not complete PutRecordBatch payload");
         return -1;
     }
+    flb_info("Sending %d records", i);
     flb_plg_debug(ctx->ins, "Sending %d records", i);
     ret = put_record_batch(ctx, buf, (size_t) offset, i);
     if (ret < 0) {
