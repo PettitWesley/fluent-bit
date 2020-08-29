@@ -305,11 +305,12 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
 
     if (buf->event_index <= 0) {
         /*
-         * this shouldn't happen, but this error msg can help us debug if it does
          * event_index should always be 1 more than the actual last event index
-         * when this function is called
+         * when this function is called.
+         * Except in the case where send_log_events() is called at the end of
+         * process_and_send. If all records were already sent, event_index
+         * will be 0. Hence this check.
          */
-        flb_plg_warn(ctx->ins, "[send_log_events] No events");
         return 0;
     }
 
