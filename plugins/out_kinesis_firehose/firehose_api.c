@@ -796,7 +796,6 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     struct flb_aws_client *firehose_client;
     flb_sds_t error;
     int failed_records = 0;
-    int exit_fb = FLB_FALSE;
 
     flb_plg_debug(ctx->ins, "Sending log records to delivery stream %s",
                   ctx->delivery_stream);
