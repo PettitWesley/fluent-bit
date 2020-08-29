@@ -54,8 +54,6 @@ struct flush {
     /* buffer used to temporarily hold an event during processing */
     char *event_buf;
     size_t event_buf_size;
-
-    size_t largest_event;
 };
 
 struct event {
@@ -92,6 +90,8 @@ struct flb_firehose {
 
     /* Plugin output instance reference */
     struct flb_output_instance *ins;
+
+    size_t largest_event;
 };
 
 void flb_firehose_ctx_destroy(struct flb_firehose *ctx);
