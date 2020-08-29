@@ -363,6 +363,7 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         flb_plg_error(ctx->ins, "Failed to send log records");
         return -1;
     }
+    buf->records_sent += i;
 
     return 0;
 }
@@ -450,7 +451,7 @@ send:
 
 /*
  * Main routine- processes msgpack and sends in batches
- * return value is the number of events processed
+ * return value is the number of events processed (number sent is stored in buf)
  */
 int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
                              const char *data, size_t bytes)
@@ -550,7 +551,8 @@ int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
         return -1;
     }
 
-    /* return number of events */
+    /* return number of events processed */
+    buf->records_processed = i;
     return i;
 
 error:

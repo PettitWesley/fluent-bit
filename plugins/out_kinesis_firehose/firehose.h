@@ -56,6 +56,9 @@ struct flush {
     size_t event_buf_size;
 
     size_t largest_event;
+
+    int records_sent;
+    int records_processed;
 };
 
 struct event {

@@ -294,7 +294,7 @@ static void cb_firehose_flush(const void *data, size_t bytes,
                                 struct flb_config *config)
 {
     struct flb_firehose *ctx = out_context;
-    int event_count;
+    int ret;
     struct flush *buf;
     (void) i_ins;
     (void) config;
@@ -309,14 +309,15 @@ static void cb_firehose_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    event_count = process_and_send_records(ctx, buf, data, bytes);
-    if (event_count < 0) {
+    ret = process_and_send_records(ctx, buf, data, bytes);
+    if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send records");
         flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    flb_plg_info(ctx->ins, "Sent %d records to Firehose", event_count);
+    flb_plg_info(ctx->ins, "Processed %d records, sent %d to %s",
+                 buf->records_processed, buf->records_sent, ctx->delivery_stream);
     flush_destroy(buf);
 
     FLB_OUTPUT_RETURN(FLB_OK);
