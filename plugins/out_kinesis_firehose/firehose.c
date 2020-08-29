@@ -296,6 +296,8 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
+    flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
+
     buf = new_flush_buffer();
     if (!buf) {
         flb_plg_error(ctx->ins, "Failed to construct flush buffer");
