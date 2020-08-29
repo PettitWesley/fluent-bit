@@ -260,6 +260,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
         }
     }
 
+    tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
     ret = mbedtls_base64_encode((unsigned char *) buf->event_buf, size, &b64_len,
                                 (unsigned char *) tmp_buf_ptr, written);
     if (ret != 0) {
@@ -281,9 +282,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     }
 
     /* copy serialized json to tmp_buf */
-    if (!strncpy(tmp_buf_ptr, buf->event_buf, written)) {
-        return -1;
-    }
+    memcpy(tmp_buf_ptr, buf->event_buf, written);
 
     buf->tmp_buf_offset += written;
     event = &buf->events[buf->event_index];
@@ -385,6 +384,7 @@ static int add_event(struct flb_firehose *ctx, struct flush *buf,
 retry_add_event:
     retry_add = FLB_FALSE;
     ret = process_event(ctx, buf, obj, tms);
+    flb_info("[process_event] ret=%d", ret);
     if (ret < 0) {
         return -1;
     }
@@ -817,7 +817,6 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     if (c) {
         flb_plg_debug(ctx->ins, "PutRecordBatch http status=%d", c->resp.status);
         flb_plg_warn(ctx->ins,"[debug] Largest event: %zu", buf->largest_event);
-        printf("Normal request: %s", buf->out_buf);
 
         if (c->resp.status == 200) {
             /* Firehose API can return partial success- check response */
