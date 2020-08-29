@@ -161,7 +161,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     size_t len;
     size_t tmp_size;
 
-    while (written < ctx->largest_event) {
+    while (written < ctx->largest_event || written < 1000) {
         tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset + written;
         ret = flb_msgpack_to_json(tmp_buf_ptr,
                                       buf->tmp_buf_size - (buf->tmp_buf_offset + written),
@@ -188,6 +188,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     if (written > ctx->largest_event) {
         ctx->largest_event = written;
     }
+    flb_plg_warn(ctx->ins,"[debug] Largest event: %zu", ctx->largest_event);
 
     if (ctx->time_key) {
         /* append time_key to end of json string */
