@@ -242,9 +242,6 @@ static int cb_firehose_init(struct flb_output_instance *ins,
     ctx->firehose_client->upstream = upstream;
     ctx->firehose_client->host = ctx->endpoint;
 
-    ctx->iterations = 10;
-
-
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -298,8 +295,6 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     struct flush *buf;
     (void) i_ins;
     (void) config;
-
-    ctx->iterations += 5;
 
     flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
 

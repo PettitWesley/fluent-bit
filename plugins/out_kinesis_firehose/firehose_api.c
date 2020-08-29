@@ -162,22 +162,21 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     size_t tmp_size;
 
     tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
-    for (int i = 0; i < ctx->iterations; i++) {
-        ret = flb_msgpack_to_json(tmp_buf_ptr + written,
-                                      buf->tmp_buf_size - (buf->tmp_buf_offset + written),
-                                      obj);
-        if (ret <= 0) {
-            /*
-             * negative value means failure to write to buffer,
-             * which means we ran out of space, and must send the logs
-             *
-             * TODO: This could also incorrectly be triggered if the record
-             * is larger than MAX_EVENT_SIZE
-             */
-            return 1;
-        }
-        written += (size_t) ret;
+    ret = flb_msgpack_to_json(tmp_buf_ptr,
+                                  buf->tmp_buf_size - buf->tmp_buf_offset,
+                                  obj);
+    if (ret <= 0) {
+        /*
+         * negative value means failure to write to buffer,
+         * which means we ran out of space, and must send the logs
+         *
+         * TODO: This could also incorrectly be triggered if the record
+         * is larger than MAX_EVENT_SIZE
+         */
+        return 1;
     }
+    written = (size_t) ret;
+
     /* Discard empty messages (written == 2 means '""') */
     if (written <= 2) {
         flb_plg_debug(ctx->ins, "Found empty log message");
