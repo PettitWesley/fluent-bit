@@ -174,7 +174,6 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
              * TODO: This could also incorrectly be triggered if the record
              * is larger than MAX_EVENT_SIZE
              */
-            flb_info("Ran out of space");
             return 1;
         }
         written += (size_t) ret;
@@ -183,10 +182,6 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     if (written <= 2) {
         flb_plg_debug(ctx->ins, "Found empty log message");
         return 2;
-    }
-
-    if (written > buf->largest_event) {
-        buf->largest_event = written;
     }
 
     if (ctx->time_key) {
@@ -310,11 +305,10 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
     struct event *event;
 
     if (buf->event_index <= 0) {
-        flb_warn("[send_log_events] No events");
+        /* this shouldn't happen, but this error msg can help us debug if it does */
+        flb_plg_warn(ctx->ins, "[send_log_events] No events");
         return 0;
     }
-
-    flb_info("[send_log_events] event_index=%d", buf->event_index);
 
     /* alloc out_buf if needed */
     if (buf->out_buf == NULL || buf->out_buf_size < buf->data_size) {
@@ -358,7 +352,6 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         flb_plg_error(ctx->ins, "Could not complete PutRecordBatch payload");
         return -1;
     }
-    flb_info("Sending %d records", i);
     flb_plg_debug(ctx->ins, "Sending %d records", i);
     ret = put_record_batch(ctx, buf, (size_t) offset, i);
     if (ret < 0) {
@@ -389,7 +382,6 @@ static int add_event(struct flb_firehose *ctx, struct flush *buf,
 retry_add_event:
     retry_add = FLB_FALSE;
     ret = process_event(ctx, buf, obj, tms);
-    flb_info("[process_event] ret=%d, event_index=%d", ret, buf->event_index);
     if (ret < 0) {
         return -1;
     }
@@ -402,7 +394,6 @@ retry_add_event:
         }
         /* send logs and then retry the add */
         retry_add = FLB_TRUE;
-        flb_info("[process_event] will RETRY_ADD");
         goto send;
     } else if (ret == 2) {
         /* discard this record and return to caller */
@@ -422,7 +413,6 @@ retry_add_event:
             return 0; /* discard this record and return to caller */
         }
         /* do not send this event */
-        flb_info("[process_event] will RETRY_ADD");
         retry_add = FLB_TRUE;
         goto send;
     }
@@ -794,19 +784,6 @@ static struct flb_http_client *mock_http_call(char *error_env_var)
     return c;
 }
 
-static void save_to_file(char *str, char *file)
-{
-    FILE *fp;
-    int ret;
-    fp = fopen(file, "w+");
-    ret = fputs(str, fp);
-    if (ret < 0) {
-        flb_error("[debug] Failed to save to %s", file);
-        flb_errno();
-    }
-    fclose(fp);
-}
-
 
 /*
  * Returns -1 on failure, 0 on success
@@ -836,7 +813,6 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
 
     if (c) {
         flb_plg_debug(ctx->ins, "PutRecordBatch http status=%d", c->resp.status);
-        flb_plg_warn(ctx->ins,"[debug] Largest event: %zu", buf->largest_event);
 
         if (c->resp.status == 200) {
             /* Firehose API can return partial success- check response */
@@ -872,8 +848,6 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
 
         /* Check error */
         if (c->resp.payload_size > 0) {
-            flb_plg_info(ctx->ins, "Raw request: %s", buf->out_buf);
-            flb_plg_info(ctx->ins, "Raw response: %s", c->resp.payload);
             error = flb_aws_error(c->resp.payload, c->resp.payload_size);
             if (error != NULL) {
                 if (strcmp(error, ERR_CODE_SERVICE_UNAVAILABLE) == 0) {
@@ -882,9 +856,12 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                                   ctx->delivery_stream);
                 }
                 if (strncmp(error, "SerializationException", 22) == 0) {
-                    flb_plg_error(ctx->ins, "<<-------------->>");
-                    flb_warn("[debug] Largest event: %zu", buf->largest_event);
-                    flb_info("Malformed request: %s", buf->out_buf);
+                    /*
+                     * If this happens, we habe a bug in the code
+                     * User should send us the output to debug
+                     */
+                    flb_plg_error(ctx->ins, "<<------Bug in Code------>>");
+                    printf("Malformed request: %s", buf->out_buf);
                     exit_fb = FLB_TRUE;
                 }
                 flb_aws_print_error(c->resp.payload, c->resp.payload_size,
@@ -895,21 +872,12 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                 /* error could not be parsed, print raw response to debug */
                 flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
             }
-            save_to_file(buf->out_buf, "/home/ec2-user/request.txt");
-            save_to_file(c->resp.payload, "/home/ec2-user/response.txt");
         }
     }
 
     flb_plg_error(ctx->ins, "Failed to send log records to %s", ctx->delivery_stream);
     if (c) {
         flb_http_client_destroy(c);
-    }
-    if (exit_fb == FLB_TRUE) {
-        flb_info("Quitting...");
-        sleep(1);
-        flb_info("Quitting...");
-        sleep(1);
-        exit(1);
     }
     return -1;
 }
