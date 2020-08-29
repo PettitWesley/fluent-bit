@@ -861,7 +861,6 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                      */
                     flb_plg_error(ctx->ins, "<<------Bug in Code------>>");
                     printf("Malformed request: %s", buf->out_buf);
-                    exit_fb = FLB_TRUE;
                 }
                 flb_aws_print_error(c->resp.payload, c->resp.payload_size,
                                     "PutRecordBatch", ctx->ins);
