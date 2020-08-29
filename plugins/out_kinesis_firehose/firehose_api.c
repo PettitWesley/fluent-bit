@@ -387,7 +387,7 @@ static int add_event(struct flb_firehose *ctx, struct flush *buf,
 retry_add_event:
     retry_add = FLB_FALSE;
     ret = process_event(ctx, buf, obj, tms);
-    flb_info("[process_event] ret=%d", ret);
+    flb_info("[process_event] ret=%d, event_index=%d", ret, buf->event_index);
     if (ret < 0) {
         return -1;
     }
