@@ -188,7 +188,6 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     if (written > ctx->largest_event) {
         ctx->largest_event = written;
     }
-    flb_plg_warn(ctx->ins,"[debug] Largest event: %zu", ctx->largest_event);
 
     if (ctx->time_key) {
         /* append time_key to end of json string */
