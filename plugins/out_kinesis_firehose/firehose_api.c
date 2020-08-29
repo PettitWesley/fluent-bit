@@ -161,12 +161,12 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     size_t len;
     size_t tmp_size;
 
+    tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
     for (int i = 0; i < ctx->iterations; i++) {
-        tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset + written;
-        ret = flb_msgpack_to_json(tmp_buf_ptr,
+        ret = flb_msgpack_to_json(tmp_buf_ptr + written,
                                       buf->tmp_buf_size - (buf->tmp_buf_offset + written),
                                       obj);
-        if (ret < 0) {
+        if (ret <= 0) {
             /*
              * negative value means failure to write to buffer,
              * which means we ran out of space, and must send the logs
