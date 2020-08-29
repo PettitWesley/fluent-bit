@@ -229,8 +229,8 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
 
     /* is (written + 1) because we still have to append newline */
     if ((written + 1) >= MAX_EVENT_SIZE) {
-        flb_plg_warn(ctx->ins, "Discarding record which is larger than "
-                     "max size allowed by Firehose");
+        flb_plg_warn(ctx->ins, "[size=%zu] Discarding record which is larger than "
+                     "max size allowed by Firehose", writen + 1);
         return 2;
     }
 
@@ -270,9 +270,9 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     written = b64_len;
 
     if (written >= MAX_EVENT_SIZE) {
-        flb_plg_warn(ctx->ins, "Discarding record which is larger than "
-                     "max size allowed by Firehose");
-        return 0;
+        flb_plg_warn(ctx->ins, "[size=%zu] Discarding record which is larger than "
+                     "max size allowed by Firehose", writen);
+        return 2;
     }
 
     tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
@@ -393,8 +393,8 @@ retry_add_event:
     else if (ret == 1) {
         if (buf->event_index <= 0) {
             /* somehow the record was larger than our entire request buffer */
-            flb_plg_error(ctx->ins, "Discarding massive log record, %s",
-                          ctx->delivery_stream);
+            flb_plg_warn(ctx->ins, "Discarding massive log record, %s",
+                         ctx->delivery_stream);
             return 0; /* discard this record and return to caller */
         }
         /* send logs and then retry the add */
@@ -403,6 +403,8 @@ retry_add_event:
         goto send;
     } else if (ret == 2) {
         /* discard this record and return to caller */
+        flb_plg_warn(ctx->ins, "Discarding large or unprocessable record, %s",
+                     ctx->delivery_stream);
         return 0;
     }
 
@@ -412,8 +414,8 @@ retry_add_event:
     if ((buf->data_size + event_bytes) > PUT_RECORD_BATCH_PAYLOAD_SIZE) {
         if (buf->event_index <= 0) {
             /* somehow the record was larger than our entire request buffer */
-            flb_plg_error(ctx->ins, "Discarding massive log record, %s",
-                          ctx->delivery_stream);
+            flb_plg_warn(ctx->ins, "[size=%zu] Discarding massive log record, %s",
+                         event_bytes, ctx->delivery_stream);
             return 0; /* discard this record and return to caller */
         }
         /* do not send this event */
