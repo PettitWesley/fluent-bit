@@ -868,7 +868,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                 flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
             }
             save_to_file(buf->out_buf, "/home/ec2-user/request.txt");
-            save_to_file(c->resp.payload), "/home/ec2-user/response.txt");
+            save_to_file(c->resp.payload, "/home/ec2-user/response.txt");
         }
     }
 
@@ -877,9 +877,9 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
         flb_http_client_destroy(c);
     }
     if (exit_fb == FLB_TRUE) {
-        flb_info("Quitting...")
+        flb_info("Quitting...");
         sleep(1);
-        flb_info("Quitting...")
+        flb_info("Quitting...");
         sleep(1);
         exit(1);
     }
