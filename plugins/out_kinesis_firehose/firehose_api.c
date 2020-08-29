@@ -817,6 +817,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     if (c) {
         flb_plg_debug(ctx->ins, "PutRecordBatch http status=%d", c->resp.status);
         flb_plg_warn(ctx->ins,"[debug] Largest event: %zu", buf->largest_event);
+        printf("Normal request: %s", buf->out_buf);
 
         if (c->resp.status == 200) {
             /* Firehose API can return partial success- check response */
