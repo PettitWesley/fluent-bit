@@ -299,7 +299,7 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
-    ctx->iterations += 1;
+    ctx->iterations += 5;
 
     flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
 
