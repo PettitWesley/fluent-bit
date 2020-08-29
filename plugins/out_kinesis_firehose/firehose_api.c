@@ -305,7 +305,11 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
     struct event *event;
 
     if (buf->event_index <= 0) {
-        /* this shouldn't happen, but this error msg can help us debug if it does */
+        /*
+         * this shouldn't happen, but this error msg can help us debug if it does
+         * event_index should always be 1 more than the actual last event index
+         * when this function is called
+         */
         flb_plg_warn(ctx->ins, "[send_log_events] No events");
         return 0;
     }
