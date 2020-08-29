@@ -390,6 +390,12 @@ retry_add_event:
     }
     else if (ret == 1) {
         /* send logs and then retry the add */
+        if (buf->event_index == 0) {
+            /* somehow the record was larger than our entire request buffer */
+            flb_plg_error(ctx->ins, "Discarding massive log record, %s",
+                          ctx->delivery_stream);
+            return 0; /* discard this record and return to caller */
+        }
         buf->event_index--;
         retry_add = FLB_TRUE;
         goto send;
