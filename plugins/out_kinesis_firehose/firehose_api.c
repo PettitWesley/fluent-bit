@@ -41,6 +41,8 @@
 #include <msgpack.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 #include "firehose_api.h"
 
@@ -765,6 +767,19 @@ static struct flb_http_client *mock_http_call(char *error_env_var)
     return c;
 }
 
+static void save_to_file(char *str, char *file)
+{
+    FILE *fp;
+    int ret;
+    fp = fopen(file, "w+");
+    ret = fputs(str, fp);
+    if (ret < 0) {
+        flb_error("[debug] Failed to save to %s", file);
+        flb_errno();
+    }
+    fclose(fp);
+}
+
 
 /*
  * Returns -1 on failure, 0 on success
@@ -777,6 +792,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     struct flb_aws_client *firehose_client;
     flb_sds_t error;
     int failed_records = 0;
+    int exit_fb = FLB_FALSE;
 
     flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
 
@@ -830,13 +846,18 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
 
         /* Check error */
         if (c->resp.payload_size > 0) {
-            flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
+            flb_plg_info(ctx->ins, "Raw request: %s", buf->out_buf);
+            flb_plg_info(ctx->ins, "Raw response: %s", c->resp.payload);
             error = flb_aws_error(c->resp.payload, c->resp.payload_size);
             if (error != NULL) {
                 if (strcmp(error, ERR_CODE_SERVICE_UNAVAILABLE) == 0) {
                     flb_plg_error(ctx->ins, "Throughput limits for %s "
                                   "may have been exceeded.",
                                   ctx->delivery_stream);
+                }
+                if (strncmp(error, "SerializationException", 22) == 0) {
+                    flb_plg_error(ctx->ins, "<<-------------->>");
+                    exit_fb = FLB_TRUE;
                 }
                 flb_aws_print_error(c->resp.payload, c->resp.payload_size,
                                     "PutRecordBatch", ctx->ins);
@@ -846,12 +867,21 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                 /* error could not be parsed, print raw response to debug */
                 flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
             }
+            save_to_file(buf->out_buf, "/home/ec2-user/request.txt");
+            save_to_file(c->resp.payload), "/home/ec2-user/response.txt");
         }
     }
 
     flb_plg_error(ctx->ins, "Failed to send log records to %s", ctx->delivery_stream);
     if (c) {
         flb_http_client_destroy(c);
+    }
+    if (exit_fb == FLB_TRUE) {
+        flb_info("Quitting...")
+        sleep(1);
+        flb_info("Quitting...")
+        sleep(1);
+        exit(1);
     }
     return -1;
 }
