@@ -313,6 +313,8 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         return 0;
     }
 
+    flb_info("[send_log_events] event_index=%d", buf->event_index);
+
     /* alloc out_buf if needed */
     if (buf->out_buf == NULL || buf->out_buf_size < buf->data_size) {
         if (buf->out_buf != NULL) {
@@ -389,13 +391,13 @@ retry_add_event:
         return -1;
     }
     else if (ret == 1) {
-        /* send logs and then retry the add */
         if (buf->event_index == 0) {
             /* somehow the record was larger than our entire request buffer */
             flb_plg_error(ctx->ins, "Discarding massive log record, %s",
                           ctx->delivery_stream);
             return 0; /* discard this record and return to caller */
         }
+        /* send logs and then retry the add */
         buf->event_index--;
         retry_add = FLB_TRUE;
         goto send;
