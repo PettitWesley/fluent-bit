@@ -259,6 +259,7 @@ struct flush *new_flush_buffer()
 {
     struct flush *buf;
 
+
     buf = flb_calloc(1, sizeof(struct flush));
     if (!buf) {
         flb_errno();
@@ -295,6 +296,8 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     struct flush *buf;
     (void) i_ins;
     (void) config;
+
+    ctx->iterations += 1;
 
     flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
 

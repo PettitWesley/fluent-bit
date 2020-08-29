@@ -161,7 +161,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     size_t len;
     size_t tmp_size;
 
-    while (written < ctx->largest_event || written < 1000) {
+    for (int i = 0; i < ctx->iterations; i++) {
         tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset + written;
         ret = flb_msgpack_to_json(tmp_buf_ptr,
                                       buf->tmp_buf_size - (buf->tmp_buf_offset + written),
@@ -185,8 +185,8 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
         return 2;
     }
 
-    if (written > ctx->largest_event) {
-        ctx->largest_event = written;
+    if (written > buf->largest_event) {
+        buf->largest_event = written;
     }
 
     if (ctx->time_key) {
@@ -816,7 +816,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
 
     if (c) {
         flb_plg_debug(ctx->ins, "PutRecordBatch http status=%d", c->resp.status);
-        flb_plg_warn(ctx->ins,"[debug] Largest event: %zu", ctx->largest_event);
+        flb_plg_warn(ctx->ins,"[debug] Largest event: %zu", buf->largest_event);
 
         if (c->resp.status == 200) {
             /* Firehose API can return partial success- check response */
@@ -863,7 +863,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                 }
                 if (strncmp(error, "SerializationException", 22) == 0) {
                     flb_plg_error(ctx->ins, "<<-------------->>");
-                    flb_warn("[debug] Largest event: %zu", ctx->largest_event);
+                    flb_warn("[debug] Largest event: %zu", buf->largest_event);
                     printf("Malformed request: %s", buf->out_buf);
                     exit_fb = FLB_TRUE;
                 }
