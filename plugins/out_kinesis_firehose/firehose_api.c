@@ -149,7 +149,7 @@ static int end_put_payload(struct flb_firehose *ctx, struct flush *buf,
 static int process_event(struct flb_firehose *ctx, struct flush *buf,
                          const msgpack_object *obj, struct flb_time *tms)
 {
-    size_t written;
+    size_t written = 0;
     int ret;
     size_t size;
     size_t b64_len;
@@ -161,21 +161,24 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     size_t len;
     size_t tmp_size;
 
-    tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset;
-    ret = flb_msgpack_to_json(tmp_buf_ptr,
-                                  buf->tmp_buf_size - buf->tmp_buf_offset,
-                                  obj);
-    if (ret < 0) {
-        /*
-         * negative value means failure to write to buffer,
-         * which means we ran out of space, and must send the logs
-         *
-         * TODO: This could also incorrectly be triggered if the record
-         * is larger than MAX_EVENT_SIZE
-         */
-        return 1;
+    while (written < buf->largest_event) {
+        tmp_buf_ptr = buf->tmp_buf + buf->tmp_buf_offset + written;
+        ret = flb_msgpack_to_json(tmp_buf_ptr,
+                                      buf->tmp_buf_size - (buf->tmp_buf_offset + written),
+                                      obj);
+        if (ret < 0) {
+            /*
+             * negative value means failure to write to buffer,
+             * which means we ran out of space, and must send the logs
+             *
+             * TODO: This could also incorrectly be triggered if the record
+             * is larger than MAX_EVENT_SIZE
+             */
+            flb_info("Ran out of space");
+            return 1;
+        }
+        written += (size_t) ret;
     }
-    written = (size_t) ret;
     /* Discard empty messages (written == 2 means '""') */
     if (written <= 2) {
         flb_plg_debug(ctx->ins, "Found empty log message");
