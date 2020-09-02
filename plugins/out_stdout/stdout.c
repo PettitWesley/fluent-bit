@@ -614,14 +614,19 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     len = flb_sds_len(json);
     chunk = flb_chunk_get(&ctx->store, tag);
 
+    /* if timeout has elapsed, we must put whatever data we have */
+    timeout_check = time(NULL) > (m_upload->init_time + ctx->upload_timeout);
+
     if (chunk == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
-        /* add data to local buffer */
-        ret = flb_buffer_put(&ctx->store, chunk, tag, json, (size_t) len);
-        flb_sds_destroy(json);
-        if (ret < 0) {
-            FLB_OUTPUT_RETURN(FLB_RETRY);
+        if (!timeout_check) {
+            /* add data to local buffer */
+            ret = flb_buffer_put(&ctx->store, chunk, tag, json, (size_t) len);
+            flb_sds_destroy(json);
+            if (ret < 0) {
+                FLB_OUTPUT_RETURN(FLB_RETRY);
+            }
+            FLB_OUTPUT_RETURN(FLB_OK);
         }
-        FLB_OUTPUT_RETURN(FLB_OK);
     }
 
     ret = construct_request_buffer(ctx, json, chunk, &buffer, &buffer_size);
