@@ -714,7 +714,7 @@ static struct flb_config_map config_map[] = {
     "Specifies the size of files in S3. Maximum size is 50GB, minimim is 1MB"
     },
     {
-     FLB_CONFIG_MAP_STR, "upload_timeout", 60,
+     FLB_CONFIG_MAP_INT, "upload_timeout", 60,
      0, FLB_FALSE, 0,
     "Optionally specify a timeout for uploads using an integer number of minutes. "
     "Whenever this amount of time has elapsed, Fluent Bit will complete an "
