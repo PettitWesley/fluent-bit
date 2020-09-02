@@ -555,6 +555,9 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     size_t buffer_size;
     int ret;
     int len;
+    int size_check = FLB_FALSE;
+    int part_num_check = FLB_FALSE;
+    int timeout_check = FLB_FALSE;
     (void) i_ins;
     (void) config;
 
@@ -656,7 +659,10 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     flb_chunk_destroy(chunk);
 
     /* complete upload if needed */
-    if (m_upload->bytes >= ctx->file_size || m_upload->part_number >= 10000) {
+    size_check = m_upload->bytes >= ctx->file_size;
+    part_num_check = m_upload->part_number >= 10000;
+    timeout_check = time(NULL) > (m_upload->init_time + ctx->upload_timeout);
+    if (size_check || part_num_check || timeout_check) {
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
         ret = complete_multipart_upload(ctx, m_upload);
         if (ret == 0) {
