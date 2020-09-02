@@ -680,8 +680,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
             flb_plg_info(ctx->ins, "Completing upload for %s because 10,000 chunks "
                          "(the API limit) have been upload", m_upload->s3_key);
         }
-        if (time(NULL) > (m_upload->init_time + ctx->upload_timeout)) {
-            timeout_check = FLB_TRUE;
+        if (timeout_check) {
             flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
                          " has elapsed", m_upload->s3_key);
         }
