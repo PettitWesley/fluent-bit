@@ -40,6 +40,8 @@
 #define MAX_FILE_SIZE         50000000000
 #define MAX_FILE_SIZE_STR     "50,000,000,000"
 
+#define DEFAULT_UPLOAD_TIMEOUT 3600
+
 struct multipart_upload {
     flb_sds_t s3_key;
     flb_sds_t tag;

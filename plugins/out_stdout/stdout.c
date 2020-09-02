@@ -120,13 +120,18 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
 
     tmp = flb_output_get_property("upload_timeout", ins);
-    i = atoi(tmp);
-    if (i <= 0) {
-        flb_plg_error(ctx->ins, "upload_timeout %s is negative or could not be parsed",
-                      tmp);
-        goto error;
+    if (tmp) {
+        i = atoi(tmp);
+        if (i <= 0) {
+            flb_plg_error(ctx->ins, "upload_timeout %s is negative or could not be parsed",
+                          tmp);
+            goto error;
+        }
+        ctx->upload_timeout = (time_t) 60 * i;
     }
-    ctx->upload_timeout = (time_t) 60 * i;
+    else {
+        ctx->upload_timeout = DEFAULT_UPLOAD_TIMEOUT;
+    }
 
     tmp = flb_output_get_property("region", ins);
     if (tmp) {
