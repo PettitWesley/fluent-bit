@@ -617,6 +617,15 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     /* if timeout has elapsed, we must put whatever data we have */
     timeout_check = time(NULL) > (m_upload->init_time + ctx->upload_timeout);
 
+    //TODO: This does not properly handle case where:
+    // - chunk is uploaded less than 5MB because of timeout
+    // - CompleteMultipartUpload fails and we FLB_RETRY
+    // - a new small chunk will try to be uploaded, making the upload
+    // un-complete-able because only last chunk can be small
+    // Solution = Complete as first step??
+    //TODO: Problem: Uploads will never be completed unless data keeps
+    // flowing with same tag.
+
     if (chunk == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
         if (!timeout_check) {
             /* add data to local buffer */
