@@ -664,30 +664,32 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     flb_chunk_destroy(chunk);
 
     /* complete upload if needed */
-    if (m_upload->bytes >= ctx->file_size) {
-        size_check = FLB_TRUE;
-        flb_plg_info(ctx->ins, "Completing upload for %s because uploaded data is greater"
-                     " than size set by total_file_size", m_upload->s3_key);
-    }
-    if (m_upload->part_number >= 10000) {
-        part_num_check = FLB_TRUE;
-        flb_plg_info(ctx->ins, "Completing upload for %s because 10,000 chunks "
-                     "(the API limit) have been upload", m_upload->s3_key);
-    }
-    if (time(NULL) > (m_upload->init_time + ctx->upload_timeout)) {
-        timeout_check = FLB_TRUE;
-        flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
-                     " has elapsed", m_upload->s3_key);
-    }
-    if (size_check || part_num_check || timeout_check) {
-        m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
-        ret = complete_multipart_upload(ctx, m_upload);
-        if (ret == 0) {
-            mk_list_del(&m_upload->_head);
-        } else {
-            /* we return FLB_OK in this case, since data was persisted */
-            flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
-                          chunk->file_path);
+    if (m_upload->bytes > 0) {
+        if (m_upload->bytes >= ctx->file_size) {
+            size_check = FLB_TRUE;
+            flb_plg_info(ctx->ins, "Completing upload for %s because uploaded data is greater"
+                         " than size set by total_file_size", m_upload->s3_key);
+        }
+        if (m_upload->part_number >= 10000) {
+            part_num_check = FLB_TRUE;
+            flb_plg_info(ctx->ins, "Completing upload for %s because 10,000 chunks "
+                         "(the API limit) have been upload", m_upload->s3_key);
+        }
+        if (time(NULL) > (m_upload->init_time + ctx->upload_timeout)) {
+            timeout_check = FLB_TRUE;
+            flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
+                         " has elapsed", m_upload->s3_key);
+        }
+        if (size_check || part_num_check || timeout_check) {
+            m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+            ret = complete_multipart_upload(ctx, m_upload);
+            if (ret == 0) {
+                mk_list_del(&m_upload->_head);
+            } else {
+                /* we return FLB_OK in this case, since data was persisted */
+                flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
+                              chunk->file_path);
+            }
         }
     }
 
