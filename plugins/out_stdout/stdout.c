@@ -44,7 +44,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 {
     int ret;
     const char *tmp;
-    int tmp_i;
+    int i;
     struct flb_stdout *ctx = NULL;
     (void) ins;
     (void) config;
