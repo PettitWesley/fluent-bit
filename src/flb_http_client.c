@@ -976,6 +976,9 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     c->header_buf[c->header_len++] = '\r';
     c->header_buf[c->header_len++] = '\n';
 
+    printf("Raw request: \n%.*s\n%.*s\n", c->header_len, c->header_buf,
+            c->body_len, c->body_buf);
+
     /* Write the header */
     ret = flb_io_net_write(c->u_conn,
                            c->header_buf, c->header_len,
