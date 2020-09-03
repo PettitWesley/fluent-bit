@@ -273,11 +273,11 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
     }
 
     /* Amazon ES Sigv4 does not allow the host header to include the port */
-    ret = flb_http_strip_port_from_host(c);
-    if (ret < 0) {
-        flb_error("[aws_client] could not strip port from host for sigv4");
-        goto error;
-    }
+    // ret = flb_http_strip_port_from_host(c);
+    // if (ret < 0) {
+    //     flb_error("[aws_client] could not strip port from host for sigv4");
+    //     goto error;
+    // }
 
     if (aws_client->has_auth) {
         signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
