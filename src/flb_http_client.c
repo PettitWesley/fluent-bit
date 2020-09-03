@@ -533,7 +533,7 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
     char *fmt_plain =                           \
         "%s %s HTTP/1.%i\r\n";
     char *fmt_proxy =                           \
-        "%s http://%s:%i%s HTTP/1.%i\r\n"
+        "%s http://%s%s HTTP/1.%i\r\n"
         "Proxy-Connection: KeepAlive\r\n";
 
     struct flb_http_client *c;
@@ -560,23 +560,23 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
     }
 
     /* FIXME: handler for HTTPS proxy */
-    // if (!proxy) {
+    if (!proxy) {
         ret = snprintf(buf, FLB_HTTP_BUF_SIZE,
                        fmt_plain,
                        str_method,
                        uri,
                        flags & FLB_HTTP_10 ? 0 : 1,
                        body_len);
-    // }
-    // else {
-    //     ret = snprintf(buf, FLB_HTTP_BUF_SIZE,
-    //                    fmt_plain,
-    //                    str_method,
-    //                    host,
-    //                    port,
-    //                    uri,
-    //                    flags & FLB_HTTP_10 ? 0 : 1);
-    // }
+    }
+    else {
+        ret = snprintf(buf, FLB_HTTP_BUF_SIZE,
+                       fmt_proxy,
+                       str_method,
+                       host,
+//                       port,
+                       uri,
+                       flags & FLB_HTTP_10 ? 0 : 1);
+    }
 
     if (ret == -1) {
         flb_errno();
