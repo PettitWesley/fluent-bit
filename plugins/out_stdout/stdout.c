@@ -99,7 +99,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         ctx->prefix = "fluent-bit";
     }
 
-    tmp = flb_output_get_property("file_size", ins);
+    tmp = flb_output_get_property("total_file_size", ins);
     if (tmp) {
         ctx->file_size = (size_t) flb_utils_size_to_bytes(tmp);
         if (ctx->file_size <= 0) {
@@ -625,6 +625,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     // Solution = Complete as first step??
     //TODO: Problem: Uploads will never be completed unless data keeps
     // flowing with same tag.
+    // I think timeout needs very separate logic
 
     if (chunk == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
         if (!timeout_check) {
@@ -741,9 +742,21 @@ static struct flb_config_map config_map[] = {
     "Specifies the format of the date. Supported formats are double, iso8601 and epoch."
     },
     {
-     FLB_CONFIG_MAP_STR, "file_size", NULL,
+     FLB_CONFIG_MAP_STR, "total_file_size", NULL,
      0, FLB_FALSE, 0,
     "Specifies the size of files in S3. Maximum size is 50GB, minimim is 1MB"
+    },
+    {
+     FLB_CONFIG_MAP_STR, "upload_chunk_size", NULL,
+     0, FLB_FALSE, 0,
+    "This plugin uses the S3 Multipart Upload API to stream data to S3, "
+    "ensuring your data gets-off-the-box as quickly as possible. "
+    "This parameter configures the size of each “part” in the upload. "
+    "The total_file_size option configures the size of the file you will see "
+    "in S3; this option determines the size of chunks uploaded until that "
+    "size is reached. These chunks are temporarily stored in chunk_buffer_path "
+    "until their size reaches upload_chunk_size, which point the chunk is "
+    "uploaded to S3. Default: 5M, Max: 50M, Min: 5M."
     },
     {
      FLB_CONFIG_MAP_INT, "upload_timeout", "60",
@@ -759,7 +772,7 @@ static struct flb_config_map config_map[] = {
     "Specifies the name of the date field in output."
     },
     {
-     FLB_CONFIG_MAP_STR, "bucket", "firenosed-dolphin-bucket",
+     FLB_CONFIG_MAP_STR, "bucket", NULL,
      0, FLB_TRUE, offsetof(struct flb_stdout, bucket),
     "S3 bucket name."
     },
