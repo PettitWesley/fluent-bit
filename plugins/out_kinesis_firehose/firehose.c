@@ -273,7 +273,7 @@ static int cb_firehose_init(struct flb_output_instance *ins,
                          ctx->proxy_port);
         }
         else {
-            io_flags = FLB_IO_TLS;
+            io_flags = FLB_IO_TCP;
             flb_plg_info(ctx->ins, "Will not use TLS to talk to Proxy %s:%i; enable"
                          " TLS with `TLS On` in your config.",
                          ctx->proxy_host,
@@ -282,7 +282,7 @@ static int cb_firehose_init(struct flb_output_instance *ins,
         upstream = flb_upstream_create(config,
                                        ctx->proxy_host,
                                        ctx->proxy_port,
-                                       FLB_IO_TLS, &ctx->client_tls);
+                                       io_flags, &ctx->client_tls);
     }
     else {
         upstream = flb_upstream_create(config, ctx->endpoint,
