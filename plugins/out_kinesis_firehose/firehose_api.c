@@ -854,6 +854,8 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
             return 0;
         }
 
+        flb_plg_debug(ctx->ins, "Raw response: %s", c->resp.payload);
+
         /* Check error */
         if (c->resp.payload_size > 0) {
             error = flb_aws_error(c->resp.payload, c->resp.payload_size);
