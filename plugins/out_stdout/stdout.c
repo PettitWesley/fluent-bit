@@ -316,6 +316,13 @@ error:
     return -1;
 }
 
+static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
+                       char *body, size_t body_size,
+                       const char *tag, int tag_len)
+{
+
+}
+
 /*
  * The S3 file name is
  * /<prefix>/-<datestamp>
@@ -495,8 +502,32 @@ static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
     return -1;
 }
 
-static struct multipart_upload *get_or_create_upload(struct flb_stdout *ctx,
-                                                     const char *tag, int tag_len)
+static struct multipart_upload *get_upload(struct flb_stdout *ctx,
+                                           const char *tag, int tag_len)
+{
+    struct multipart_upload *m_upload = NULL;
+    struct multipart_upload *tmp_upload = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    flb_sds_t s3_key = NULL;
+    flb_sds_t tmp_sds = NULL;
+
+    mk_list_foreach_safe(head, tmp, &ctx->uploads) {
+        tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
+        if (tmp_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
+            continue;
+        }
+        if (strcmp(tmp_upload->tag, tag) == 0) {
+            m_upload = tmp_upload;
+            break;
+        }
+    }
+
+    return m_upload;
+}
+
+static struct multipart_upload *create_upload(struct flb_stdout *ctx,
+                                              const char *tag, int tag_len)
 {
     struct multipart_upload *m_upload = NULL;
     struct multipart_upload *tmp_upload = NULL;
