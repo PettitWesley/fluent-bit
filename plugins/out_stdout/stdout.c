@@ -103,20 +103,53 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     if (tmp) {
         ctx->file_size = (size_t) flb_utils_size_to_bytes(tmp);
         if (ctx->file_size <= 0) {
-            flb_plg_error(ctx->ins, "Failed to parse file_size %s", tmp);
+            flb_plg_error(ctx->ins, "Failed to parse total_file_size %s", tmp);
             goto error;
         }
-        if (ctx->file_size < 10000000) {
-            flb_plg_error(ctx->ins, "todo: fix: file size must be at least 10MB");
+        if (ctx->file_size < 1000000) {
+            flb_plg_error(ctx->ins, "total_file_size must be at least 1MB");
             goto error;
         }
         if (ctx->file_size > MAX_FILE_SIZE) {
-            flb_plg_error(ctx->ins, "Max file_size is %s bytes", MAX_FILE_SIZE_STR);
+            flb_plg_error(ctx->ins, "Max total_file_size is %s bytes", MAX_FILE_SIZE_STR);
             goto error;
         }
     } else {
         ctx->file_size = DEFAULT_FILE_SIZE;
         flb_plg_info(ctx->ins, "Using default file size 100MB");
+    }
+
+    tmp = flb_output_get_property("upload_chunk_size", ins);
+    if (tmp) {
+        ctx->upload_chunk_size = (size_t) flb_utils_size_to_bytes(tmp);
+        if (ctx->upload_chunk_size <= 0) {
+            flb_plg_error(ctx->ins, "Failed to parse upload_chunk_size %s", tmp);
+            goto error;
+        }
+        if (ctx->upload_chunk_size < MIN_CHUNKED_UPLOAD_SIZE) {
+            flb_plg_error(ctx->ins, "upload_chunk_size must be at least 5M");
+            goto error;
+        }
+        if (ctx->upload_chunk_size > MAX_CHUNKED_UPLOAD_SIZE) {
+            flb_plg_error(ctx->ins, "Max upload_chunk_size is 50M");
+            goto error;
+        }
+    } else {
+        ctx->upload_chunk_size = MIN_CHUNKED_UPLOAD_SIZE;
+    }
+
+    tmp = flb_output_get_property("use_put_object", ins);
+    if (tmp && (strncasecmp(tmp, "On", 2) == 0 || strncasecmp(tmp, "true", 4) == 0)) {
+        ctx->use_put_object = FLB_TRUE;
+        if (ctx->file_size > MAX_FILE_SIZE_PUT_OBJECT) {
+            flb_plg_error(ctx->ins, "Max total_file_size is 50M when use_put_object is enabled");
+            goto error;
+        }
+        tmp = flb_output_get_property("upload_chunk_size", ins);
+        if (tmp) {
+            flb_plg_error(ctx->ins, "upload_chunk_size is not compatible with use_put_object");
+            goto error;
+        }
     }
 
     tmp = flb_output_get_property("upload_timeout", ins);
@@ -316,19 +349,94 @@ error:
     return -1;
 }
 
+/*
+ * return value is one of FLB_OK, FLB_RETRY, FLB_ERROR
+ */
 static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
                        char *body, size_t body_size,
                        const char *tag, int tag_len)
 {
+    struct multipart_upload *m_upload = NULL;
+    int create_upload = FLB_FALSE;
+    int complete_upload = FLB_FALSE;
+    int size_check = FLB_FALSE;
+    int part_num_check = FLB_FALSE;
+    int timeout_check = FLB_FALSE;
+    int ret;
 
     if (ctx->use_put_object == FLB_TRUE) {
         goto put_object;
     }
 
+    m_upload = get_upload(ctx, tag, tag_len);
+    if (m_upload == NULL) {
+        if (time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
+            /* timeout already reached, just PutObject */
+            goto put_object;
+        }
+        else if(chunk->size > MIN_CHUNKED_UPLOAD_SIZE) {
+            create_upload = FLB_TRUE;
+            goto multipart;
+        }
+        else {
+            goto put_object;
+        }
+    }
+    else {
+        /* existing upload */
+        if (chunk->size < MIN_CHUNKED_UPLOAD_SIZE) {
+            complete_upload = FLB_TRUE;
+        }
+
+        goto multipart;
+    }
+
+
+    /*
+     * remove chunk from buffer list- needed for async http so that the
+     * same chunk won't be sent more than once
+     */
+    mk_list_del(&chunk->_head);
 
 put_object:
 
+    ret = s3_put_object(ctx, body, body_size);
+    flb_free(buffer);
+    if (ret < 0) {
+        /* re-add chunk to list */
+        mk_list_add(&chunk->_head, &ctx->store.chunks);
+        return FLB_RETRY;
+    }
+
+    /* data was sent successfully- delete the local buffer */
+    ret = flb_remove_chunk_files(chunk);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
+                      chunk->file_path);
+    }
+    flb_chunk_destroy(chunk);
+
 multipart:
+
+
+    if (m_upload->bytes >= ctx->file_size) {
+        size_check = FLB_TRUE;
+        flb_plg_info(ctx->ins, "Completing upload for %s because uploaded data is greater"
+                     " than size set by total_file_size", m_upload->s3_key);
+    }
+    if (m_upload->part_number >= 10000) {
+        part_num_check = FLB_TRUE;
+        flb_plg_info(ctx->ins, "Completing upload for %s because 10,000 chunks "
+                     "(the API limit) have been uploaded", m_upload->s3_key);
+    }
+    if (time(NULL) > (m_upload->init_time + ctx->upload_timeout)) {
+        timeout_check = FLB_TRUE;
+        flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
+                     " has elapsed", m_upload->s3_key);
+    }
+    if (size_check || part_num_check || timeout_check) {
+        complete_upload = FLB_TRUE;
+    }
 }
 
 /*
@@ -650,7 +758,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     // flowing with same tag.
     // I think timeout needs very separate logic
 
-    if (chunk == NULL || (chunk->size + len) < CHUNKED_UPLOAD_SIZE) {
+    if (chunk == NULL || (chunk->size + len) < MIN_CHUNKED_UPLOAD_SIZE) {
         if (!timeout_check) {
             /* add data to local buffer */
             ret = flb_buffer_put(&ctx->store, chunk, tag, json, (size_t) len);

@@ -29,7 +29,8 @@
 #include <fluent-bit/flb_s3_local_buffer.h>
 
 /* Upload data to S3 in 5MB chunks */
-#define CHUNKED_UPLOAD_SIZE 5000000
+#define MIN_CHUNKED_UPLOAD_SIZE 5000000
+#define MAX_CHUNKED_UPLOAD_SIZE 50000000
 
 
 #define MULTIPART_UPLOAD_STATE_NOT_CREATED              0
@@ -39,6 +40,8 @@
 #define DEFAULT_FILE_SIZE     100000000
 #define MAX_FILE_SIZE         50000000000
 #define MAX_FILE_SIZE_STR     "50,000,000,000"
+
+#define MAX_FILE_SIZE_PUT_OBJECT         50000000
 
 #define DEFAULT_UPLOAD_TIMEOUT 3600
 
@@ -95,6 +98,7 @@ struct flb_stdout {
     struct mk_list uploads;
 
     size_t file_size;
+    size_t upload_chunk_size;
     time_t upload_timeout;
 
     struct flb_output_instance *ins;
