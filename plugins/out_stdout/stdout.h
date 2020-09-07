@@ -69,6 +69,7 @@ struct flb_stdout {
     char *time_key;
     char *endpoint;
     int free_endpoint;
+    int use_put_object;
 
     struct flb_aws_provider *provider;
     struct flb_aws_provider *base_provider;
