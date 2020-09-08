@@ -784,6 +784,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     /* if timeout has elapsed, we must put whatever data we have */
     if (chunk != NULL && time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
         timeout_check = FLB_TRUE;
+        flb_plg_info(ctx->ins, "upload_timeout reached for %s", tag);
     }
 
     if (chunk == NULL || (chunk->size + len) < ctx->upload_chunk_size) {
