@@ -149,9 +149,17 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         ctx->upload_chunk_size = MIN_CHUNKED_UPLOAD_SIZE;
     }
 
+    if (ctx->file_size < MIN_CHUNKED_UPLOAD_SIZE) {
+        flb_plg_info(ctx->ins, "total_file_size is less than 5 MB, will use PutObject API");
+        ctx->use_put_object = FLB_TRUE;
+    }
+
     tmp = flb_output_get_property("use_put_object", ins);
     if (tmp && (strncasecmp(tmp, "On", 2) == 0 || strncasecmp(tmp, "true", 4) == 0)) {
         ctx->use_put_object = FLB_TRUE;
+    }
+
+    if (ctx->use_put_object == FLB_TRUE) {
         /*
          * code internally uses 'upload_chunk_size' as the unit for each Put,
          * regardless of which API is used to send data
