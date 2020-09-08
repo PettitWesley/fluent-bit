@@ -39,6 +39,13 @@ static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size);
 
 static int put_all_chunks(struct flb_stdout *ctx);
 
+static struct multipart_upload *get_upload(struct flb_stdout *ctx,
+                                           const char *tag, int tag_len);
+
+static struct multipart_upload *create_upload(struct flb_stdout *ctx,
+                                              const char *tag, int tag_len);
+
+
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
 {
@@ -357,7 +364,7 @@ static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
                        const char *tag, int tag_len)
 {
     struct multipart_upload *m_upload = NULL;
-    int create_upload = FLB_FALSE;
+    int init_upload = FLB_FALSE;
     int complete_upload = FLB_FALSE;
     int size_check = FLB_FALSE;
     int part_num_check = FLB_FALSE;
@@ -375,7 +382,7 @@ static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
             goto put_object;
         }
         else if(chunk->size > MIN_CHUNKED_UPLOAD_SIZE) {
-            create_upload = FLB_TRUE;
+            init_upload = FLB_TRUE;
             goto multipart;
         }
         else {
@@ -417,7 +424,7 @@ put_object:
 
 multipart:
 
-    if (create_upload == FLB_TRUE) {
+    if (init_upload == FLB_TRUE) {
         m_upload = create_upload(ctx, tag, tag_len);
         if (!m_upload) {
             flb_plg_error(ctx->ins, "Could not find or create upload for tag %s", tag);
@@ -440,7 +447,7 @@ multipart:
      */
     mk_list_del(&chunk->_head);
 
-    ret = upload_part(ctx, m_upload, buffer, buffer_size);
+    ret = upload_part(ctx, m_upload, body, body_size);
     if (ret < 0) {
         /* re-add chunk to list */
         mk_list_add(&chunk->_head, &ctx->store.chunks);
@@ -677,8 +684,6 @@ static struct multipart_upload *get_upload(struct flb_stdout *ctx,
     struct multipart_upload *tmp_upload = NULL;
     struct mk_list *tmp;
     struct mk_list *head;
-    flb_sds_t s3_key = NULL;
-    flb_sds_t tmp_sds = NULL;
 
     mk_list_foreach_safe(head, tmp, &ctx->uploads) {
         tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
@@ -799,13 +804,13 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not construct request buffer for %s",
                       chunk->file_path);
-        return FLB_OUTPUT_RETURN(FLB_RETRY);
+        FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     ret = upload_data(chunk, buffer, buffer_size, tag, tag_len);
     flb_free(buffer);
     if (ret != FLB_OK) {
-        return ret;
+        FLB_OUTPUT_RETURN(ret);
     }
 
 cleanup_existing:
@@ -832,7 +837,7 @@ cleanup_existing:
              * exit- can try again on next flush
              * we return OK since the actual data sent in this flush was persisted
              */
-            return FLB_OK
+            FLB_OUTPUT_RETURN(FLB_OK);
         }
     }
 
