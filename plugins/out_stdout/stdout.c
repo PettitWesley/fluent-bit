@@ -152,6 +152,11 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     tmp = flb_output_get_property("use_put_object", ins);
     if (tmp && (strncasecmp(tmp, "On", 2) == 0 || strncasecmp(tmp, "true", 4) == 0)) {
         ctx->use_put_object = FLB_TRUE;
+        /*
+         * code internally uses 'upload_chunk_size' as the unit for each Put,
+         * regardless of which API is used to send data
+         */
+        ctx->upload_chunk_size = ctx->file_size;
         if (ctx->file_size > MAX_FILE_SIZE_PUT_OBJECT) {
             flb_plg_error(ctx->ins, "Max total_file_size is 50M when use_put_object is enabled");
             goto error;
