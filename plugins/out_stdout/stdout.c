@@ -484,7 +484,7 @@ multipart:
         } else {
             /* we return FLB_OK in this case, since data was persisted */
             flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
-                          chunk->file_path);
+                          m_upload->s3_key);
         }
     }
 
@@ -737,12 +737,14 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 {
     struct flb_stdout *ctx = out_context;
     flb_sds_t json = NULL;
-    struct flb_local_chunk *chunk;
+    struct flb_local_chunk *chunk = NULL;
+    struct multipart_upload *m_upload = NULL;
     char *buffer = NULL;
     size_t buffer_size;
     timeout_check = FLB_FALSE;
     struct mk_list *tmp;
     struct mk_list *head;
+    int complete;
     int ret;
     int len;
     (void) i_ins;
@@ -779,7 +781,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         timeout_check = FLB_TRUE;
     }
 
-    if (chunk == NULL || (chunk->size + len) < MIN_CHUNKED_UPLOAD_SIZE) {
+    if (chunk == NULL || (chunk->size + len) < ctx->upload_chunk_size) {
         if (timeout_check == FLB_FALSE) {
             /* add data to local buffer */
             ret = flb_buffer_put(&ctx->store, chunk, tag, json, (size_t) len);
@@ -835,6 +837,31 @@ cleanup_existing:
     }
 
     /* Check all uploads and see if any need completion */
+    mk_list_foreach_safe(head, tmp, &ctx->uploads) {
+        m_upload = mk_list_entry(head, struct multipart_upload, _head);
+        complete = FLB_FALSE;
+        if (m_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
+            complete = FLB_TRUE;
+        }
+        if (time(NULL) < (chunk->create_time + ctx->upload_timeout)) {
+            flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
+                         " has elapsed", m_upload->s3_key);
+            complete = FLB_TRUE;
+        }
+        if (complete == FLB_TRUE) {
+            m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+            ret = complete_multipart_upload(ctx, m_upload);
+            if (ret == 0) {
+                mk_list_del(&m_upload->_head);
+            } else {
+                /* we return FLB_OK in this case, since data was persisted */
+                flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
+                              m_upload->s3_key);
+            }
+        }
+    }
+
+    FLB_OUTPUT_RETURN(FLB_OK);
 }
 
 static int cb_stdout_exit(void *data, struct flb_config *config)
