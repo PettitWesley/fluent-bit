@@ -367,6 +367,8 @@ error:
 
 /*
  * return value is one of FLB_OK, FLB_RETRY, FLB_ERROR
+ *
+ * Chunk is allowed to be NULL
  */
 static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
                        char *body, size_t body_size,
@@ -386,11 +388,11 @@ static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
 
     m_upload = get_upload(ctx, tag, tag_len);
     if (m_upload == NULL) {
-        if (time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
+        if (chunk != NULL && time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
             /* timeout already reached, just PutObject */
             goto put_object;
         }
-        else if(chunk->size > MIN_CHUNKED_UPLOAD_SIZE) {
+        else if(body_size > MIN_CHUNKED_UPLOAD_SIZE) {
             init_upload = FLB_TRUE;
             goto multipart;
         }
@@ -400,7 +402,7 @@ static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
     }
     else {
         /* existing upload */
-        if (chunk->size < MIN_CHUNKED_UPLOAD_SIZE) {
+        if (body_size < MIN_CHUNKED_UPLOAD_SIZE) {
             complete_upload = FLB_TRUE;
         }
 
@@ -413,22 +415,28 @@ put_object:
      * remove chunk from buffer list- needed for async http so that the
      * same chunk won't be sent more than once
      */
-    mk_list_del(&chunk->_head);
+    if (chunk) {
+        mk_list_del(&chunk->_head);
+    }
 
     ret = s3_put_object(ctx, body, body_size);
     if (ret < 0) {
         /* re-add chunk to list */
-        mk_list_add(&chunk->_head, &ctx->store.chunks);
+        if (chunk) {
+            mk_list_add(&chunk->_head, &ctx->store.chunks);
+        }
         return FLB_RETRY;
     }
 
     /* data was sent successfully- delete the local buffer */
-    ret = flb_remove_chunk_files(chunk);
-    if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
-                      chunk->file_path);
+    if (chunk) {
+        ret = flb_remove_chunk_files(chunk);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
+                          chunk->file_path);
+        }
+        flb_chunk_destroy(chunk);
     }
-    flb_chunk_destroy(chunk);
     return FLB_OK;
 
 multipart:
@@ -454,24 +462,30 @@ multipart:
      * remove chunk from buffer list- needed for async http so that the
      * same chunk won't be sent more than once
      */
-    mk_list_del(&chunk->_head);
+    if (chunk) {
+        mk_list_del(&chunk->_head);
+    }
 
     ret = upload_part(ctx, m_upload, body, body_size);
     if (ret < 0) {
         /* re-add chunk to list */
-        mk_list_add(&chunk->_head, &ctx->store.chunks);
+        if (chunk) {
+            mk_list_add(&chunk->_head, &ctx->store.chunks);
+        }
         return FLB_RETRY;
     }
     m_upload->part_number += 1;
 
 
     /* data was sent successfully- delete the local buffer */
-    ret = flb_remove_chunk_files(chunk);
-    if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
-                      chunk->file_path);
+    if (chunk) {
+        ret = flb_remove_chunk_files(chunk);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
+                          chunk->file_path);
+        }
+        flb_chunk_destroy(chunk);
     }
-    flb_chunk_destroy(chunk);
 
     if (m_upload->bytes >= ctx->file_size) {
         size_check = FLB_TRUE;
@@ -596,6 +610,9 @@ static int put_all_chunks(struct flb_stdout *ctx)
     return 0;
 }
 
+/*
+ * Either new_data or chunk can be NULL, but not both
+ */
 static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
                                     struct flb_local_chunk *chunk,
                                     char **out_buf, size_t *out_size)
@@ -604,17 +621,24 @@ static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
     char *tmp;
     size_t body_size;
     char *buffered_data = NULL;
-    size_t buffer_size;
+    size_t buffer_size = 0;
     int ret;
 
-    ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
-    if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not read locally buffered data %s",
-                      chunk->file_path);
+    if (new_data == NULL && chunk == NULL) {
+        flb_plg_error(ctx->ins, "[construct_request_buffer] Something went wrong"
+                      " both chunk and new_data are NULL");
         return -1;
     }
+    if (chunk) {
+        ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not read locally buffered data %s",
+                          chunk->file_path);
+            return -1;
+        }
+        body_size = buffer_size;
+    }
 
-    body_size = buffer_size;
     if (new_data) {
         body_size += flb_sds_len(new_data);
     }
@@ -758,6 +782,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     int timeout_check = FLB_FALSE;
     struct mk_list *tmp;
     struct mk_list *head;
+    size_t chunk_size = 0;
     int complete;
     int ret;
     int len;
@@ -796,7 +821,12 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         flb_plg_info(ctx->ins, "upload_timeout reached for %s", tag);
     }
 
-    if (chunk == NULL || (chunk->size + len) < ctx->upload_chunk_size) {
+    chunk_size = len;
+    if (chunk) {
+        chunk_size += chunk->size;
+    }
+
+    if (chunk_size < ctx->upload_chunk_size) {
         if (timeout_check == FLB_FALSE) {
             /* add data to local buffer */
             ret = flb_buffer_put(&ctx->store, chunk, tag, json, (size_t) len);
