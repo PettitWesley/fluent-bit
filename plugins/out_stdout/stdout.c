@@ -185,6 +185,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             goto error;
         }
         ctx->upload_timeout = (time_t) 60 * i;
+        flb_plg_error(ctx->ins, "upload_timeout is %lu", ctx->upload_timeout);
     }
     else {
         ctx->upload_timeout = DEFAULT_UPLOAD_TIMEOUT;
@@ -898,7 +899,7 @@ cleanup_existing:
         }
         if (time(NULL) < (m_upload->init_time + ctx->upload_timeout)) {
             flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
-                         " has elapsed", m_upload->s3_key);
+                         " has passed", m_upload->s3_key);
             complete = FLB_TRUE;
         }
         if (complete == FLB_TRUE) {
