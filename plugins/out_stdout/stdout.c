@@ -405,6 +405,9 @@ static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
         if (chunk != NULL && time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
             /* timeout already reached, just PutObject */
             goto put_object;
+        } else if (body_size >= ctx->file_size) {
+            /* already big enough, just use PutObject API */
+            goto put_object;
         }
         else if(body_size > MIN_CHUNKED_UPLOAD_SIZE) {
             init_upload = FLB_TRUE;
