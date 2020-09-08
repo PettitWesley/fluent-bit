@@ -137,10 +137,10 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             flb_plg_error(ctx->ins, "upload_chunk_size can not be larger than total_file_size");
             goto error;
         }
-        if (ctx->upload_chunk_size < MIN_CHUNKED_UPLOAD_SIZE) {
-            flb_plg_error(ctx->ins, "upload_chunk_size must be at least 5M");
-            goto error;
-        }
+        // if (ctx->upload_chunk_size < MIN_CHUNKED_UPLOAD_SIZE) {
+        //     flb_plg_error(ctx->ins, "upload_chunk_size must be at least 5M");
+        //     goto error;
+        // }
         if (ctx->upload_chunk_size > MAX_CHUNKED_UPLOAD_SIZE) {
             flb_plg_error(ctx->ins, "Max upload_chunk_size is 50M");
             goto error;
@@ -149,10 +149,10 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         ctx->upload_chunk_size = MIN_CHUNKED_UPLOAD_SIZE;
     }
 
-    if (ctx->file_size < MIN_CHUNKED_UPLOAD_SIZE) {
-        flb_plg_info(ctx->ins, "total_file_size is less than 5 MB, will use PutObject API");
-        ctx->use_put_object = FLB_TRUE;
-    }
+    // if (ctx->file_size < MIN_CHUNKED_UPLOAD_SIZE) {
+    //     flb_plg_info(ctx->ins, "total_file_size is less than 5 MB, will use PutObject API");
+    //     ctx->use_put_object = FLB_TRUE;
+    // }
 
     tmp = flb_output_get_property("use_put_object", ins);
     if (tmp && (strncasecmp(tmp, "On", 2) == 0 || strncasecmp(tmp, "true", 4) == 0)) {
