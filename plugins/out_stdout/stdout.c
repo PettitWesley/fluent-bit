@@ -746,7 +746,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct multipart_upload *m_upload = NULL;
     char *buffer = NULL;
     size_t buffer_size;
-    timeout_check = FLB_FALSE;
+    int timeout_check = FLB_FALSE;
     struct mk_list *tmp;
     struct mk_list *head;
     int complete;
@@ -807,7 +807,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    ret = upload_data(chunk, buffer, buffer_size, tag, tag_len);
+    ret = upload_data(ctx, chunk, buffer, buffer_size, tag, tag_len);
     flb_free(buffer);
     if (ret != FLB_OK) {
         FLB_OUTPUT_RETURN(ret);
@@ -830,7 +830,7 @@ cleanup_existing:
             continue;
         }
 
-        ret = upload_data(chunk, buffer, buffer_size, tag, tag_len);
+        ret = upload_data(ctx, chunk, buffer, buffer_size, tag, tag_len);
         flb_free(buffer);
         if (ret != FLB_OK) {
             /*
