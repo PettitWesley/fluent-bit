@@ -154,6 +154,11 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         ctx->use_put_object = FLB_TRUE;
     }
 
+    if ((ctx->upload_chunk_size * 2) > ctx->file_size) {
+        flb_plg_info(ctx->ins, "total_file_size is less than 2x upload_chunk_size, will use PutObject API");
+        ctx->use_put_object = FLB_TRUE;
+    }
+
     tmp = flb_output_get_property("use_put_object", ins);
     if (tmp && (strncasecmp(tmp, "On", 2) == 0 || strncasecmp(tmp, "true", 4) == 0)) {
         ctx->use_put_object = FLB_TRUE;
@@ -510,6 +515,7 @@ multipart:
         timeout_check = FLB_TRUE;
         flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
                      " has elapsed", m_upload->s3_key);
+        flb_warn("now=%lu\ninit=%lu\ntimeout=%lu", time(NULL), m_upload->init_time, ctx->upload_timeout);
     }
     if (size_check || part_num_check || timeout_check) {
         complete_upload = FLB_TRUE;
