@@ -391,6 +391,7 @@ static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
         goto multipart;
     }
 
+put_object:
 
     /*
      * remove chunk from buffer list- needed for async http so that the
@@ -398,10 +399,8 @@ static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
      */
     mk_list_del(&chunk->_head);
 
-put_object:
-
     ret = s3_put_object(ctx, body, body_size);
-    flb_free(buffer);
+    flb_free(body);
     if (ret < 0) {
         /* re-add chunk to list */
         mk_list_add(&chunk->_head, &ctx->store.chunks);
@@ -415,9 +414,49 @@ put_object:
                       chunk->file_path);
     }
     flb_chunk_destroy(chunk);
+    return FLB_OK;
 
 multipart:
 
+    if (create_upload == FLB_TRUE) {
+        m_upload = create_upload(ctx, tag, tag_len);
+        if (!m_upload) {
+            flb_plg_error(ctx->ins, "Could not find or create upload for tag %s", tag);
+            return FLB_RETRY;
+        }
+    }
+
+    if (m_upload->upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
+        ret = create_multipart_upload(ctx, m_upload);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not initiate multipart upload");
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        m_upload->upload_state = MULTIPART_UPLOAD_STATE_CREATED;
+    }
+
+    /*
+     * remove chunk from buffer list- needed for async http so that the
+     * same chunk won't be sent more than once
+     */
+    mk_list_del(&chunk->_head);
+
+    ret = upload_part(ctx, m_upload, buffer, buffer_size);
+    if (ret < 0) {
+        /* re-add chunk to list */
+        mk_list_add(&chunk->_head, &ctx->store.chunks);
+        return FLB_RETRY;
+    }
+    m_upload->part_number += 1;
+
+
+    /* data was sent successfully- delete the local buffer */
+    ret = flb_remove_chunk_files(chunk);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
+                      chunk->file_path);
+    }
+    flb_chunk_destroy(chunk);
 
     if (m_upload->bytes >= ctx->file_size) {
         size_check = FLB_TRUE;
@@ -437,6 +476,20 @@ multipart:
     if (size_check || part_num_check || timeout_check) {
         complete_upload = FLB_TRUE;
     }
+
+    if (complete_upload == FLB_TRUE) {
+        m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+        ret = complete_multipart_upload(ctx, m_upload);
+        if (ret == 0) {
+            mk_list_del(&m_upload->_head);
+        } else {
+            /* we return FLB_OK in this case, since data was persisted */
+            flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
+                          chunk->file_path);
+        }
+    }
+
+    return FLB_OK;
 }
 
 /*
@@ -718,12 +771,6 @@ static void cb_stdout_flush(const void *data, size_t bytes,
 
     /* initiate upload if needed */
     if (m_upload->upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
-        m_upload->s3_key = get_s3_key(ctx, tag, tag_len);
-        if (!m_upload->s3_key) {
-            flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
-            FLB_OUTPUT_RETURN(FLB_ERROR);
-        }
-
         ret = create_multipart_upload(ctx, m_upload);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not initiate multipart upload");
