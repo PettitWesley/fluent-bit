@@ -896,7 +896,7 @@ cleanup_existing:
         if (m_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
             complete = FLB_TRUE;
         }
-        if (time(NULL) < (chunk->create_time + ctx->upload_timeout)) {
+        if (time(NULL) < (m_upload->create_time + ctx->upload_timeout)) {
             flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
                          " has elapsed", m_upload->s3_key);
             complete = FLB_TRUE;
