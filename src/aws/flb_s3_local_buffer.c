@@ -215,7 +215,7 @@ static size_t append_data(char *path, char *data, size_t bytes)
 }
 
 /* we store the Fluent tag in a file "<hash_key>.tag" */
-static int write_tag(char *buffer_path, char *tag)
+static int write_tag(char *buffer_path, const char *tag)
 {
     char tmp[PATH_MAX];
     size_t ret;
@@ -367,7 +367,7 @@ struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, const char
 /*
  * Simple and fast hashing algorithm to create keys in the local buffer
  */
-flb_sds_t simple_hash(char *str)
+flb_sds_t simple_hash(const char *str)
 {
     unsigned long hash = 5381;
     int c;
