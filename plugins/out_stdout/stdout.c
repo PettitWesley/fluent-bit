@@ -400,7 +400,6 @@ put_object:
     mk_list_del(&chunk->_head);
 
     ret = s3_put_object(ctx, body, body_size);
-    flb_free(body);
     if (ret < 0) {
         /* re-add chunk to list */
         mk_list_add(&chunk->_head, &ctx->store.chunks);
@@ -550,7 +549,7 @@ static int put_all_chunks(struct flb_stdout *ctx)
 
         ret = construct_request_buffer(ctx, NULL, chunk, &buffer, &buffer_size);
         if (ret < 0) {
-            flb_plg_error(ctx->ins, "Could not construct request buffer %s",
+            flb_plg_error(ctx->ins, "Could not construct request buffer for %s",
                           chunk->file_path);
             return -1;
         }
@@ -737,24 +736,17 @@ static void cb_stdout_flush(const void *data, size_t bytes,
                             struct flb_config *config)
 {
     struct flb_stdout *ctx = out_context;
-    struct multipart_upload *m_upload = NULL;
     flb_sds_t json = NULL;
     struct flb_local_chunk *chunk;
     char *buffer = NULL;
     size_t buffer_size;
+    timeout_check = FLB_FALSE;
+    struct mk_list *tmp;
+    struct mk_list *head;
     int ret;
     int len;
-    int size_check = FLB_FALSE;
-    int part_num_check = FLB_FALSE;
-    int timeout_check = FLB_FALSE;
     (void) i_ins;
     (void) config;
-
-    m_upload = get_or_create_upload(ctx, tag, tag_len);
-    if (!m_upload) {
-        flb_plg_error(ctx->ins, "Could not find or create upload for tag %s", tag);
-        FLB_OUTPUT_RETURN(FLB_RETRY);
-    }
 
     /* first, clean up any old buffers found on startup */
     if (ctx->has_old_buffers == FLB_TRUE) {
@@ -767,16 +759,6 @@ static void cb_stdout_flush(const void *data, size_t bytes,
         } else {
             ctx->has_old_buffers = FLB_FALSE;
         }
-    }
-
-    /* initiate upload if needed */
-    if (m_upload->upload_state == MULTIPART_UPLOAD_STATE_NOT_CREATED) {
-        ret = create_multipart_upload(ctx, m_upload);
-        if (ret < 0) {
-            flb_plg_error(ctx->ins, "Could not initiate multipart upload");
-            FLB_OUTPUT_RETURN(FLB_RETRY);
-        }
-        m_upload->upload_state = MULTIPART_UPLOAD_STATE_CREATED;
     }
 
     json = flb_pack_msgpack_to_json_format(data, bytes,
@@ -793,99 +775,66 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     chunk = flb_chunk_get(&ctx->store, tag);
 
     /* if timeout has elapsed, we must put whatever data we have */
-    timeout_check = time(NULL) > (m_upload->init_time + ctx->upload_timeout);
-
-    //TODO: This does not properly handle case where:
-    // - chunk is uploaded less than 5MB because of timeout
-    // - CompleteMultipartUpload fails and we FLB_RETRY
-    // - a new small chunk will try to be uploaded, making the upload
-    // un-complete-able because only last chunk can be small
-    // Solution = Complete as first step??
-    //TODO: Problem: Uploads will never be completed unless data keeps
-    // flowing with same tag.
-    // I think timeout needs very separate logic
+    if (chunk != NULL && time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
+        timeout_check = FLB_TRUE;
+    }
 
     if (chunk == NULL || (chunk->size + len) < MIN_CHUNKED_UPLOAD_SIZE) {
-        if (!timeout_check) {
+        if (timeout_check == FLB_FALSE) {
             /* add data to local buffer */
             ret = flb_buffer_put(&ctx->store, chunk, tag, json, (size_t) len);
             flb_sds_destroy(json);
             if (ret < 0) {
                 FLB_OUTPUT_RETURN(FLB_RETRY);
             }
-            FLB_OUTPUT_RETURN(FLB_OK);
+            /* send any chunks/uploads which have timed out */
+            goto cleanup_existing;
         }
     }
 
     ret = construct_request_buffer(ctx, json, chunk, &buffer, &buffer_size);
     flb_sds_destroy(json);
     if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not construct request buffer %s",
+        flb_plg_error(ctx->ins, "Could not construct request buffer for %s",
                       chunk->file_path);
         return FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    /*
-     * remove chunk from buffer list- needed for async http so that the
-     * same chunk won't be sent more than once
-     */
-    mk_list_del(&chunk->_head);
-
-    // ret = s3_put_object(ctx, buffer, buffer_size);
-    // flb_free(buffer);
-    // if (ret < 0) {
-    //     /* re-add chunk to list */
-    //     mk_list_add(&chunk->_head, &ctx->store.chunks);
-    //     return FLB_OUTPUT_RETURN(FLB_RETRY);
-    // }
-
-    ret = upload_part(ctx, m_upload, buffer, buffer_size);
-    if (ret < 0) {
-        /* re-add chunk to list */
-        mk_list_add(&chunk->_head, &ctx->store.chunks);
-        return FLB_OUTPUT_RETURN(FLB_RETRY);
+    ret = upload_data(chunk, buffer, buffer_size, tag, tag_len);
+    flb_free(buffer);
+    if (ret != FLB_OK) {
+        return ret;
     }
-    m_upload->part_number += 1;
 
+cleanup_existing:
 
-    /* data was sent successfully- delete the local buffer */
-    ret = flb_remove_chunk_files(chunk);
-    if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
-                      chunk->file_path);
-    }
-    flb_chunk_destroy(chunk);
+    /* Check all chunks and see if any have timed out */
+    mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
+        chunk = mk_list_entry(head, struct flb_local_chunk, _head);
 
-    /* complete upload if needed */
-    if (m_upload->bytes > 0) {
-        if (m_upload->bytes >= ctx->file_size) {
-            size_check = FLB_TRUE;
-            flb_plg_info(ctx->ins, "Completing upload for %s because uploaded data is greater"
-                         " than size set by total_file_size", m_upload->s3_key);
+        if (time(NULL) < (chunk->create_time + ctx->upload_timeout)) {
+            continue; /* Only send chunks which have timed out */
         }
-        if (m_upload->part_number >= 10000) {
-            part_num_check = FLB_TRUE;
-            flb_plg_info(ctx->ins, "Completing upload for %s because 10,000 chunks "
-                         "(the API limit) have been upload", m_upload->s3_key);
+
+        ret = construct_request_buffer(ctx, NULL, chunk, &buffer, &buffer_size);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not construct request buffer for %s",
+                          chunk->file_path);
+            continue;
         }
-        if (timeout_check) {
-            flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
-                         " has elapsed", m_upload->s3_key);
-        }
-        if (size_check || part_num_check || timeout_check) {
-            m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
-            ret = complete_multipart_upload(ctx, m_upload);
-            if (ret == 0) {
-                mk_list_del(&m_upload->_head);
-            } else {
-                /* we return FLB_OK in this case, since data was persisted */
-                flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
-                              chunk->file_path);
-            }
+
+        ret = upload_data(chunk, buffer, buffer_size, tag, tag_len);
+        flb_free(buffer);
+        if (ret != FLB_OK) {
+            /*
+             * exit- can try again on next flush
+             * we return OK since the actual data sent in this flush was persisted
+             */
+            return FLB_OK
         }
     }
 
-    FLB_OUTPUT_RETURN(FLB_OK);
+    /* Check all uploads and see if any need completion */
 }
 
 static int cb_stdout_exit(void *data, struct flb_config *config)
