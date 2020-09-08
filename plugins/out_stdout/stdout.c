@@ -436,7 +436,7 @@ multipart:
         ret = create_multipart_upload(ctx, m_upload);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not initiate multipart upload");
-            FLB_OUTPUT_RETURN(FLB_RETRY);
+            return FLB_RETRY;
         }
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_CREATED;
     }

@@ -249,7 +249,7 @@ static char *read_tag(char *buffer_path)
  * 'c' should be NULL if no local chunk suitable for this data has been created yet
  */
 int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
-                   char *tag, char *data, size_t bytes)
+                   const char *tag, char *data, size_t bytes)
 {
     size_t written;
     flb_sds_t path;
@@ -337,7 +337,7 @@ int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
 /*
  * Returns the chunk associated with the given key
  */
-struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, char *tag)
+struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, const char *tag)
 {
     struct mk_list *tmp;
     struct mk_list *head;
