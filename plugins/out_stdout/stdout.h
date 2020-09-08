@@ -29,7 +29,7 @@
 #include <fluent-bit/flb_s3_local_buffer.h>
 
 /* Upload data to S3 in 5MB chunks */
-#define MIN_CHUNKED_UPLOAD_SIZE 50
+#define MIN_CHUNKED_UPLOAD_SIZE 5000000
 #define MAX_CHUNKED_UPLOAD_SIZE 50000000
 
 
