@@ -133,6 +133,10 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             flb_plg_error(ctx->ins, "Failed to parse upload_chunk_size %s", tmp);
             goto error;
         }
+        if (ctx->upload_chunk_size > ctx->file_size) {
+            flb_plg_error(ctx->ins, "upload_chunk_size can not be larger than total_file_size");
+            goto error;
+        }
         if (ctx->upload_chunk_size < MIN_CHUNKED_UPLOAD_SIZE) {
             flb_plg_error(ctx->ins, "upload_chunk_size must be at least 5M");
             goto error;
