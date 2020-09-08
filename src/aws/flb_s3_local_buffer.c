@@ -31,7 +31,7 @@
 /*
  * Simple and fast hashing algorithm to create keys in the local buffer
  */
-flb_sds_t simple_hash(char *str);
+flb_sds_t simple_hash(const char *str);
 
 static char *read_tag(char *buffer_path);
 
@@ -221,7 +221,7 @@ static int write_tag(char *buffer_path, const char *tag)
     size_t ret;
 
     snprintf(tmp, sizeof(tmp), "%s.tag", buffer_path);
-    ret = append_data(tmp, tag, strlen(tag));
+    ret = append_data(tmp, (char *) tag, strlen(tag));
     if (ret <= 0) {
         return -1;
     }
