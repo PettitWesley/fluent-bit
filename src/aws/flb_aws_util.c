@@ -396,6 +396,11 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
                   aws_client->host, ret, c->resp.status);
     }
 
+    if (ret != 0 && c != NULL) {
+        flb_http_client_destroy(c);
+        c = NULL;
+    }
+
     flb_upstream_conn_release(u_conn);
     flb_sds_destroy(signature);
     return c;
