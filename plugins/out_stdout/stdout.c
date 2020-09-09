@@ -35,7 +35,7 @@ static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
                                     struct flb_local_chunk *chunk,
                                     char **out_buf, size_t *out_size);
 
-static int s3_put_object(struct flb_stdout *ctx, char *tag, time_t create_time,
+static int s3_put_object(struct flb_stdout *ctx, const char *tag, time_t create_time,
                          char *body, size_t body_size);
 
 static int put_all_chunks(struct flb_stdout *ctx);
@@ -781,7 +781,7 @@ static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
     return 0;
 }
 
-static int s3_put_object(struct flb_stdout *ctx, char *tag, time_t create_time,
+static int s3_put_object(struct flb_stdout *ctx, const char *tag, time_t create_time,
                          char *body, size_t body_size)
 {
     flb_sds_t uri = NULL;
@@ -790,7 +790,7 @@ static int s3_put_object(struct flb_stdout *ctx, char *tag, time_t create_time,
 
     uri = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
     if (!uri) {
-        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", chunk->tag);
+        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
         return -1;
     }
 
