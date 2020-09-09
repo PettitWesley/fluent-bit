@@ -130,10 +130,10 @@ static void s3_context_destroy(struct flb_stdout *ctx)
     flb_free(ctx);
 }
 
-static flb_sds_t state_file_dir(char *buffer_dir)
-{
-
-}
+// static flb_sds_t state_file_dir(char *buffer_dir)
+// {
+//
+// }
 
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
@@ -193,7 +193,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     tmp = flb_output_get_property("buffer_dir", ins);
     if (tmp) {
         len = strlen(tmp);
-        if (tmp[len - 1] == "/" || tmp[len - 1] == "\\") {
+        if (tmp[len - 1] == '/' || tmp[len - 1] == '\\') {
             flb_plg_error(ctx->ins, "'buffer_dir' can not end in a / of \\");
             goto error;
         }
