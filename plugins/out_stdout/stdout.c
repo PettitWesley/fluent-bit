@@ -45,6 +45,90 @@ static struct multipart_upload *get_upload(struct flb_stdout *ctx,
 static struct multipart_upload *create_upload(struct flb_stdout *ctx,
                                               const char *tag, int tag_len);
 
+static void multipart_upload_destroy(struct multipart_upload *m_upload)
+{
+    int i;
+    flb_sds_t etag;
+
+    if (!m_upload) {
+        return;
+    }
+
+    if (m_upload->s3_key) {
+        flb_sds_destroy(m_upload->s3_key);
+    }
+    if (m_upload->tag) {
+        flb_sds_destroy(m_upload->tag);
+    }
+    if (m_upload->upload_id) {
+        flb_sds_destroy(m_upload->upload_id);
+    }
+
+    for (i = 0; i < m_upload->part_number; i++) {
+        etag = m_upload->etags[i];
+        if (etag) {
+            flb_sds_destroy(etag);
+        }
+    }
+
+    flb_free(m_upload);
+}
+
+static void s3_context_destroy(struct flb_stdout *ctx)
+{
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct flb_local_chunk *chunk;
+    struct multipart_upload *m_upload = NULL;
+
+    if (!ctx) {
+        return;
+    }
+
+    if (mk_list_is_set(&ctx->store.chunks) == 0) {
+        mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
+            chunk = mk_list_entry(head, struct flb_local_chunk, _head);
+            flb_chunk_destroy(chunk);
+        }
+    }
+
+    if (mk_list_is_set(&ctx->uploads) == 0) {
+        mk_list_foreach_safe(head, tmp, &ctx->uploads) {
+            m_upload = mk_list_entry(head, struct multipart_upload, _head);
+            multipart_upload_destroy(m_upload);
+        }
+    }
+
+    if (ctx->base_provider) {
+        flb_aws_provider_destroy(ctx->base_provider);
+    }
+
+    if (ctx->provider) {
+        flb_aws_provider_destroy(ctx->provider);
+    }
+
+    if (ctx->provider_tls.context) {
+        flb_tls_context_destroy(ctx->provider_tls.context);
+    }
+
+    if (ctx->sts_provider_tls.context) {
+        flb_tls_context_destroy(ctx->sts_provider_tls.context);
+    }
+
+    if (ctx->client_tls.context) {
+        flb_tls_context_destroy(ctx->client_tls.context);
+    }
+
+    if (ctx->s3_client) {
+        flb_aws_client_destroy(ctx->s3_client);
+    }
+
+    if (ctx->free_endpoint == FLB_FALSE) {
+        flb_free(ctx->endpoint);
+    }
+
+    flb_free(ctx);
+}
 
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
@@ -376,6 +460,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     return 0;
 
 error:
+    s3_context_destroy(ctx);
     return -1;
 }
 
@@ -529,6 +614,7 @@ multipart:
         ret = complete_multipart_upload(ctx, m_upload);
         if (ret == 0) {
             mk_list_del(&m_upload->_head);
+            multipart_upload_destroy(m_upload);
         } else {
             /* we return FLB_OK in this case, since data was persisted */
             flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
@@ -916,9 +1002,10 @@ cleanup_existing:
             ret = complete_multipart_upload(ctx, m_upload);
             if (ret == 0) {
                 mk_list_del(&m_upload->_head);
+                multipart_upload_destroy(m_upload);
             } else {
                 /* we return FLB_OK in this case, since data was persisted */
-                flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
+                flb_plg_error(ctx->ins, "Could not complete upload %s, will retry on next flush..",
                               m_upload->s3_key);
             }
         }
@@ -931,6 +1018,9 @@ static int cb_stdout_exit(void *data, struct flb_config *config)
 {
     int ret;
     struct flb_stdout *ctx = data;
+    struct multipart_upload *m_upload = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
 
     if (!ctx) {
         return 0;
@@ -946,8 +1036,26 @@ static int cb_stdout_exit(void *data, struct flb_config *config)
         }
     }
 
-    flb_free(ctx);
-    //TODO: destroy function
+    if (mk_list_size(&ctx->uploads) > 0) {
+        mk_list_foreach_safe(head, tmp, &ctx->uploads) {
+            m_upload = mk_list_entry(head, struct multipart_upload, _head);
+
+            if (m_upload->bytes > 0) {
+                m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+                ret = complete_multipart_upload(ctx, m_upload);
+                if (ret == 0) {
+                    mk_list_del(&m_upload->_head);
+                    multipart_upload_destroy(m_upload);
+                } else {
+                    flb_plg_error(ctx->ins, "Could not complete upload %s",
+                                  m_upload->s3_key);
+                }
+            }
+        }
+    }
+
+    s3_context_destroy(ctx);
+
     return 0;
 }
 
