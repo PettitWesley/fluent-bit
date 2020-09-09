@@ -123,7 +123,7 @@ static void s3_context_destroy(struct flb_stdout *ctx)
         flb_aws_client_destroy(ctx->s3_client);
     }
 
-    if (ctx->free_endpoint == FLB_FALSE) {
+    if (ctx->free_endpoint == FLB_TRUE) {
         flb_free(ctx->endpoint);
     }
 
