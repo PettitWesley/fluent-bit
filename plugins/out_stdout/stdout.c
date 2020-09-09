@@ -179,7 +179,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     if (tmp) {
         ctx->bucket = (char *) tmp;
     } else {
-        flb_error("[out_s3] 'bucket' is a required parameter");
+        flb_plg_error(ctx->ins, "'bucket' is a required parameter");
         goto error;
     }
 
@@ -284,7 +284,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     if (tmp) {
         ctx->region = (char *) tmp;
     } else {
-        flb_error("[out_s3] 'region' is a required parameter");
+        flb_plg_error(ctx->ins, "'region' is a required parameter");
         goto error;
     }
 
@@ -304,7 +304,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         ctx->endpoint = flb_s3_endpoint(ctx->bucket, ctx->region);
         ctx->free_endpoint = FLB_TRUE;
         if (!ctx->endpoint) {
-            flb_error("[out_s3] Could not construct S3 endpoint");
+            flb_plg_error(ctx->ins,  "Could not construct S3 endpoint");
             goto error;
         }
     }
@@ -343,7 +343,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
                                                        flb_aws_client_generator());
 
     if (!ctx->provider) {
-        flb_error("[out_s3] Failed to create AWS Credential Provider");
+        flb_plg_error(ctx->ins, "Failed to create AWS Credential Provider");
         goto error;
     }
 
@@ -374,7 +374,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
 
         session_name = flb_sts_session_name();
         if (!session_name) {
-            flb_error("[out_s3] Failed to create aws iam role "
+            flb_plg_error(ctx->ins, "Failed to create aws iam role "
                       "session name");
             flb_errno();
             goto error;
@@ -390,8 +390,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
                                                 NULL,
                                                 flb_aws_client_generator());
         if (!ctx->provider) {
-            flb_error("[out_s3] Failed to create AWS STS Credential "
-                      "Provider");
+            flb_plg_error(ctx->ins, "Failed to create AWS STS Credential "
+                         "Provider");
             goto error;
         }
 
@@ -441,7 +441,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     ctx->s3_client->upstream = flb_upstream_create(config, ctx->endpoint, 443,
                                                    FLB_IO_TLS, &ctx->client_tls);
     if (!ctx->s3_client->upstream) {
-        flb_error("[out_s3] Connection initialization error");
+        flb_plg_error(ctx->ins, "Connection initialization error");
         goto error;
     }
 
@@ -604,7 +604,6 @@ multipart:
         timeout_check = FLB_TRUE;
         flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
                      " has elapsed", m_upload->s3_key);
-        flb_warn("now=%lu\ninit=%lu\ntimeout=%lu", time(NULL), m_upload->init_time, ctx->upload_timeout);
     }
     if (size_check || part_num_check || timeout_check) {
         complete_upload = FLB_TRUE;
