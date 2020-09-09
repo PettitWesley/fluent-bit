@@ -130,12 +130,18 @@ static void s3_context_destroy(struct flb_stdout *ctx)
     flb_free(ctx);
 }
 
+static flb_sds_t state_file_dir(char *buffer_dir)
+{
+
+}
+
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
 {
     int ret;
     const char *tmp;
     int i;
+    int len;
     struct flb_stdout *ctx = NULL;
     (void) ins;
     (void) config;
@@ -178,15 +184,26 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     tmp = flb_output_get_property("bucket", ins);
     if (tmp) {
         ctx->bucket = (char *) tmp;
-    } else {
+    }
+    else {
         flb_plg_error(ctx->ins, "'bucket' is a required parameter");
         goto error;
+    }
+
+    tmp = flb_output_get_property("buffer_dir", ins);
+    if (tmp) {
+        len = strlen(tmp);
+        if (tmp[len - 1] == "/" || tmp[len - 1] == "\\") {
+            flb_plg_error(ctx->ins, "'buffer_dir' can not end in a / of \\");
+            goto error;
+        }
     }
 
     tmp = flb_output_get_property("prefix", ins);
     if (tmp) {
         ctx->prefix = (char *) tmp;
-    } else {
+    }
+    else {
         ctx->prefix = "fluent-bit";
     }
 
@@ -205,7 +222,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             flb_plg_error(ctx->ins, "Max total_file_size is %s bytes", MAX_FILE_SIZE_STR);
             goto error;
         }
-    } else {
+    }
+    else {
         ctx->file_size = DEFAULT_FILE_SIZE;
         flb_plg_info(ctx->ins, "Using default file size 100MB");
     }
@@ -229,7 +247,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             flb_plg_error(ctx->ins, "Max upload_chunk_size is 50M");
             goto error;
         }
-    } else {
+    }
+    else {
         ctx->upload_chunk_size = MIN_CHUNKED_UPLOAD_SIZE;
     }
 
@@ -282,7 +301,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     tmp = flb_output_get_property("region", ins);
     if (tmp) {
         ctx->region = (char *) tmp;
-    } else {
+    }
+    else {
         flb_plg_error(ctx->ins, "'region' is a required parameter");
         goto error;
     }
@@ -290,7 +310,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     tmp = flb_output_get_property("time_key", ins);
     if (tmp) {
         ctx->time_key = (char *) tmp;
-    } else {
+    }
+    else {
         ctx->time_key = "time";
     }
 
@@ -298,7 +319,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     if (tmp) {
         ctx->endpoint = (char *) tmp;
         ctx->free_endpoint = FLB_FALSE;
-    } else {
+    }
+    else {
         /* default endpoint for the given region */
         ctx->endpoint = flb_s3_endpoint(ctx->bucket, ctx->region);
         ctx->free_endpoint = FLB_TRUE;

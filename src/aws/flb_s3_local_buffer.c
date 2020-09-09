@@ -369,12 +369,14 @@ struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, const char
 flb_sds_t simple_hash(const char *str)
 {
     unsigned long hash = 5381;
+    unsigned long hash2 = 5381;
     int c;
     flb_sds_t hash_str;
     flb_sds_t tmp;
 
     while ((c = *str++)) {
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+        hash2 = ((hash2 << 5) + hash) - c;
     }
 
     /* flb_sds_printf allocs if the incoming sds is not at least 64 bytes */
@@ -383,7 +385,7 @@ flb_sds_t simple_hash(const char *str)
         flb_errno();
         return NULL;
     }
-    tmp = flb_sds_printf(&hash_str, "%lu", hash);
+    tmp = flb_sds_printf(&hash_str, "%lu%lu", hash, hash2);
     if (!tmp) {
         flb_errno();
         flb_sds_destroy(hash_str);
