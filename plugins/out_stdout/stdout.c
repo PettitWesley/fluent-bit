@@ -131,24 +131,6 @@ static void s3_context_destroy(struct flb_stdout *ctx)
     flb_free(ctx);
 }
 
-static flb_sds_t state_file_dir(char *buffer_dir)
-{
-    flb_sds_t dir;
-    flb_sds_t tmp;
-
-    dir = flb_sds_create_size(64);
-
-    tmp = flb_sds_printf(&dir, "%s/%s", buffer_dir, "multipart_upload_state_file");
-    if (!tmp) {
-        flb_errno();
-        flb_sds_destroy(dir);
-        return NULL;
-    }
-    dir = tmp;
-
-    return dir;
-}
-
 static int cb_stdout_init(struct flb_output_instance *ins,
                           struct flb_config *config, void *data)
 {
