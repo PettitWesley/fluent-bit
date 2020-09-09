@@ -773,8 +773,6 @@ static int s3_put_object(struct flb_stdout *ctx, const char *tag, time_t create_
         return -1;
     }
 
-    flb_info("URI: %s", uri);
-
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
                                           uri, body, body_size,
