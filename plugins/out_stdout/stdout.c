@@ -36,7 +36,7 @@ static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
                                     char **out_buf, size_t *out_size);
 
 static int s3_put_object(struct flb_stdout *ctx, char *tag, time_t create_time,
-                         char *body, size_t body_size)
+                         char *body, size_t body_size);
 
 static int put_all_chunks(struct flb_stdout *ctx);
 
