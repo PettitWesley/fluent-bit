@@ -680,7 +680,7 @@ static char* replace_uri_tokens(const char* original_string, const char* current
 }
 
 /* Constructs S3 object key as per the format. */
-flb_sds_t flb_get_s3_key(const char *format, time_t time, char *tag, char *tag_delimiter)
+flb_sds_t flb_get_s3_key(const char *format, time_t time, const char *tag, char *tag_delimiter)
 {
     int i = 0;
     int ret = 0;
