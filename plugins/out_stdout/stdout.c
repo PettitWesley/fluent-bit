@@ -274,7 +274,6 @@ static int cb_stdout_init(struct flb_output_instance *ins,
             goto error;
         }
         ctx->upload_timeout = (time_t) 60 * i;
-        flb_plg_error(ctx->ins, "upload_timeout is %lu", ctx->upload_timeout);
     }
     else {
         ctx->upload_timeout = DEFAULT_UPLOAD_TIMEOUT;
