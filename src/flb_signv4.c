@@ -705,6 +705,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
             if (!tmp) {
                 flb_error("[signv4] error formatting hashed payload");
                 flb_sds_destroy(cr);
+                flb_sds_destroy(payload_hash);
                 return NULL;
             }
             payload_hash = tmp;
@@ -751,6 +752,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
         flb_errno();
         flb_kv_release(&list_tmp);
         flb_sds_destroy(cr);
+        flb_sds_destroy(payload_hash);
         return NULL;
     }
 
@@ -774,6 +776,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
             flb_free(arr);
             flb_kv_release(&list_tmp);
             flb_sds_destroy(cr);
+            flb_sds_destroy(payload_hash);
             return NULL;
         }
         cr = tmp;
@@ -786,6 +789,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
         flb_free(arr);
         flb_kv_release(&list_tmp);
         flb_sds_destroy(cr);
+        flb_sds_destroy(payload_hash);
         return NULL;
     }
     cr = tmp;
@@ -806,6 +810,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
             flb_free(arr);
             flb_kv_release(&list_tmp);
             flb_sds_destroy(cr);
+            flb_sds_destroy(payload_hash);
             return NULL;
         }
         cr = tmp;
@@ -827,6 +832,7 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
             flb_free(arr);
             flb_kv_release(&list_tmp);
             flb_sds_destroy(cr);
+            flb_sds_destroy(payload_hash);
             return NULL;
         }
         *signed_headers = tmp;
@@ -840,9 +846,11 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     if (!tmp) {
         flb_error("[signv4] error adding payload hash");
         flb_sds_destroy(cr);
+        flb_sds_destroy(payload_hash);
         return NULL;
     }
     cr = tmp;
+    flb_sds_destroy(payload_hash);
 
     return cr;
 }
