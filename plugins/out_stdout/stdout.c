@@ -776,6 +776,8 @@ static int s3_put_object(struct flb_stdout *ctx, const char *tag, time_t create_
         return -1;
     }
 
+    flb_info("URI: %s", uri);
+
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
                                           uri, body, body_size,
@@ -791,7 +793,7 @@ static int s3_put_object(struct flb_stdout *ctx, const char *tag, time_t create_
         flb_aws_print_xml_error(c->resp.payload, c->resp.payload_size,
                                 "PutObject", ctx->ins);
         if (c->resp.data != NULL) {
-            flb_plg_debug(ctx->ins, "Raw PutObject response: %s", c->resp.data);
+            flb_plg_error(ctx->ins, "Raw PutObject response: %s", c->resp.data);
         }
         flb_http_client_destroy(c);
     }
