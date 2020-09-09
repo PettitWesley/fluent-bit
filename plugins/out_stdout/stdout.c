@@ -413,7 +413,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to read existing local buffers at %s",
                       ctx->store.dir);
-        goto error;
+        /* just ignore the existing local buffers and continue */
+        flb_local_buffer_destroy_chunks(&ctx->store);
     }
 
     if (mk_list_size(&ctx->store.chunks) > 0) {

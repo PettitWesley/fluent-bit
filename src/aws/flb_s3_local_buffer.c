@@ -52,7 +52,7 @@ void flb_chunk_destroy(struct flb_local_chunk *c)
     flb_free(c);
 }
 
-void flb_local_buffer_destroy(struct flb_local_buffer *store)
+void flb_local_buffer_destroy_chunks(struct flb_local_buffer *store)
 {
     struct mk_list *tmp;
     struct mk_list *head;
@@ -67,7 +67,6 @@ void flb_local_buffer_destroy(struct flb_local_buffer *store)
             flb_chunk_destroy(chunk);
         }
     }
-    flb_free(store);
 }
 
 static int is_tag_file(char *string)
