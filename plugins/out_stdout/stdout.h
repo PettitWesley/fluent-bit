@@ -70,6 +70,8 @@ struct flb_stdout {
     char *region;
     char *prefix;
     char *time_key;
+    char *s3_key_format;
+    char *tag_delimiters;
     char *endpoint;
     int free_endpoint;
     int use_put_object;

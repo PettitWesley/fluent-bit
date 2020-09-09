@@ -35,7 +35,8 @@ static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
                                     struct flb_local_chunk *chunk,
                                     char **out_buf, size_t *out_size);
 
-static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size);
+static int s3_put_object(struct flb_stdout *ctx, char *tag, time_t create_time,
+                         char *body, size_t body_size)
 
 static int put_all_chunks(struct flb_stdout *ctx);
 
@@ -514,6 +515,7 @@ static int upload_data(struct flb_stdout *ctx, struct flb_local_chunk *chunk,
     int size_check = FLB_FALSE;
     int part_num_check = FLB_FALSE;
     int timeout_check = FLB_FALSE;
+    time_t create_time;
     int ret;
 
     if (ctx->use_put_object == FLB_TRUE) {
@@ -554,9 +556,13 @@ put_object:
      */
     if (chunk) {
         mk_list_del(&chunk->_head);
+        create_time = chunk->create_time;
+    }
+    else {
+        create_time = time(NULL);
     }
 
-    ret = s3_put_object(ctx, body, body_size);
+    ret = s3_put_object(ctx, tag, create_time, body, body_size);
     if (ret < 0) {
         /* re-add chunk to list */
         if (chunk) {
@@ -659,41 +665,6 @@ multipart:
     return FLB_OK;
 }
 
-/*
- * The S3 file name is
- * /<prefix>/-<datestamp>
- */
-static flb_sds_t get_s3_key(struct flb_stdout *ctx, const char *tag, int tag_len)
-{
-    flb_sds_t uri;
-    flb_sds_t tmp;
-    char datestamp[40];
-    struct tm gmt;
-    time_t t_now = time(NULL);
-
-    if (!gmtime_r(&t_now, &gmt)) {
-        flb_errno();
-        return NULL;
-    }
-
-    strftime(datestamp, sizeof(datestamp) - 1, "%Y/%m/%d/%H/%M:%S", &gmt);
-
-    uri = flb_sds_create_size(strlen(ctx->prefix) + tag_len + 50);
-    if (!uri) {
-        flb_errno();
-        return NULL;
-    }
-
-    tmp = flb_sds_printf(&uri, "/%s/%s/%s", ctx->prefix, tag, datestamp);
-    if (!tmp) {
-        flb_sds_destroy(uri);
-        flb_errno();
-        return NULL;
-    }
-    uri = tmp;
-
-    return uri;
-}
 
 /*
  * Attempts to send all chunks to S3 using PutObject
@@ -728,7 +699,7 @@ static int put_all_chunks(struct flb_stdout *ctx)
          */
         mk_list_del(&chunk->_head);
 
-        ret = s3_put_object(ctx, buffer, buffer_size);
+        ret = s3_put_object(ctx, chunk->tag, chunk->create_time, buffer, buffer_size);
         flb_free(buffer);
         if (ret < 0) {
             /* re-add chunk to list */
@@ -810,16 +781,16 @@ static int construct_request_buffer(struct flb_stdout *ctx, flb_sds_t new_data,
     return 0;
 }
 
-static int s3_put_object(struct flb_stdout *ctx, char *body, size_t body_size)
+static int s3_put_object(struct flb_stdout *ctx, char *tag, time_t create_time,
+                         char *body, size_t body_size)
 {
     flb_sds_t uri = NULL;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
 
-    //TODO
-    uri = get_s3_key(ctx, "todo", 4);
+    uri = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
     if (!uri) {
-        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", "todo");
+        flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", chunk->tag);
         return -1;
     }
 
@@ -883,7 +854,7 @@ static struct multipart_upload *create_upload(struct flb_stdout *ctx,
         flb_errno();
         return NULL;
     }
-    s3_key = get_s3_key(ctx, tag, tag_len);
+    s3_key = flb_get_s3_key(ctx->s3_key_format, time(NULL), tag, ctx->tag_delimiters);
     if (!s3_key) {
         flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
         flb_free(m_upload);
@@ -1147,6 +1118,26 @@ static struct flb_config_map config_map[] = {
     "Directory to locally buffer data before sending. Plugin uses the S3 Multipart "
     "upload API to send data in chunks of 5 MB at a time- only a small amount of"
     " data will be locally buffered at any given point in time."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "s3_key_format", "fluent-bit-logs/$TAG/%Y/%m/%d/%H/%M/%S",
+     0, FLB_TRUE, offsetof(struct flb_stdout, s3_key_format),
+    "Format string for keys in S3. This option supports strftime time formatters "
+    "and a syntax for selecting parts of the Fluent log tag using a syntax inspired "
+    "by the rewrite_tag filter. Add $TAG in the format string to insert the full "
+    "log tag; add $TAG[0] to insert the first part of the tag in the s3 key. "
+    "The tag is split into “parts” using the characters specified with the "
+    "s3_key_format_tag_delimiters option. See the in depth examples and tutorial"
+    " in the documentation."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "s3_key_format_tag_delimiters", ".",
+     0, FLB_TRUE, offsetof(struct flb_stdout, tag_delimiters),
+    "A series of characters which will be used to split the tag into “parts” for "
+    "use with the s3_key_format option. See the in depth examples and tutorial in "
+    "the documentation."
     },
 
     {
