@@ -1105,7 +1105,7 @@ static struct flb_config_map config_map[] = {
     },
 
     {
-     FLB_CONFIG_MAP_STR, "s3_key_format", "fluent-bit-logs/$TAG/%Y/%m/%d/%H/%M/%S",
+     FLB_CONFIG_MAP_STR, "s3_key_format", "/fluent-bit-logs/$TAG/%Y/%m/%d/%H/%M/%S",
      0, FLB_TRUE, offsetof(struct flb_stdout, s3_key_format),
     "Format string for keys in S3. This option supports strftime time formatters "
     "and a syntax for selecting parts of the Fluent log tag using a syntax inspired "

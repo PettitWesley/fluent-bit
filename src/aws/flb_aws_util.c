@@ -714,9 +714,11 @@ flb_sds_t flb_get_s3_key(const char *format, time_t time, const char *tag, char 
         }
     }
 
-    if(ret == 0){
-        flb_warn("[s3_key] Invalid Tag delimiter: does not exist in tag. "
-                 "tag=%s, format=%s", tag, format);
+    if (strstr(format, "$TAG[") != NULL) {
+        if(ret == 0){
+            flb_warn("[s3_key] Invalid Tag delimiter: does not exist in tag. "
+                     "tag=%s, format=%s", tag, format);
+        }
     }
 
     /* Split the string on the delimiters */
