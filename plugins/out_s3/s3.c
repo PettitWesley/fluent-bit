@@ -970,7 +970,7 @@ cleanup_existing:
 
         m_upload = get_upload(ctx, chunk->tag, strlen(chunk->tag));
 
-        ret = construct_request_buffer(ctx, chunk, &buffer, &buffer_size);
+        ret = construct_request_buffer(ctx, NULL, chunk, &buffer, &buffer_size);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not construct request buffer for %s",
                           chunk->file_path);
