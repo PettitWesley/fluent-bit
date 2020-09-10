@@ -261,7 +261,6 @@ int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
         flb_plg_debug(store->ins, "Creating new local buffer for %s", tag);
         c = flb_calloc(1, sizeof(struct flb_local_chunk));
         if (!c) {
-            flb_sds_destroy(hash_key);
             flb_errno();
             return -1;
         }
@@ -332,7 +331,6 @@ struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, const char
     struct mk_list *head;
     struct flb_local_chunk *c = NULL;
     struct flb_local_chunk *tmp_chunk;
-    flb_sds_t hash_key;
 
     mk_list_foreach_safe(head, tmp, &store->chunks) {
         tmp_chunk = mk_list_entry(head, struct flb_local_chunk, _head);
