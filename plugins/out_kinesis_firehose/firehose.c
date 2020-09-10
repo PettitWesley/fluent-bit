@@ -204,7 +204,7 @@ static int cb_firehose_init(struct flb_output_instance *ins,
         session_name = NULL;
     }
 
-    /* initialize credentials and set to sync mode */
+    /* set to sync mode and initialize credentials */
     ctx->aws_provider->provider_vtable->sync(ctx->aws_provider);
     ctx->aws_provider->provider_vtable->init(ctx->aws_provider);
 

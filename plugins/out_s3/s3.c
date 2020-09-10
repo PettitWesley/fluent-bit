@@ -464,11 +464,9 @@ static int cb_s3_init(struct flb_output_instance *ins,
 
     ctx->s3_client->host = ctx->endpoint;
 
-    /* initialize credentials in sync mode */
+    /* set to sync mode and initialize credentials */
     ctx->provider->provider_vtable->sync(ctx->provider);
     ctx->provider->provider_vtable->init(ctx->provider);
-    /* set back to async */
-    ctx->provider->provider_vtable->async(ctx->provider);
 
 
 
