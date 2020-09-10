@@ -59,6 +59,12 @@ struct multipart_upload {
     flb_sds_t etags[10000];
     int part_number;
 
+    /*
+     * we use async http, so we need to check that all part requests have
+     * completed before we complete the upload
+     */
+    int parts_uploaded;
+
     /* ongoing tracker of how much data has been sent for this upload */
     size_t bytes;
 
