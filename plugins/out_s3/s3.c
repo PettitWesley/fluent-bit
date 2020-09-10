@@ -236,7 +236,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
             goto error;
         }
         if (ctx->upload_chunk_size < MIN_CHUNKED_UPLOAD_SIZE) {
-            flb_plg_error(ctx->ins, "upload_chunk_size must be at least 5M");
+            flb_plg_error(ctx->ins, "upload_chunk_size must be at least 5,242,880 bytes");
             goto error;
         }
         if (ctx->upload_chunk_size > MAX_CHUNKED_UPLOAD_SIZE) {
