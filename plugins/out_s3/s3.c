@@ -770,8 +770,8 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
 
-    /* can always run PutObject in async mode */
-    ctx->s3_client->flags |= ~(FLB_IO_ASYNC);
+    /* run in sync mode */
+    ctx->s3_client->flags &= ~(FLB_IO_ASYNC);
 
     uri = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
     if (!uri) {
