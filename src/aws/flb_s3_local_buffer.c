@@ -31,7 +31,7 @@
 /*
  * Simple and fast hashing algorithm to create keys in the local buffer
  */
-flb_sds_t simple_hash(const char *str);
+flb_sds_t simple_hash(struct timespec *ts, const char *tag);
 
 static char *read_tag(char *buffer_path);
 
@@ -256,13 +256,6 @@ int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
     flb_sds_t hash_key;
     int ret;
 
-    hash_key = simple_hash(tag);
-    if (!hash_key) {
-        flb_plg_error(store->ins, "Could not create local buffer hash key for %s",
-                      tag);
-        return -1;
-    }
-
     if (c == NULL) {
         /* create a new chunk */
         flb_plg_debug(store->ins, "Creating new local buffer for %s", tag);
@@ -272,25 +265,25 @@ int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
             flb_errno();
             return -1;
         }
-        c->create_time = time(NULL);
-        c->key = flb_sds_create(hash_key);
-        if (!c->key) {
-            flb_errno();
-            flb_sds_destroy(hash_key);
+        timespec_get(&c->ts, TIME_UTC);
+        c->create_time = c->ts.tv_sec;
+        hash_key = simple_hash(&c->ts, tag);
+        if (!hash_key) {
+            flb_plg_error(store->ins, "Could not create local buffer hash key for %s",
+                          tag);
             flb_chunk_destroy(c);
             return -1;
         }
+        c->key = hash_key;
         c->tag = flb_sds_create(tag);
         if (!c->tag) {
             flb_errno();
-            flb_sds_destroy(hash_key);
             flb_chunk_destroy(c);
             return -1;
         }
         path = flb_sds_create_size(strlen(store->dir) + strlen(hash_key));
         if (!path) {
             flb_errno();
-            flb_sds_destroy(hash_key);
             flb_chunk_destroy(c);
             flb_errno();
             return -1;
@@ -298,7 +291,6 @@ int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
         tmp_sds = flb_sds_printf(&path, "%s/%s", store->dir, hash_key);
         if (!tmp_sds) {
             flb_errno();
-            flb_sds_destroy(hash_key);
             flb_chunk_destroy(c);
             flb_sds_destroy(path);
             return -1;
@@ -313,8 +305,6 @@ int flb_buffer_put(struct flb_local_buffer *store, struct flb_local_chunk *c,
         }
         mk_list_add(&c->_head, &store->chunks);
     }
-
-    flb_sds_destroy(hash_key);
 
     written = append_data(c->file_path, data, bytes);
     if (written > 0) {
@@ -344,29 +334,21 @@ struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, const char
     struct flb_local_chunk *tmp_chunk;
     flb_sds_t hash_key;
 
-    hash_key = simple_hash(tag);
-    if (!hash_key) {
-        flb_plg_error(store->ins, "Could not create local buffer hash key for tag %s",
-                      tag);
-        return NULL;
-    }
-
     mk_list_foreach_safe(head, tmp, &store->chunks) {
         tmp_chunk = mk_list_entry(head, struct flb_local_chunk, _head);
-        if (strcmp(tmp_chunk->key, hash_key) == 0) {
+        if (strcmp(tmp_chunk->tag, tag) == 0) {
             c = tmp_chunk;
             break;
         }
     }
 
-    flb_sds_destroy(hash_key);
     return c;
 }
 
 /*
  * Simple and fast hashing algorithm to create keys in the local buffer
  */
-flb_sds_t simple_hash(const char *str)
+flb_sds_t simple_hash(struct timespec *ts, const char *tag)
 {
     unsigned long hash = 5381;
     unsigned long hash2 = 5381;
@@ -374,10 +356,11 @@ flb_sds_t simple_hash(const char *str)
     flb_sds_t hash_str;
     flb_sds_t tmp;
 
-    while ((c = *str++)) {
+    while ((c = *tag++)) {
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-        hash2 = ((hash2 << 5) + hash) - c;
     }
+
+    hash2 = (unsigned long) hash2 * ts->tv_sec * ts->tv_nsec;
 
     /* flb_sds_printf allocs if the incoming sds is not at least 64 bytes */
     hash_str = flb_sds_create_size(64);
@@ -385,7 +368,7 @@ flb_sds_t simple_hash(const char *str)
         flb_errno();
         return NULL;
     }
-    tmp = flb_sds_printf(&hash_str, "%lu%lu", hash, hash2);
+    tmp = flb_sds_printf(&hash_str, "%lu-%lu", hash, hash2);
     if (!tmp) {
         flb_errno();
         flb_sds_destroy(hash_str);

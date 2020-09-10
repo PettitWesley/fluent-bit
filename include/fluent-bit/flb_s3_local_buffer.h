@@ -29,6 +29,7 @@ struct flb_local_chunk {
     flb_sds_t tag;
     flb_sds_t file_path;
     size_t size;
+    struct timespec ts;
     time_t create_time;
 
     struct mk_list _head;
