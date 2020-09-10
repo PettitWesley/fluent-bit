@@ -490,7 +490,6 @@ static int upload_data(struct flb_s3 *ctx, struct flb_local_chunk *chunk,
                        char *body, size_t body_size,
                        const char *tag, int tag_len)
 {
-    struct multipart_upload *m_upload = NULL;
     int init_upload = FLB_FALSE;
     int complete_upload = FLB_FALSE;
     int size_check = FLB_FALSE;
@@ -969,7 +968,9 @@ cleanup_existing:
             continue; /* Only send chunks which have timed out */
         }
 
-        ret = construct_request_buffer(ctx, NULL, chunk, &buffer, &buffer_size);
+        m_upload = get_upload(ctx, chunk->tag, strlen(chunk->tag));
+
+        ret = construct_request_buffer(ctx, chunk, m_upload, &buffer, &buffer_size);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not construct request buffer for %s",
                           chunk->file_path);
