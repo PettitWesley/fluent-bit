@@ -144,7 +144,7 @@ int complete_multipart_upload(struct flb_s3 *ctx,
 
     /* run in sync mode */
     ctx->s3_client->flags &= ~(FLB_IO_ASYNC);
-    flb_info("[complete_multipart_upload] ID=%s", m_upload->upload_id)
+    flb_info("[complete_multipart_upload] ID=%s", m_upload->upload_id);
 
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 11 +
                               flb_sds_len(m_upload->upload_id));
@@ -209,7 +209,7 @@ int create_multipart_upload(struct flb_s3 *ctx,
 
     /* run in sync mode */
     ctx->s3_client->flags &= ~(FLB_IO_ASYNC);
-    flb_info("[create_multipart_upload] ID=%s", m_upload->upload_id)
+    flb_info("[create_multipart_upload] ID=%s", m_upload->upload_id);
 
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 8);
     if (!uri) {
@@ -311,7 +311,7 @@ int upload_part(struct flb_s3 *ctx, struct multipart_upload *m_upload,
 
     /* run in sync mode */
     ctx->s3_client->flags &= ~(FLB_IO_ASYNC);
-    flb_info("[upload_part] ID=%s", m_upload->upload_id)
+    flb_info("[upload_part] ID=%s", m_upload->upload_id);
 
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 8);
     if (!uri) {
