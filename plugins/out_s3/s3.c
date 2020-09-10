@@ -771,7 +771,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     struct flb_aws_client *s3_client;
 
     /* run in sync mode */
-    ctx->s3_client->flags &= ~(FLB_IO_ASYNC);
+    ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
 
     uri = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
     if (!uri) {
