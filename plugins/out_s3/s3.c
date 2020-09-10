@@ -535,7 +535,6 @@ put_object:
      * same chunk won't be sent more than once
      */
     if (chunk) {
-        mk_list_del(&chunk->_head);
         create_time = chunk->create_time;
     }
     else {
@@ -568,6 +567,9 @@ multipart:
         m_upload = create_upload(ctx, tag, tag_len);
         if (!m_upload) {
             flb_plg_error(ctx->ins, "Could not find or create upload for tag %s", tag);
+            if (chunk) {
+                mk_list_add(&chunk->_head, &ctx->store.chunks);
+            }
             return FLB_RETRY;
         }
     }
@@ -576,17 +578,12 @@ multipart:
         ret = create_multipart_upload(ctx, m_upload);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not initiate multipart upload");
+            if (chunk) {
+                mk_list_add(&chunk->_head, &ctx->store.chunks);
+            }
             return FLB_RETRY;
         }
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_CREATED;
-    }
-
-    /*
-     * remove chunk from buffer list- needed for async http so that the
-     * same chunk won't be sent more than once
-     */
-    if (chunk) {
-        mk_list_del(&chunk->_head);
     }
 
     ret = upload_part(ctx, m_upload, body, body_size);
@@ -670,12 +667,6 @@ static int put_all_chunks(struct flb_s3 *ctx)
             return -1;
         }
 
-        /*
-         * remove chunk from buffer list- needed for async http so that the
-         * same chunk won't be sent more than once
-         */
-        mk_list_del(&chunk->_head);
-
         ret = s3_put_object(ctx, chunk->tag, chunk->create_time, buffer, buffer_size);
         flb_free(buffer);
         if (ret < 0) {
@@ -722,6 +713,11 @@ static int construct_request_buffer(struct flb_s3 *ctx, flb_sds_t new_data,
                           chunk->file_path);
             return -1;
         }
+        /*
+         * remove chunk from buffer list- needed for async http so that the
+         * same chunk won't be sent more than once
+         */
+        mk_list_del(&chunk->_head);
         body_size = buffer_size;
     }
 
@@ -733,6 +729,9 @@ static int construct_request_buffer(struct flb_s3 *ctx, flb_sds_t new_data,
     if (!body) {
         flb_errno();
         flb_free(buffered_data);
+        if (chunk) {
+            mk_list_add(&chunk->_head, &ctx->store.chunks);
+        }
         return -1;
     }
     tmp = memcpy(body, buffered_data, buffer_size);
@@ -740,6 +739,9 @@ static int construct_request_buffer(struct flb_s3 *ctx, flb_sds_t new_data,
         flb_errno();
         flb_free(body);
         flb_free(buffered_data);
+        if (chunk) {
+            mk_list_add(&chunk->_head, &ctx->store.chunks);
+        }
         return -1;
     }
     flb_free(buffered_data);
@@ -748,6 +750,9 @@ static int construct_request_buffer(struct flb_s3 *ctx, flb_sds_t new_data,
         if (!tmp) {
             flb_errno();
             flb_free(body);
+            if (chunk) {
+                mk_list_add(&chunk->_head, &ctx->store.chunks);
+            }
             return -1;
         }
     }
