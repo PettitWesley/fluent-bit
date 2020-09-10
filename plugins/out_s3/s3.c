@@ -486,6 +486,7 @@ error:
  * Chunk is allowed to be NULL
  */
 static int upload_data(struct flb_s3 *ctx, struct flb_local_chunk *chunk,
+                       struct multipart_upload *m_upload,
                        char *body, size_t body_size,
                        const char *tag, int tag_len)
 {
@@ -502,7 +503,6 @@ static int upload_data(struct flb_s3 *ctx, struct flb_local_chunk *chunk,
         goto put_object;
     }
 
-    m_upload = get_upload(ctx, tag, tag_len);
     if (m_upload == NULL) {
         if (chunk != NULL && time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
             /* timeout already reached, just PutObject */
@@ -628,11 +628,12 @@ multipart:
 
     if (complete_upload == FLB_TRUE) {
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+        mk_list_del(&m_upload->_head);
         ret = complete_multipart_upload(ctx, m_upload);
         if (ret == 0) {
-            mk_list_del(&m_upload->_head);
             multipart_upload_destroy(m_upload);
         } else {
+            mk_list_add(&m_upload->_head, &ctx->uploads);
             /* we return FLB_OK in this case, since data was persisted */
             flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
                           m_upload->s3_key);
@@ -874,6 +875,7 @@ static void cb_s3_flush(const void *data, size_t bytes,
     struct mk_list *tmp;
     struct mk_list *head;
     size_t chunk_size = 0;
+    size_t upload_size = 0;
     int complete;
     int ret;
     int len;
@@ -912,12 +914,24 @@ static void cb_s3_flush(const void *data, size_t bytes,
         flb_plg_info(ctx->ins, "upload_timeout reached for %s", tag);
     }
 
+    m_upload = get_upload(ctx, tag, tag_len);
+
+    if (m_upload != NULL && time(NULL) > (m_upload->init_time + ctx->upload_timeout)) {
+        timeout_check = FLB_TRUE;
+        flb_plg_info(ctx->ins, "upload_timeout reached for %s", tag);
+    }
+
     chunk_size = len;
     if (chunk) {
         chunk_size += chunk->size;
     }
 
-    if (chunk_size < ctx->upload_chunk_size) {
+    upload_size = len;
+    if (m_upload) {
+        upload_size += m_upload->bytes;
+    }
+
+    if (chunk_size < ctx->upload_chunk_size && upload_size < ctx->file_size) {
         if (timeout_check == FLB_FALSE) {
             /* add data to local buffer */
             ret = flb_buffer_put(&ctx->store, chunk, tag, json, (size_t) len);
@@ -938,13 +952,14 @@ static void cb_s3_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    ret = upload_data(ctx, chunk, buffer, buffer_size, tag, tag_len);
+    ret = upload_data(ctx, chunk, m_upload, buffer, buffer_size, tag, tag_len);
     flb_free(buffer);
     if (ret != FLB_OK) {
         FLB_OUTPUT_RETURN(ret);
     }
 
 cleanup_existing:
+    m_upload = NULL;
 
     /* Check all chunks and see if any have timed out */
     mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
@@ -986,11 +1001,12 @@ cleanup_existing:
         }
         if (complete == FLB_TRUE) {
             m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+            mk_list_del(&m_upload->_head);
             ret = complete_multipart_upload(ctx, m_upload);
             if (ret == 0) {
-                mk_list_del(&m_upload->_head);
                 multipart_upload_destroy(m_upload);
             } else {
+                mk_list_add(&m_upload->_head, &ctx->uploads);
                 /* we return FLB_OK in this case, since data was persisted */
                 flb_plg_error(ctx->ins, "Could not complete upload %s, will retry on next flush..",
                               m_upload->s3_key);
@@ -1029,11 +1045,12 @@ static int cb_s3_exit(void *data, struct flb_config *config)
 
             if (m_upload->bytes > 0) {
                 m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+                mk_list_del(&m_upload->_head);
                 ret = complete_multipart_upload(ctx, m_upload);
                 if (ret == 0) {
-                    mk_list_del(&m_upload->_head);
                     multipart_upload_destroy(m_upload);
                 } else {
+                    mk_list_add(&m_upload->_head, &ctx->uploads);
                     flb_plg_error(ctx->ins, "Could not complete upload %s",
                                   m_upload->s3_key);
                 }
