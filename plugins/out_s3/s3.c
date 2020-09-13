@@ -766,18 +766,39 @@ static int construct_request_buffer(struct flb_s3 *ctx, flb_sds_t new_data,
 static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time,
                          char *body, size_t body_size)
 {
-    flb_sds_t uri = NULL;
+    flb_sds_t s3_key = NULL;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
+    char *random_alphanumeric;
+    int len;
+    char uri[1024]; /* max S3 key length */
 
     /* run in sync mode */
     ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
 
-    uri = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
-    if (!uri) {
+    s3_key = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
+    if (!s3_key) {
         flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
         return -1;
     }
+
+    len = flb_sds_len(s3_key);
+    if ((len + 16) <= 1024) {
+        random_alphanumeric = flb_sts_session_name();
+        if (!random_alphanumeric) {
+            flb_sds_destroy(s3_key);
+            flb_plg_error(ctx->ins, "Failed to create randomness for S3 key %s", tag);
+            return -1;
+        }
+
+        memcpy(uri, s3_key, len);
+        memcpy(uri + len, "-object", 7);
+        memcpy(uri + len + 7, random_alphanumeric, 8);
+        uri[len + 15] = '\0';
+        flb_free(random_data);
+    }
+
+    flb_info("key: %s", uri);
 
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
@@ -787,7 +808,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
         flb_plg_debug(ctx->ins, "PutObject http status=%d", c->resp.status);
         if (c->resp.status == 200) {
             flb_plg_info(ctx->ins, "Successfully uploaded object %s", uri);
-            flb_sds_destroy(uri);
+            flb_sds_destroy(s3_key);
             flb_http_client_destroy(c);
             return 0;
         }
@@ -800,7 +821,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     }
 
     flb_plg_error(ctx->ins, "PutObject request failed");
-    flb_sds_destroy(uri);
+    flb_sds_destroy(s3_key);
     return -1;
 }
 
