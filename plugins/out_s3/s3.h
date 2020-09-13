@@ -110,6 +110,7 @@ struct flb_s3 {
     time_t upload_timeout;
 
     int timer_created;
+    int timer_ms;
 
     struct flb_output_instance *ins;
 };
