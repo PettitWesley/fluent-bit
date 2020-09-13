@@ -253,7 +253,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->use_put_object = FLB_TRUE;
     }
 
-    if ((ctx->upload_chunk_size * 2) > ctx->file_size) {
+    if (ctx->upload_chunk_size ! = MIN_CHUNKED_UPLOAD_SIZE && (ctx->upload_chunk_size * 2) > ctx->file_size) {
         flb_plg_error(ctx->ins, "total_file_size is less than 2x upload_chunk_size");
         goto error;
     }
