@@ -783,6 +783,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     }
 
     len = flb_sds_len(s3_key);
+    flb_info("len=%d", len);
     memcpy(uri, s3_key, len);
     if ((len + 16) <= 1024) {
         random_alphanumeric = flb_sts_session_name();
