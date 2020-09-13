@@ -471,22 +471,10 @@ static int cb_s3_init(struct flb_output_instance *ins,
     ctx->provider->provider_vtable->sync(ctx->provider);
     ctx->provider->provider_vtable->init(ctx->provider);
 
-
+    ctx->timer_created = FLB_FALSE;
 
     /* Export context */
     flb_output_set_context(ins, ctx);
-
-    /*
-     * create a timer that will run periodically and check if uploads
-     * are ready for completion
-     */
-    ret = flb_sched_timer_cb_create(config, FLB_SCHED_TIMER_CB_PERM, 5000,
-                                    cb_s3_upload,
-                                    ctx);
-    if (ret == -1) {
-        flb_plg_error(ctx->ins, "Failed to create upload timer");
-        goto error;
-    }
 
     return 0;
 
@@ -922,6 +910,22 @@ static void cb_s3_flush(const void *data, size_t bytes,
     int len;
     (void) i_ins;
     (void) config;
+
+    /*
+     * create a timer that will run periodically and check if uploads
+     * are ready for completion
+     * this is created once on the first flush
+     */
+    if (ctx->timer_created == FLB_FALSE) {
+        ret = flb_sched_timer_cb_create(config, FLB_SCHED_TIMER_CB_PERM, 5000,
+                                        cb_s3_upload,
+                                        ctx);
+        if (ret == -1) {
+            flb_plg_error(ctx->ins, "Failed to create upload timer");
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        ctx->timer_created = FLB_TRUE;
+    }
 
     /* first, clean up any old buffers found on startup */
     if (ctx->has_old_buffers == FLB_TRUE) {

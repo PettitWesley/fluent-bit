@@ -109,6 +109,8 @@ struct flb_s3 {
     size_t upload_chunk_size;
     time_t upload_timeout;
 
+    int timer_created;
+
     struct flb_output_instance *ins;
 };
 
