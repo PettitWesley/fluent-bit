@@ -472,7 +472,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     ctx->provider->provider_vtable->init(ctx->provider);
 
     ctx->timer_created = FLB_FALSE;
-    ctx->timer_ms = (int) (ctx->upload_timeout / 6) * 1000
+    ctx->timer_ms = (int) (ctx->upload_timeout / 6) * 1000;
 
     /* Export context */
     flb_output_set_context(ins, ctx);
