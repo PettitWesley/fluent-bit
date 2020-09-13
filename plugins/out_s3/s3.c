@@ -783,6 +783,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     }
 
     len = flb_sds_len(s3_key);
+    memcpy(uri, s3_key, len);
     if ((len + 16) <= 1024) {
         random_alphanumeric = flb_sts_session_name();
         if (!random_alphanumeric) {
@@ -791,9 +792,8 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
             return -1;
         }
 
-        memcpy(uri, s3_key, len);
-        memcpy(uri + len, "-object", 7);
-        memcpy(uri + len + 7, random_alphanumeric, 8);
+        memcpy(&uri[len], "-object", 7);
+        memcpy(&uri[len + 7], random_alphanumeric, 8);
         uri[len + 15] = '\0';
         flb_free(random_alphanumeric);
     }
