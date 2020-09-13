@@ -917,7 +917,8 @@ static void cb_s3_flush(const void *data, size_t bytes,
      * this is created once on the first flush
      */
     if (ctx->timer_created == FLB_FALSE) {
-        ret = flb_sched_timer_cb_create(config, FLB_SCHED_TIMER_CB_PERM, 5000,
+        flb_plg_debug(ctx->ins, "Creating upload timer..");
+        ret = flb_sched_timer_cb_create(config, FLB_SCHED_TIMER_CB_PERM, 50000,
                                         cb_s3_upload,
                                         ctx);
         if (ret == -1) {
