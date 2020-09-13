@@ -798,8 +798,6 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
         flb_free(random_alphanumeric);
     }
 
-    flb_info("key: %s", uri);
-
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
                                           uri, body, body_size,
