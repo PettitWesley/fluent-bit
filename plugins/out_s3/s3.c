@@ -782,7 +782,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
         return -1;
     }
 
-    len = flb_sds_len(s3_key);
+    len = strlen(s3_key);
     flb_info("len=%d, key=%s", len, s3_key);
     memcpy(uri, s3_key, len);
     if ((len + 16) <= 1024) {
