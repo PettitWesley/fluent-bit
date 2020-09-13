@@ -795,7 +795,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
         memcpy(uri + len, "-object", 7);
         memcpy(uri + len + 7, random_alphanumeric, 8);
         uri[len + 15] = '\0';
-        flb_free(random_data);
+        flb_free(random_alphanumeric);
     }
 
     flb_info("key: %s", uri);
