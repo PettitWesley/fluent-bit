@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_signv4.h>
+#include <fluent-bit/flb_scheduler.h>
 #include <stdlib.h>
 #include <msgpack.h>
 
@@ -134,7 +135,7 @@ static void s3_context_destroy(struct flb_s3 *ctx)
 }
 
 static int cb_s3_init(struct flb_output_instance *ins,
-                          struct flb_config *config, void *data)
+                      struct flb_config *config, void *data)
 {
     int ret;
     const char *tmp;
@@ -479,7 +480,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
      * create a timer that will run periodically and check if uploads
      * are ready for completion
      */
-    ret = flb_sched_timer_cb_create(ctx, FLB_SCHED_TIMER_CB_PERM, 5000,
+    ret = flb_sched_timer_cb_create(config, FLB_SCHED_TIMER_CB_PERM, 5000,
                                     cb_s3_upload,
                                     ctx);
     if (ret == -1) {
