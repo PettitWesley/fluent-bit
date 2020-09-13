@@ -886,20 +886,15 @@ static struct multipart_upload *create_upload(struct flb_s3 *ctx,
 
 static void cb_s3_upload(struct flb_config *config, void *data)
 {
-    struct flb_s3 *ctx = out_context;
-    flb_sds_t json = NULL;
+    struct flb_s3 *ctx = data;
     struct flb_local_chunk *chunk = NULL;
     struct multipart_upload *m_upload = NULL;
     char *buffer = NULL;
     size_t buffer_size;
-    int timeout_check = FLB_FALSE;
     struct mk_list *tmp;
     struct mk_list *head;
-    size_t chunk_size = 0;
-    size_t upload_size = 0;
     int complete;
     int ret;
-    int len;
 
     flb_plg_debug(ctx->ins, "Running upload timer callback..");
 
