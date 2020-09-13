@@ -40,6 +40,8 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
 
 static int put_all_chunks(struct flb_s3 *ctx);
 
+static void cb_s3_upload(struct flb_config *ctx, void *data);
+
 static struct multipart_upload *get_upload(struct flb_s3 *ctx,
                                            const char *tag, int tag_len);
 
@@ -473,6 +475,18 @@ static int cb_s3_init(struct flb_output_instance *ins,
     /* Export context */
     flb_output_set_context(ins, ctx);
 
+    /*
+     * create a timer that will run periodically and check if uploads
+     * are ready for completion
+     */
+    ret = flb_sched_timer_cb_create(ctx, FLB_SCHED_TIMER_CB_PERM, 5000,
+                                    cb_s3_upload,
+                                    ctx);
+    if (ret == -1) {
+        flb_plg_error(ctx->ins, "Failed to create upload timer");
+        goto error;
+    }
+
     return 0;
 
 error:
@@ -878,6 +892,11 @@ static struct multipart_upload *create_upload(struct flb_s3 *ctx,
     mk_list_add(&m_upload->_head, &ctx->uploads);
 
     return m_upload;
+}
+
+static void cb_s3_upload(struct flb_config *config, void *data)
+{
+    flb_info("[cb_s3_upload] Running...");
 }
 
 static void cb_s3_flush(const void *data, size_t bytes,
