@@ -964,11 +964,8 @@ static void cb_s3_flush(const void *data, size_t bytes,
     char *buffer = NULL;
     size_t buffer_size;
     int timeout_check = FLB_FALSE;
-    struct mk_list *tmp;
-    struct mk_list *head;
     size_t chunk_size = 0;
     size_t upload_size = 0;
-    int complete;
     int ret;
     int len;
     (void) i_ins;
@@ -980,7 +977,7 @@ static void cb_s3_flush(const void *data, size_t bytes,
      * this is created once on the first flush
      */
     if (ctx->timer_created == FLB_FALSE) {
-        flb_plg_debug(ctx->ins, "Creating upload timer with frequency %d ms", ctx->timer_ms);
+        flb_plg_debug(ctx->ins, "Creating upload timer with frequency %ds", ctx->timer_ms / 1000);
         ret = flb_sched_timer_cb_create(config, FLB_SCHED_TIMER_CB_PERM, ctx->timer_ms,
                                         cb_s3_upload,
                                         ctx);
