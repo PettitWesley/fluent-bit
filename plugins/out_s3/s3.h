@@ -45,6 +45,14 @@
 
 #define DEFAULT_UPLOAD_TIMEOUT 3600
 
+/*
+ * If we see repeated errors on an upload, we will discard it
+ * This saves us from scenarios where something goes wrong and an upload can
+ * not proceed (may be some other process completed it or deleted the upload)
+ * instead of erroring out forever, we eventually discard the upload.
+ */
+#define MAX_UPLOAD_ERRORS 10
+
 struct multipart_upload {
     flb_sds_t s3_key;
     flb_sds_t tag;
@@ -69,6 +77,10 @@ struct multipart_upload {
     size_t bytes;
 
     struct mk_list _head;
+
+    /* see note for MAX_UPLOAD_ERRORS */
+    int upload_errors;
+    int complete_errors;
 };
 
 struct flb_s3 {

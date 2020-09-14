@@ -591,6 +591,7 @@ multipart:
 
     ret = upload_part(ctx, m_upload, body, body_size);
     if (ret < 0) {
+        m_upload->upload_errors += 1;
         /* re-add chunk to list */
         if (chunk) {
             mk_list_add(&chunk->_head, &ctx->store.chunks);
@@ -636,10 +637,17 @@ multipart:
         if (ret == 0) {
             multipart_upload_destroy(m_upload);
         } else {
-            mk_list_add(&m_upload->_head, &ctx->uploads);
-            /* we return FLB_OK in this case, since data was persisted */
-            flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
-                          m_upload->s3_key);
+            m_upload->complete_errors += 1;
+            if (tmp_upload->complete_errors < MAX_UPLOAD_ERRORS) {
+                mk_list_add(&m_upload->_head, &ctx->uploads);
+                /* we return FLB_OK in this case, since data was persisted */
+                flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
+                              m_upload->s3_key);
+            }
+            else {
+                flb_plg_error(ctx->ins, "Upload for %s has reached max completion errors, plugin will give up",
+                              tmp_upload->s3_key);
+            }
         }
     }
 
@@ -838,6 +846,12 @@ static struct multipart_upload *get_upload(struct flb_s3 *ctx,
     mk_list_foreach_safe(head, tmp, &ctx->uploads) {
         tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
         if (tmp_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
+            continue;
+        }
+        if (tmp_upload->upload_errors >= MAX_UPLOAD_ERRORS) {
+            tmp_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+            flb_plg_error(ctx->ins, "Upload for %s has reached max upload errors",
+                          tmp_upload->s3_key);
             continue;
         }
         if (strcmp(tmp_upload->tag, tag) == 0) {
