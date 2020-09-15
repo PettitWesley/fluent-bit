@@ -210,7 +210,7 @@ static size_t append_data(char *path, char *data, size_t bytes)
     fd = open(
         path,
         O_CREAT | O_WRONLY,
-        S_IRWXO
+        0777
     );
     if (fd == -1){
         return -1;
