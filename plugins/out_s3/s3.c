@@ -638,7 +638,7 @@ multipart:
             multipart_upload_destroy(m_upload);
         } else {
             m_upload->complete_errors += 1;
-            if (tmp_upload->complete_errors < MAX_UPLOAD_ERRORS) {
+            if (m_upload->complete_errors < MAX_UPLOAD_ERRORS) {
                 mk_list_add(&m_upload->_head, &ctx->uploads);
                 /* we return FLB_OK in this case, since data was persisted */
                 flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
