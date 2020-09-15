@@ -23,6 +23,8 @@
 #include <fluent-bit/flb_s3_local_buffer.h>
 #include <monkey/mk_core/mk_list.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
@@ -206,7 +208,7 @@ static size_t append_data(char *path, char *data, size_t bytes)
     int fd;
     size_t written;
     fd = open(
-        file_name,
+        path,
         O_CREAT | O_WRONLY,
         S_IRWXU
     );
