@@ -473,6 +473,9 @@ static int cb_s3_init(struct flb_output_instance *ins,
 
     ctx->timer_created = FLB_FALSE;
     ctx->timer_ms = (int) (ctx->upload_timeout / 6) * 1000;
+    if (ctx->timer_ms > UPLOAD_TIMER_MAX_WAIT) {
+        ctx->timer_ms = UPLOAD_TIMER_MAX_WAIT;
+    }
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -532,9 +535,6 @@ static int upload_data(struct flb_s3 *ctx, struct flb_local_chunk *chunk,
     }
 
 put_object:
-
-    /* run in async mode */
-    //ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
 
     /*
      * remove chunk from buffer list- needed for async http so that the
@@ -616,17 +616,17 @@ multipart:
 
     if (m_upload->bytes >= ctx->file_size) {
         size_check = FLB_TRUE;
-        flb_plg_info(ctx->ins, "Completing upload for %s because uploaded data is greater"
+        flb_plg_info(ctx->ins, "Will complete upload for %s because uploaded data is greater"
                      " than size set by total_file_size", m_upload->s3_key);
     }
     if (m_upload->part_number >= 10000) {
         part_num_check = FLB_TRUE;
-        flb_plg_info(ctx->ins, "Completing upload for %s because 10,000 chunks "
+        flb_plg_info(ctx->ins, "Will complete upload for %s because 10,000 chunks "
                      "(the API limit) have been uploaded", m_upload->s3_key);
     }
     if (time(NULL) > (m_upload->init_time + ctx->upload_timeout)) {
         timeout_check = FLB_TRUE;
-        flb_plg_info(ctx->ins, "Completing upload for %s because upload_timeout"
+        flb_plg_info(ctx->ins, "Will complete upload for %s because upload_timeout"
                      " has elapsed", m_upload->s3_key);
     }
     if (size_check || part_num_check || timeout_check) {
@@ -634,25 +634,27 @@ multipart:
     }
 
     if (complete_upload == FLB_TRUE) {
+        /* mark for completion- the upload timer will handle actual completion */
         m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
-        mk_list_del(&m_upload->_head);
-        ret = complete_multipart_upload(ctx, m_upload);
-        if (ret == 0) {
-            multipart_upload_destroy(m_upload);
-        } else {
-            m_upload->complete_errors += 1;
-            if (m_upload->complete_errors < MAX_UPLOAD_ERRORS) {
-                mk_list_add(&m_upload->_head, &ctx->uploads);
-                /* we return FLB_OK in this case, since data was persisted */
-                flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
-                              m_upload->s3_key);
-            }
-            else {
-                flb_plg_error(ctx->ins, "Upload for %s has reached max completion errors, plugin will give up",
-                              m_upload->s3_key);
-            }
-        }
     }
+    //     mk_list_del(&m_upload->_head);
+    //     ret = complete_multipart_upload(ctx, m_upload);
+    //     if (ret == 0) {
+    //         multipart_upload_destroy(m_upload);
+    //     } else {
+    //         m_upload->complete_errors += 1;
+    //         if (m_upload->complete_errors < MAX_UPLOAD_ERRORS) {
+    //             mk_list_add(&m_upload->_head, &ctx->uploads);
+    //             /* we return FLB_OK in this case, since data was persisted */
+    //             flb_plg_error(ctx->ins, "Could not complete upload, will retry on next flush..",
+    //                           m_upload->s3_key);
+    //         }
+    //         else {
+    //             flb_plg_error(ctx->ins, "Upload for %s has reached max completion errors, plugin will give up",
+    //                           m_upload->s3_key);
+    //         }
+    //     }
+    // }
 
     return FLB_OK;
 }
@@ -941,6 +943,14 @@ static void cb_s3_upload(struct flb_config *config, void *data)
     mk_list_foreach_safe(head, tmp, &ctx->uploads) {
         m_upload = mk_list_entry(head, struct multipart_upload, _head);
         complete = FLB_FALSE;
+
+        if (m_upload->complete_errors >= MAX_UPLOAD_ERRORS) {
+            flb_plg_error(ctx->ins, "Upload for %s has reached max completion errors, plugin will give up",
+                          m_upload->s3_key);
+            mk_list_del(&m_upload->_head);
+            continue;
+        }
+
         if (m_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
             complete = FLB_TRUE;
         }
@@ -957,7 +967,8 @@ static void cb_s3_upload(struct flb_config *config, void *data)
                 multipart_upload_destroy(m_upload);
             } else {
                 mk_list_add(&m_upload->_head, &ctx->uploads);
-                /* we return FLB_OK in this case, since data was persisted */
+                /* data was persisted, this can be retried */
+                m_upload->complete_errors += 1;
                 flb_plg_error(ctx->ins, "Could not complete upload %s, will retry on next flush..",
                                   m_upload->s3_key);
             }
