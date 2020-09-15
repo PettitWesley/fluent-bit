@@ -646,7 +646,7 @@ multipart:
             }
             else {
                 flb_plg_error(ctx->ins, "Upload for %s has reached max completion errors, plugin will give up",
-                              tmp_upload->s3_key);
+                              m_upload->s3_key);
             }
         }
     }
