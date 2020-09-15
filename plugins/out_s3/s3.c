@@ -785,7 +785,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     int len;
     char uri[1024]; /* max S3 key length */
 
-    /* run in sync mode */
+    /* run in async mode */
     ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
 
     s3_key = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
@@ -912,6 +912,19 @@ static void cb_s3_upload(struct flb_config *config, void *data)
 
     flb_plg_debug(ctx->ins, "Running upload timer callback..");
 
+    /* first, clean up any old buffers found on startup */
+    if (ctx->has_old_buffers == FLB_TRUE) {
+        flb_plg_info(ctx->ins, "Sending locally buffered data from previous "
+                     "executions to S3; buffer=%s", ctx->store.dir);
+        ctx->has_old_buffers = FLB_FALSE;
+        ret = put_all_chunks(ctx);
+        if (ret < 0) {
+            ctx->has_old_buffers = FLB_TRUE;
+            flb_plg_error(ctx->ins, "Failed to send locally buffered data left over"
+                          " from previous executions; will retry. Buffer=%s", ctx->store.dir);
+        }
+    }
+
     /* Check all chunks and see if any have timed out */
     mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
         chunk = mk_list_entry(head, struct flb_local_chunk, _head);
@@ -1000,19 +1013,6 @@ static void cb_s3_flush(const void *data, size_t bytes,
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
         ctx->timer_created = FLB_TRUE;
-    }
-
-    /* first, clean up any old buffers found on startup */
-    if (ctx->has_old_buffers == FLB_TRUE) {
-        flb_plg_info(ctx->ins, "Sending locally buffered data from previous "
-                     "executions to S3; buffer=%s", ctx->store.dir);
-        ret = put_all_chunks(ctx);
-        if (ret < 0) {
-            flb_plg_error(ctx->ins, "Failed to send locally buffered data left over"
-                          " from previous executions; will retry. Buffer=%s", ctx->store.dir);
-        } else {
-            ctx->has_old_buffers = FLB_FALSE;
-        }
     }
 
     json = flb_pack_msgpack_to_json_format(data, bytes,
