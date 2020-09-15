@@ -786,7 +786,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     char uri[1024]; /* max S3 key length */
 
     /* run in sync mode */
-    ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+    ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
 
     s3_key = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
     if (!s3_key) {
@@ -1090,8 +1090,8 @@ static int cb_s3_exit(void *data, struct flb_config *config)
     }
 
     if (mk_list_size(&ctx->store.chunks) > 0) {
-        /* exit must run in sync mode */
-        ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+        /* exit must run in sync mode (why??) */
+        ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
         flb_plg_info(ctx->ins, "Sending all locally buffered data to S3");
         ret = put_all_chunks(ctx);
         if (ret < 0) {
