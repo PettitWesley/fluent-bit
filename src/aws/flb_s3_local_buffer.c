@@ -202,29 +202,42 @@ int flb_mkdir_all(const char *dir) {
     return 0;
 }
 
+// static size_t append_data(char *path, char *data, size_t bytes)
+// {
+//     FILE *f;
+//     int fd;
+//     size_t written;
+//     fd = open(
+//         path,
+//         O_CREAT | O_WRONLY,
+//         0777
+//     );
+//     if (fd == -1){
+//         return -1;
+//     }
+//
+//     f = fdopen(fd, "a");
+//     if (!f) {
+//         flb_errno();
+//         close(fd);
+//         return -1;
+//     }
+//
+//     written = fwrite(data, 1, bytes, f);
+//     close(fd);
+//     return written;
+// }
+
 static size_t append_data(char *path, char *data, size_t bytes)
 {
     FILE *f;
-    int fd;
     size_t written;
-    fd = open(
-        path,
-        O_CREAT | O_WRONLY,
-        0777
-    );
-    if (fd == -1){
-        return -1;
-    }
-
-    f = fdopen(fd, "a");
+    f = fopen(path , "a" );
     if (!f) {
-        flb_errno();
-        close(fd);
         return -1;
     }
-
     written = fwrite(data, 1, bytes, f);
-    close(fd);
+    fclose(f);
     return written;
 }
 
