@@ -533,6 +533,9 @@ static int upload_data(struct flb_s3 *ctx, struct flb_local_chunk *chunk,
 
 put_object:
 
+    /* run in async mode */
+    ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
+
     /*
      * remove chunk from buffer list- needed for async http so that the
      * same chunk won't be sent more than once
@@ -785,9 +788,6 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     int len;
     char uri[1024]; /* max S3 key length */
 
-    /* run in async mode */
-    ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
-
     s3_key = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters);
     if (!s3_key) {
         flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
@@ -912,19 +912,6 @@ static void cb_s3_upload(struct flb_config *config, void *data)
 
     flb_plg_debug(ctx->ins, "Running upload timer callback..");
 
-    /* first, clean up any old buffers found on startup */
-    if (ctx->has_old_buffers == FLB_TRUE) {
-        flb_plg_info(ctx->ins, "Sending locally buffered data from previous "
-                     "executions to S3; buffer=%s", ctx->store.dir);
-        ctx->has_old_buffers = FLB_FALSE;
-        ret = put_all_chunks(ctx);
-        if (ret < 0) {
-            ctx->has_old_buffers = FLB_TRUE;
-            flb_plg_error(ctx->ins, "Failed to send locally buffered data left over"
-                          " from previous executions; will retry. Buffer=%s", ctx->store.dir);
-        }
-    }
-
     /* Check all chunks and see if any have timed out */
     mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
         chunk = mk_list_entry(head, struct flb_local_chunk, _head);
@@ -1015,6 +1002,19 @@ static void cb_s3_flush(const void *data, size_t bytes,
         ctx->timer_created = FLB_TRUE;
     }
 
+    /* clean up any old buffers found on startup */
+    if (ctx->has_old_buffers == FLB_TRUE) {
+        flb_plg_info(ctx->ins, "Sending locally buffered data from previous "
+                     "executions to S3; buffer=%s", ctx->store.dir);
+        ctx->has_old_buffers = FLB_FALSE;
+        ret = put_all_chunks(ctx);
+        if (ret < 0) {
+            ctx->has_old_buffers = FLB_TRUE;
+            flb_plg_error(ctx->ins, "Failed to send locally buffered data left over"
+                          " from previous executions; will retry. Buffer=%s", ctx->store.dir);
+        }
+    }
+
     json = flb_pack_msgpack_to_json_format(data, bytes,
                                            FLB_PACK_JSON_FORMAT_LINES,
                                            ctx->json_date_format,
@@ -1090,8 +1090,8 @@ static int cb_s3_exit(void *data, struct flb_config *config)
     }
 
     if (mk_list_size(&ctx->store.chunks) > 0) {
-        /* exit must run in sync mode (why??) */
-        ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
+        /* exit must run in sync mode  */
+        ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
         flb_plg_info(ctx->ins, "Sending all locally buffered data to S3");
         ret = put_all_chunks(ctx);
         if (ret < 0) {
