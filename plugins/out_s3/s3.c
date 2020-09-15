@@ -534,7 +534,7 @@ static int upload_data(struct flb_s3 *ctx, struct flb_local_chunk *chunk,
 put_object:
 
     /* run in async mode */
-    ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
+    //ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
 
     /*
      * remove chunk from buffer list- needed for async http so that the
