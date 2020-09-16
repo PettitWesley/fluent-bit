@@ -23,6 +23,8 @@
 #include <fluent-bit/flb_s3_local_buffer.h>
 #include <monkey/mk_core/mk_list.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
@@ -203,13 +205,27 @@ int flb_mkdir_all(const char *dir) {
 static size_t append_data(char *path, char *data, size_t bytes)
 {
     FILE *f;
+    int fd;
     size_t written;
-    f = fopen(path , "a" );
-    if (!f) {
+    fd = open(
+        path,
+        O_CREAT | O_WRONLY,
+        S_IRWXU
+    );
+    if (fd == -1){
         return -1;
     }
+
+    f = fdopen(fd, "a");
+    if (!f) {
+        flb_errno();
+        close(fd);
+        return -1;
+    }
+
     written = fwrite(data, 1, bytes, f);
-    fclose(f);
+    fflush(f);
+    close(fd);
     return written;
 }
 

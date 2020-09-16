@@ -29,12 +29,16 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #define AWS_SERVICE_ENDPOINT_FORMAT            "%s.%s.amazonaws.com"
 #define AWS_SERVICE_ENDPOINT_BASE_LEN          15
 
-#define S3_SERVICE_ENDPOINT_FORMAT             "%s.s3.amazonaws.com"
-#define S3_SERVICE_ENDPOINT_BASE_LEN           17
+#define S3_SERVICE_GLOBAL_ENDPOINT_FORMAT             "%s.s3.amazonaws.com"
+#define S3_SERVICE_GLOBAL_ENDPOINT_BASE_LEN           17
+
+#define S3_SERVICE_ENDPOINT_FORMAT             "%s.s3.%s.amazonaws.com"
+#define S3_SERVICE_ENDPOINT_BASE_LEN           18
 
 #define TAG_PART_DESCRIPTOR "$TAG[%d]"
 #define TAG_DESCRIPTOR "$TAG"
@@ -99,42 +103,40 @@ int flb_read_file(const char *path, char **out_buf, size_t *out_size)
     int ret;
     long bytes;
     char *buf = NULL;
-    FILE *fp = NULL;
     struct stat st;
     int fd;
 
-    fp = fopen(path, "r");
-    if (!fp) {
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
         return -1;
     }
 
-    fd = fileno(fp);
     ret = fstat(fd, &st);
     if (ret == -1) {
         flb_errno();
-        fclose(fp);
+        close(fd);
         return -1;
     }
 
     buf = flb_malloc(st.st_size + sizeof(char));
     if (!buf) {
         flb_errno();
-        fclose(fp);
+        close(fd);
         return -1;
     }
 
-    bytes = fread(buf, st.st_size, 1, fp);
-    if (bytes != 1) {
+    bytes = read(fd, buf, st.st_size);
+    if (bytes < 0) {
         flb_errno();
         flb_free(buf);
-        fclose(fp);
+        close(fd);
         return -1;
     }
 
     /* fread does not add null byte */
     buf[st.st_size] = '\0';
 
-    fclose(fp);
+    close(fd);
     *out_buf = buf;
     *out_size = st.st_size;
 
@@ -147,9 +149,17 @@ int flb_read_file(const char *path, char **out_buf, size_t *out_size)
 char *flb_s3_endpoint(char* bucket, char* region)
 {
     char *endpoint = NULL;
-    size_t len = S3_SERVICE_ENDPOINT_BASE_LEN;
+    size_t len = 0;
     int is_cn = FLB_FALSE;
     int bytes;
+
+    if (strcmp("us-east-1", region) == 0) {
+        len = S3_SERVICE_GLOBAL_ENDPOINT_BASE_LEN;
+    }
+    else {
+        len = S3_SERVICE_ENDPOINT_BASE_LEN;
+        len += strlen(region);
+    }
 
 
     /* In the China regions, ".cn" is appended to the URL */
@@ -171,7 +181,13 @@ char *flb_s3_endpoint(char* bucket, char* region)
         return NULL;
     }
 
-    bytes = snprintf(endpoint, len, S3_SERVICE_ENDPOINT_FORMAT, bucket);
+    if (strcmp("us-east-1", region) == 0) {
+        bytes = snprintf(endpoint, len, S3_SERVICE_GLOBAL_ENDPOINT_FORMAT, bucket);
+    }
+    else {
+        bytes = snprintf(endpoint, len, S3_SERVICE_ENDPOINT_FORMAT, bucket, region);
+    }
+
     if (bytes < 0) {
         flb_errno();
         flb_free(endpoint);
