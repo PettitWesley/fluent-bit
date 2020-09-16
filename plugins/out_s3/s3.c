@@ -477,8 +477,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->timer_ms = UPLOAD_TIMER_MAX_WAIT;
     }
 
-    /* run in sync mode */
-    ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+    // /* run in sync mode */
+    // ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
