@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #define AWS_SERVICE_ENDPOINT_FORMAT            "%s.%s.amazonaws.com"
 #define AWS_SERVICE_ENDPOINT_BASE_LEN          15
@@ -97,50 +98,95 @@ char *flb_aws_endpoint(char* service, char* region)
 
 }
 
+// int flb_read_file(const char *path, char **out_buf, size_t *out_size)
+// {
+//     int ret;
+//     long bytes;
+//     char *buf = NULL;
+//     FILE *fp = NULL;
+//     struct stat st;
+//     int fd;
+//
+//     flb_info("path=%s" , path);
+//
+//     fp = fopen(path, "rb");
+//     if (!fp) {
+//         return -1;
+//     }
+//
+//     fd = fileno(fp);
+//     ret = fstat(fd, &st);
+//     if (ret == -1) {
+//         flb_errno();
+//         fclose(fp);
+//         return -1;
+//     }
+//
+//     buf = flb_malloc(st.st_size + sizeof(char));
+//     if (!buf) {
+//         flb_errno();
+//         fclose(fp);
+//         return -1;
+//     }
+//
+//     bytes = fread(buf, st.st_size, 1, fp);
+//     if (bytes != 1) {
+//         flb_errno();
+//         flb_free(buf);
+//         fclose(fp);
+//         return -1;
+//     }
+//
+//     /* fread does not add null byte */
+//     buf[st.st_size] = '\0';
+//
+//     fclose(fp);
+//     *out_buf = buf;
+//     *out_size = st.st_size;
+//
+//     return 0;
+// }
+
 int flb_read_file(const char *path, char **out_buf, size_t *out_size)
 {
     int ret;
     long bytes;
     char *buf = NULL;
-    FILE *fp = NULL;
     struct stat st;
     int fd;
 
-    flb_info("path=%s" , path);
-    flb_errno();
-
-    fp = fopen(path, "rb");
-    if (!fp) {
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        flb_errno();
         return -1;
     }
 
-    fd = fileno(fp);
     ret = fstat(fd, &st);
     if (ret == -1) {
         flb_errno();
-        fclose(fp);
+        close(fd);
         return -1;
     }
 
     buf = flb_malloc(st.st_size + sizeof(char));
     if (!buf) {
         flb_errno();
-        fclose(fp);
+        close(fd);
         return -1;
     }
 
-    bytes = fread(buf, st.st_size, 1, fp);
-    if (bytes != 1) {
+    bytes = read(fd, buf, st.st_size);
+    if (bytes < 0) {
         flb_errno();
         flb_free(buf);
-        fclose(fp);
+        close(fd);
         return -1;
     }
 
     /* fread does not add null byte */
     buf[st.st_size] = '\0';
 
-    fclose(fp);
+    close(fd);
     *out_buf = buf;
     *out_size = st.st_size;
 
