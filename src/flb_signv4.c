@@ -1095,6 +1095,8 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
 
+    flb_info("cr: \n%s", cr);
+
     /* Task 2: string to sign */
     string_to_sign = flb_signv4_string_to_sign(c, cr, amzdate,
                                                datestamp, service, region);
@@ -1106,6 +1108,8 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
     flb_sds_destroy(cr);
+
+    flb_info("string_to_sign: \n%s", string_to_sign);
 
     /* Task 3: calculate the signature */
     signature = flb_signv4_calculate_signature(string_to_sign, datestamp,
