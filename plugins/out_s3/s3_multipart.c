@@ -142,8 +142,6 @@ int complete_multipart_upload(struct flb_s3 *ctx,
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
 
-    flb_info("[complete_multipart_upload] ID=%s", m_upload->upload_id);
-
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 11 +
                               flb_sds_len(m_upload->upload_id));
     if (!uri) {
@@ -164,8 +162,6 @@ int complete_multipart_upload(struct flb_s3 *ctx,
         flb_sds_destroy(uri);
         return -1;
     }
-
-    flb_info("Raw request: %s", body);
 
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_POST,
@@ -204,8 +200,6 @@ int create_multipart_upload(struct flb_s3 *ctx,
     flb_sds_t tmp;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
-
-    flb_info("[create_multipart_upload] ID=%s", m_upload->upload_id);
 
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 8);
     if (!uri) {
@@ -304,8 +298,6 @@ int upload_part(struct flb_s3 *ctx, struct multipart_upload *m_upload,
     flb_sds_t tmp;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
-
-    flb_info("[upload_part] ID=%s", m_upload->upload_id);
 
     uri = flb_sds_create_size(flb_sds_len(m_upload->s3_key) + 8);
     if (!uri) {

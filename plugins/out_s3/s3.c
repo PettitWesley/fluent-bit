@@ -807,8 +807,6 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
         return -1;
     }
 
-    flb_info("s3_key: %s", s3_key);
-
     len = strlen(s3_key);
     memcpy(uri, s3_key, len);
     if ((len + 16) <= 1024) {
@@ -827,8 +825,6 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     else {
         uri[len] = '\0';
     }
-
-    flb_info("uri: %s", uri);
 
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_PUT,
