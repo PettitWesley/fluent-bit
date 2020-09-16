@@ -228,24 +228,13 @@ static size_t append_data(char *path, char *data, size_t bytes)
     return written;
 }
 
-// static size_t append_data(char *path, char *data, size_t bytes)
-// {
-//     FILE *f;
-//     size_t written;
-//     f = fopen(path , "a" );
-//     if (!f) {
-//         return -1;
-//     }
-//     written = fwrite(data, 1, bytes, f);
-//     fclose(f);
-//     return written;
-// }
-
 /* we store the Fluent tag in a file "<hash_key>.tag" */
 static int write_tag(char *buffer_path, const char *tag)
 {
     char tmp[PATH_MAX];
     size_t ret;
+
+    flb_info("writing tag %s", tag);
 
     snprintf(tmp, sizeof(tmp), "%s.tag", buffer_path);
     ret = append_data(tmp, (char *) tag, strlen(tag));

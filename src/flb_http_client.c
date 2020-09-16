@@ -607,8 +607,6 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
         break;
     };
 
-    flb_info("uri in client: %s", uri);
-
     buf = flb_calloc(1, FLB_HTTP_BUF_SIZE);
     if (!buf) {
         flb_errno();
@@ -644,8 +642,6 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
         flb_free(buf);
         return NULL;
     }
-
-    flb_info("uri in client buf: %s", buf);
 
     c->u_conn      = u_conn;
     c->method      = method;
@@ -1071,8 +1067,6 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
         flb_http_client_debug_cb(c, "_debug.http.request_payload");
     }
 #endif
-
-    flb_info("raw headers: %.*s\n", c->header_len, c->header_buf);
 
     /* Write the header */
     ret = flb_io_net_write(c->u_conn,
