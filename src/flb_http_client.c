@@ -1068,6 +1068,8 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     }
 #endif
 
+    printf("raw headers: %.*s\n", c->header_len, c->header_buf);
+
     /* Write the header */
     ret = flb_io_net_write(c->u_conn,
                            c->header_buf, c->header_len,
