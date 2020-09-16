@@ -33,8 +33,11 @@
 #define AWS_SERVICE_ENDPOINT_FORMAT            "%s.%s.amazonaws.com"
 #define AWS_SERVICE_ENDPOINT_BASE_LEN          15
 
-#define S3_SERVICE_ENDPOINT_FORMAT             "%s.s3.amazonaws.com"
-#define S3_SERVICE_ENDPOINT_BASE_LEN           17
+#define S3_SERVICE_GLOBAL_ENDPOINT_FORMAT             "%s.s3.amazonaws.com"
+#define S3_SERVICE_GLOBAL_ENDPOINT_BASE_LEN           17
+
+#define S3_SERVICE_ENDPOINT_FORMAT             "%s.s3.%s.amazonaws.com"
+#define S3_SERVICE_ENDPOINT_BASE_LEN           18
 
 #define TAG_PART_DESCRIPTOR "$TAG[%d]"
 #define TAG_DESCRIPTOR "$TAG"
@@ -147,9 +150,16 @@ int flb_read_file(const char *path, char **out_buf, size_t *out_size)
 char *flb_s3_endpoint(char* bucket, char* region)
 {
     char *endpoint = NULL;
-    size_t len = S3_SERVICE_ENDPOINT_BASE_LEN;
+    size_t len = 0;
     int is_cn = FLB_FALSE;
     int bytes;
+
+    if (strcmp("us-east-1", region) == 0) {
+        len = S3_SERVICE_GLOBAL_ENDPOINT_BASE_LEN;
+    }
+    else {
+        len = S3_SERVICE_ENDPOINT_BASE_LEN;
+    }
 
 
     /* In the China regions, ".cn" is appended to the URL */
@@ -171,7 +181,13 @@ char *flb_s3_endpoint(char* bucket, char* region)
         return NULL;
     }
 
-    bytes = snprintf(endpoint, len, S3_SERVICE_ENDPOINT_FORMAT, bucket);
+    if (strcmp("us-east-1", region) == 0) {
+        bytes = snprintf(endpoint, len, S3_SERVICE_GLOBAL_ENDPOINT_FORMAT, bucket);
+    }
+    else {
+        bytes = snprintf(endpoint, len, S3_SERVICE_ENDPOINT_FORMAT, bucket, region);
+    }
+
     if (bytes < 0) {
         flb_errno();
         flb_free(endpoint);
