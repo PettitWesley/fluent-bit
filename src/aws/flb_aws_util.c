@@ -159,6 +159,7 @@ char *flb_s3_endpoint(char* bucket, char* region)
     }
     else {
         len = S3_SERVICE_ENDPOINT_BASE_LEN;
+        len += strlen(region);
     }
 
 
