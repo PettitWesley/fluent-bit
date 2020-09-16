@@ -210,7 +210,7 @@ int flb_mkdir_all(const char *dir) {
 //     fd = open(
 //         path,
 //         O_CREAT | O_WRONLY,
-//         0777
+//         S_IRWXU
 //     );
 //     if (fd == -1){
 //         return -1;

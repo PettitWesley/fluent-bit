@@ -477,8 +477,14 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->timer_ms = UPLOAD_TIMER_MAX_WAIT;
     }
 
-    // /* run in sync mode */
-    // ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+    /*
+     * Run S3 in sync mode.
+     * Multipart uploads don't work with async mode right now in high throughput
+     * cases. Its not clear why. Realistically, the performance of sync mode
+     * will be sufficient for most users, and long term we can do the work
+     * to enable async if needed.
+     */
+    ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -1104,8 +1110,8 @@ static int cb_s3_exit(void *data, struct flb_config *config)
     }
 
     if (mk_list_size(&ctx->store.chunks) > 0) {
-        /* exit must run in sync mode  */
-        ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+        /* exit must run in sync mode (right now all requests do)  */
+        //ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
         flb_plg_info(ctx->ins, "Sending all locally buffered data to S3");
         ret = put_all_chunks(ctx);
         if (ret < 0) {
