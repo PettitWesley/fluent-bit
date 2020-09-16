@@ -108,7 +108,7 @@ int flb_read_file(const char *path, char **out_buf, size_t *out_size)
 
     flb_info("path=%s" , path);
 
-    fp = fopen(path, "r");
+    fp = fopen(path, "rb");
     if (!fp) {
         return -1;
     }
