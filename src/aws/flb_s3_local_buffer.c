@@ -224,6 +224,7 @@ static size_t append_data(char *path, char *data, size_t bytes)
     }
 
     written = fwrite(data, 1, bytes, f);
+    fflush(f);
     close(fd);
     return written;
 }
@@ -233,8 +234,6 @@ static int write_tag(char *buffer_path, const char *tag)
 {
     char tmp[PATH_MAX];
     size_t ret;
-
-    flb_info("writing tag %s", tag);
 
     snprintf(tmp, sizeof(tmp), "%s.tag", buffer_path);
     ret = append_data(tmp, (char *) tag, strlen(tag));
