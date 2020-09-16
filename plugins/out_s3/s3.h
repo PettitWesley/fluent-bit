@@ -32,6 +32,7 @@
 #define MIN_CHUNKED_UPLOAD_SIZE 5242880
 #define MAX_CHUNKED_UPLOAD_SIZE 50000000
 
+#define UPLOAD_TIMER_MAX_WAIT 60000
 
 #define MULTIPART_UPLOAD_STATE_NOT_CREATED              0
 #define MULTIPART_UPLOAD_STATE_CREATED                  1
@@ -44,6 +45,14 @@
 #define MAX_FILE_SIZE_PUT_OBJECT         50000000
 
 #define DEFAULT_UPLOAD_TIMEOUT 3600
+
+/*
+ * If we see repeated errors on an upload, we will discard it
+ * This saves us from scenarios where something goes wrong and an upload can
+ * not proceed (may be some other process completed it or deleted the upload)
+ * instead of erroring out forever, we eventually discard the upload.
+ */
+#define MAX_UPLOAD_ERRORS 10
 
 struct multipart_upload {
     flb_sds_t s3_key;
@@ -69,6 +78,10 @@ struct multipart_upload {
     size_t bytes;
 
     struct mk_list _head;
+
+    /* see note for MAX_UPLOAD_ERRORS */
+    int upload_errors;
+    int complete_errors;
 };
 
 struct flb_s3 {
@@ -108,6 +121,9 @@ struct flb_s3 {
     size_t file_size;
     size_t upload_chunk_size;
     time_t upload_timeout;
+
+    int timer_created;
+    int timer_ms;
 
     struct flb_output_instance *ins;
 };
