@@ -607,6 +607,8 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
         break;
     };
 
+    flb_info("uri in client: %s", uri);
+
     buf = flb_calloc(1, FLB_HTTP_BUF_SIZE);
     if (!buf) {
         flb_errno();
@@ -642,6 +644,8 @@ struct flb_http_client *flb_http_client(struct flb_upstream_conn *u_conn,
         flb_free(buf);
         return NULL;
     }
+
+    flb_info("uri in client buf: %s", buf);
 
     c->u_conn      = u_conn;
     c->method      = method;
