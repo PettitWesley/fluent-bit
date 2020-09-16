@@ -202,44 +202,44 @@ int flb_mkdir_all(const char *dir) {
     return 0;
 }
 
-// static size_t append_data(char *path, char *data, size_t bytes)
-// {
-//     FILE *f;
-//     int fd;
-//     size_t written;
-//     fd = open(
-//         path,
-//         O_CREAT | O_WRONLY,
-//         S_IRWXU
-//     );
-//     if (fd == -1){
-//         return -1;
-//     }
-//
-//     f = fdopen(fd, "a");
-//     if (!f) {
-//         flb_errno();
-//         close(fd);
-//         return -1;
-//     }
-//
-//     written = fwrite(data, 1, bytes, f);
-//     close(fd);
-//     return written;
-// }
-
 static size_t append_data(char *path, char *data, size_t bytes)
 {
     FILE *f;
+    int fd;
     size_t written;
-    f = fopen(path , "a" );
-    if (!f) {
+    fd = open(
+        path,
+        O_CREAT | O_WRONLY,
+        S_IRWXU
+    );
+    if (fd == -1){
         return -1;
     }
+
+    f = fdopen(fd, "a");
+    if (!f) {
+        flb_errno();
+        close(fd);
+        return -1;
+    }
+
     written = fwrite(data, 1, bytes, f);
-    fclose(f);
+    close(fd);
     return written;
 }
+
+// static size_t append_data(char *path, char *data, size_t bytes)
+// {
+//     FILE *f;
+//     size_t written;
+//     f = fopen(path , "a" );
+//     if (!f) {
+//         return -1;
+//     }
+//     written = fwrite(data, 1, bytes, f);
+//     fclose(f);
+//     return written;
+// }
 
 /* we store the Fluent tag in a file "<hash_key>.tag" */
 static int write_tag(char *buffer_path, const char *tag)
