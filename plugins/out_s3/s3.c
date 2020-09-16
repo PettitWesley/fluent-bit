@@ -477,6 +477,9 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->timer_ms = UPLOAD_TIMER_MAX_WAIT;
     }
 
+    /* run in sync mode */
+    ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -969,7 +972,7 @@ static void cb_s3_upload(struct flb_config *config, void *data)
                 mk_list_add(&m_upload->_head, &ctx->uploads);
                 /* data was persisted, this can be retried */
                 m_upload->complete_errors += 1;
-                flb_plg_error(ctx->ins, "Could not complete upload %s, will retry on next flush..",
+                flb_plg_error(ctx->ins, "Could not complete upload %s, will retry..",
                                   m_upload->s3_key);
             }
         }
