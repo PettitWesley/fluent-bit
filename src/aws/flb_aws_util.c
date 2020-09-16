@@ -98,99 +98,99 @@ char *flb_aws_endpoint(char* service, char* region)
 
 }
 
-// int flb_read_file(const char *path, char **out_buf, size_t *out_size)
-// {
-//     int ret;
-//     long bytes;
-//     char *buf = NULL;
-//     FILE *fp = NULL;
-//     struct stat st;
-//     int fd;
-//
-//     flb_info("path=%s" , path);
-//
-//     fp = fopen(path, "rb");
-//     if (!fp) {
-//         return -1;
-//     }
-//
-//     fd = fileno(fp);
-//     ret = fstat(fd, &st);
-//     if (ret == -1) {
-//         flb_errno();
-//         fclose(fp);
-//         return -1;
-//     }
-//
-//     buf = flb_malloc(st.st_size + sizeof(char));
-//     if (!buf) {
-//         flb_errno();
-//         fclose(fp);
-//         return -1;
-//     }
-//
-//     bytes = fread(buf, st.st_size, 1, fp);
-//     if (bytes != 1) {
-//         flb_errno();
-//         flb_free(buf);
-//         fclose(fp);
-//         return -1;
-//     }
-//
-//     /* fread does not add null byte */
-//     buf[st.st_size] = '\0';
-//
-//     fclose(fp);
-//     *out_buf = buf;
-//     *out_size = st.st_size;
-//
-//     return 0;
-// }
-
 int flb_read_file(const char *path, char **out_buf, size_t *out_size)
 {
     int ret;
     long bytes;
     char *buf = NULL;
+    FILE *fp = NULL;
     struct stat st;
     int fd;
 
-    fd = open(path, O_RDONLY);
-    if (fd < 0) {
+    flb_info("path=%s" , path);
+
+    fp = fopen(path, "rb");
+    if (!fp) {
         return -1;
     }
 
+    fd = fileno(fp);
     ret = fstat(fd, &st);
     if (ret == -1) {
         flb_errno();
-        close(fd);
+        fclose(fp);
         return -1;
     }
 
     buf = flb_malloc(st.st_size + sizeof(char));
     if (!buf) {
         flb_errno();
-        close(fd);
+        fclose(fp);
         return -1;
     }
 
-    bytes = read(fd, buf, st.st_size);
+    bytes = fread(buf, st.st_size, 1, fp);
     if (bytes < 0) {
         flb_errno();
         flb_free(buf);
-        close(fd);
+        fclose(fp);
         return -1;
     }
 
     /* fread does not add null byte */
     buf[st.st_size] = '\0';
 
-    close(fd);
+    fclose(fp);
     *out_buf = buf;
     *out_size = st.st_size;
 
     return 0;
 }
+
+// int flb_read_file(const char *path, char **out_buf, size_t *out_size)
+// {
+//     int ret;
+//     long bytes;
+//     char *buf = NULL;
+//     struct stat st;
+//     int fd;
+//
+//     fd = open(path, O_RDONLY);
+//     if (fd < 0) {
+//         return -1;
+//     }
+//
+//     ret = fstat(fd, &st);
+//     if (ret == -1) {
+//         flb_errno();
+//         close(fd);
+//         return -1;
+//     }
+//
+//     buf = flb_malloc(st.st_size + sizeof(char));
+//     if (!buf) {
+//         flb_errno();
+//         close(fd);
+//         return -1;
+//     }
+//
+//     bytes = read(fd, buf, st.st_size);
+//     if (bytes < 0) {
+//         flb_errno();
+//         flb_free(buf);
+//         close(fd);
+//         return -1;
+//     }
+//
+//     /* fread does not add null byte */
+//     buf[st.st_size] = '\0';
+//
+//     close(fd);
+//     *out_buf = buf;
+//     *out_size = st.st_size;
+//
+//     return 0;
+// }
 
 /*
  * https://bucket.s3.amazonaws.com(.cn)
