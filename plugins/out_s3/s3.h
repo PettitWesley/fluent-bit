@@ -47,12 +47,15 @@
 #define DEFAULT_UPLOAD_TIMEOUT 3600
 
 /*
- * If we see repeated errors on an upload, we will discard it
+ * If we see repeated errors on an upload/chunk, we will discard it
  * This saves us from scenarios where something goes wrong and an upload can
  * not proceed (may be some other process completed it or deleted the upload)
  * instead of erroring out forever, we eventually discard the upload.
+ *
+ * The same is done for chunks, just to be safe, even though realistically
+ * I can't think of a reason why a chunk could become unsendable.
  */
-#define MAX_UPLOAD_ERRORS 10
+#define MAX_UPLOAD_ERRORS 5
 
 struct multipart_upload {
     flb_sds_t s3_key;
@@ -88,7 +91,6 @@ struct flb_s3 {
     char *bucket;
     char *region;
     char *prefix;
-    char *time_key;
     char *s3_key_format;
     char *tag_delimiters;
     char *endpoint;

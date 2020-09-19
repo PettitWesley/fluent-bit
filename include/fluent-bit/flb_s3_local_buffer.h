@@ -32,6 +32,9 @@ struct flb_local_chunk {
     struct timespec ts;
     time_t create_time;
 
+    /* times this chunk could not be sent */
+    int failures;
+
     struct mk_list _head;
 };
 

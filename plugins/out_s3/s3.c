@@ -306,14 +306,6 @@ static int cb_s3_init(struct flb_output_instance *ins,
         goto error;
     }
 
-    tmp = flb_output_get_property("time_key", ins);
-    if (tmp) {
-        ctx->time_key = (char *) tmp;
-    }
-    else {
-        ctx->time_key = "time";
-    }
-
     tmp = flb_output_get_property("endpoint", ins);
     if (tmp) {
         ctx->endpoint = (char *) tmp;
@@ -563,6 +555,7 @@ put_object:
         /* re-add chunk to list */
         if (chunk) {
             mk_list_add(&chunk->_head, &ctx->store.chunks);
+            chunk->failures += 1;
         }
         return FLB_RETRY;
     }
@@ -609,6 +602,7 @@ multipart:
         /* re-add chunk to list */
         if (chunk) {
             mk_list_add(&chunk->_head, &ctx->store.chunks);
+            chunk->failures += 1;
         }
         return FLB_RETRY;
     }
@@ -688,6 +682,14 @@ static int put_all_chunks(struct flb_s3 *ctx)
     mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
         chunk = mk_list_entry(head, struct flb_local_chunk, _head);
 
+        if (chunk->failures >= MAX_UPLOAD_ERRORS) {
+            mk_list_del(&chunk->_head);
+            flb_plg_warn(ctx->ins, "Chunk for tag %s failed to send %s times, "
+                         "will not retry", chunk->tag, MAX_UPLOAD_ERRORS);
+            flb_free(chunk);
+            continue;
+        }
+
         ret = construct_request_buffer(ctx, NULL, chunk, &buffer, &buffer_size);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not construct request buffer for %s",
@@ -700,6 +702,7 @@ static int put_all_chunks(struct flb_s3 *ctx)
         if (ret < 0) {
             /* re-add chunk to list */
             mk_list_add(&chunk->_head, &ctx->store.chunks);
+            chunk->failures += 1;
             return -1;
         }
 
@@ -1053,6 +1056,16 @@ static void cb_s3_flush(const void *data, size_t bytes,
     len = flb_sds_len(json);
     chunk = flb_chunk_get(&ctx->store, tag);
 
+    if (chunk != NULL) {
+        if (chunk->failures >= MAX_UPLOAD_ERRORS) {
+            mk_list_del(&chunk->_head);
+            flb_plg_warn(ctx->ins, "Chunk for tag %s failed to send %s times, "
+                         "will not retry", chunk->tag, MAX_UPLOAD_ERRORS);
+            flb_free(chunk);
+            chunk = NULL;
+        }
+    }
+
     /* if timeout has elapsed, we must put whatever data we have */
     if (chunk != NULL && time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
         timeout_check = FLB_TRUE;
@@ -1199,7 +1212,7 @@ static struct flb_config_map config_map[] = {
     },
 
     {
-     FLB_CONFIG_MAP_STR, "buffer_dir", "/fluent-bit/buffer/s3",
+     FLB_CONFIG_MAP_STR, "chunk_buffer_dir", "/fluent-bit/buffer/s3",
      0, FLB_TRUE, offsetof(struct flb_s3, buffer_dir),
     "Directory to locally buffer data before sending. Plugin uses the S3 Multipart "
     "upload API to send data in chunks of 5 MB at a time- only a small amount of"
