@@ -112,6 +112,9 @@ struct flb_s3 {
     struct flb_local_buffer store;
     flb_sds_t buffer_dir;
 
+    struct flb_local_buffer upload_store;
+    flb_sds_t upload_dir;
+
     /*
      * used to track that unset buffers were found on startup that have not
      * been sent

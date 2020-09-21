@@ -234,6 +234,14 @@ static int cb_s3_init(struct flb_output_instance *ins,
     }
     ctx->buffer_dir = tmp_sds;
 
+    /* upload state is stored in a sub-dir */
+    tmp_sds = concat_path(ctx->buffer_dir, "multipart_upload_metadata");
+    if (!tmp_sds) {
+        flb_plg_error(ctx->ins, "Could not construct upload buffer path");
+        goto error;
+    }
+    ctx->upload_dir = tmp_sds;
+
     tmp = flb_output_get_property("s3_key_format", ins);
     if (tmp) {
         if (tmp[0] != '/') {
@@ -455,6 +463,16 @@ static int cb_s3_init(struct flb_output_instance *ins,
         goto error;
     }
 
+    ctx->upload_store.ins = ctx->ins;
+    ctx->upload_store.dir = ctx->upload_dir;
+    mk_list_init(&ctx->store.chunks);
+    ret = flb_mkdir_all(ctx->upload_store.dir);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Failed to create directories for local buffer: %s",
+                      ctx->store.dir);
+        goto error;
+    }
+
     /* read any remaining buffers from previous (failed) executions */
     ctx->has_old_buffers = FLB_FALSE;
     ret = flb_init_local_buffer(&ctx->store);
@@ -643,7 +661,6 @@ multipart:
         return FLB_RETRY;
     }
     m_upload->part_number += 1;
-
 
     /* data was sent successfully- delete the local buffer */
     if (chunk) {

@@ -50,6 +50,76 @@ static inline int try_to_write(char *buf, int *off, size_t left,
     return FLB_TRUE;
 }
 
+
+/* the 'tag' or key in the upload_dir is s3_key + \n + upload_id */
+static flb_sds_t upload_key(struct multipart_upload *m_upload)
+{
+    flb_sds_t key;
+    flb_sds_t tmp;
+
+    key = flb_sds_create_size(64);
+
+    tmp = flb_sds_printf(&key, "%s\n%s", m_upload->s3_key, m_upload->upload_id);
+    if (!tmp) {
+        flb_errno();
+        flb_sds_destroy(key);
+        return NULL;
+    }
+    key = tmp;
+
+    return key;
+}
+
+/* store list of part number and etag */
+static flb_sds_t upload_data(flb_sds_t etag, int part_num)
+{
+    flb_sds_t data;
+    flb_sds_t tmp;
+
+    data = flb_sds_create_size(64);
+
+    tmp = flb_sds_printf(&data, "part_number=%d\tetag=%s", part_num, etag);
+    if (!tmp) {
+        flb_errno();
+        flb_sds_destroy(data);
+        return NULL;
+    }
+    data = tmp;
+
+    return data;
+}
+
+/* persists upload data to the file system */
+static int save_upload(struct flb_s3 *ctx, struct multipart_upload *m_upload,
+                       flb_sds_t etag)
+{
+    flb_sds_t upload_key;
+    flb_sds_t upload_data;
+    int ret;
+    int len;
+    struct flb_local_chunk *chunk = NULL;
+
+    upload_key = upload_key(m_upload);
+    if (!upload_key) {
+        flb_plg_debug(ctx->ins, "Could not constuct upload key for buffer dir");
+        return -1;
+    }
+
+    upload_data = upload_data(etag, m_upload->part_number);
+    if (!upload_data) {
+        flb_plg_debug(ctx->ins, "Could not constuct upload key for buffer dir");
+        return -1;
+    }
+
+    len = flb_sds_len(upload_data);
+
+    chunk = flb_chunk_get(&ctx->upload_store, upload_key);
+
+    ret = flb_buffer_put(&ctx->upload_store, chunk, upload_key, upload_data, (size_t) len);
+
+    return ret;
+}
+
 /*
  * https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html
  */
@@ -296,6 +366,7 @@ int upload_part(struct flb_s3 *ctx, struct multipart_upload *m_upload,
 {
     flb_sds_t uri = NULL;
     flb_sds_t tmp;
+    int ret;
     struct flb_http_client *c = NULL;
     struct flb_aws_client *s3_client;
 
@@ -340,6 +411,19 @@ int upload_part(struct flb_s3 *ctx, struct multipart_upload *m_upload,
             flb_http_client_destroy(c);
             /* track how many bytes are have gone toward this upload */
             m_upload->bytes += body_size;
+
+            /* finally, attempt to persist the data for this upload */
+            ret = save_upload(ctx, m_upload, tmp)
+            if (ret == 0) {
+                flb_plg_debug(ctx->ins, "Successfully persisted upload data, UploadId=%s"
+                              m_upload->upload_id);
+            }
+            else {
+                flb_plg_warn(ctx->ins, "Was not able to persisted upload data to disk; "
+                            "if fluent bit dies without completing this upload the part "
+                            "could be lost, UploadId=%s, ETag=%s"
+                              m_upload->upload_id, tmp);
+            }
             return 0;
         }
         flb_aws_print_xml_error(c->resp.payload, c->resp.payload_size,
