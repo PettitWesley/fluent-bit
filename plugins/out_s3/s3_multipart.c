@@ -415,14 +415,14 @@ int upload_part(struct flb_s3 *ctx, struct multipart_upload *m_upload,
             /* finally, attempt to persist the data for this upload */
             ret = save_upload(ctx, m_upload, tmp);
             if (ret == 0) {
-                flb_plg_debug(ctx->ins, "Successfully persisted upload data, UploadId=%s"
+                flb_plg_debug(ctx->ins, "Successfully persisted upload data, UploadId=%s",
                               m_upload->upload_id);
             }
             else {
                 flb_plg_warn(ctx->ins, "Was not able to persisted upload data to disk; "
                             "if fluent bit dies without completing this upload the part "
-                            "could be lost, UploadId=%s, ETag=%s"
-                              m_upload->upload_id, tmp);
+                            "could be lost, UploadId=%s, ETag=%s",
+                            m_upload->upload_id, tmp);
             }
             return 0;
         }
