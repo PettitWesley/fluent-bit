@@ -401,7 +401,7 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
         else {
             normalize_uri = FLB_FALSE;
         }
-        signature = flb_signv4_do(c, FLB_TRUE, normalize_uri, time(NULL),
+        signature = flb_signv4_do(c, normalize_uri, FLB_TRUE, time(NULL),
                                   aws_client->region, aws_client->service,
                                   aws_client->s3_mode,
                                   aws_client->provider);
