@@ -228,7 +228,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
      * of this plugin using the same buffer dir
      */
     tmp_sds = concat_path(ctx->chunk_buffer_dir, ctx->bucket);
-    if (tmp_sds) {
+    if (!tmp_sds) {
+        flb_plg_error(ctx->ins, "Could not construct buffer path");
         goto error;
     }
     ctx->buffer_dir = tmp_sds;
