@@ -78,7 +78,7 @@ static flb_sds_t upload_data(flb_sds_t etag, int part_num)
 
     data = flb_sds_create_size(64);
 
-    tmp = flb_sds_printf(&data, "part_number=%d\tetag=%s", part_num, etag);
+    tmp = flb_sds_printf(&data, "part_number=%d\tetag=%s\n", part_num, etag);
     if (!tmp) {
         flb_errno();
         flb_sds_destroy(data);
