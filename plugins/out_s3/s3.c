@@ -465,7 +465,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
 
     ctx->upload_store.ins = ctx->ins;
     ctx->upload_store.dir = ctx->upload_dir;
-    mk_list_init(&ctx->store.chunks);
+    mk_list_init(&ctx->upload_store.chunks);
     ret = flb_mkdir_all(ctx->upload_store.dir);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to create directories for local buffer: %s",
