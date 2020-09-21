@@ -49,6 +49,25 @@ static struct multipart_upload *get_upload(struct flb_s3 *ctx,
 static struct multipart_upload *create_upload(struct flb_s3 *ctx,
                                               const char *tag, int tag_len);
 
+
+static flb_sds_t concat_path(char *p1, char *p2)
+{
+    flb_sds_t dir;
+    flb_sds_t tmp;
+
+    dir = flb_sds_create_size(64);
+
+    tmp = flb_sds_printf(&dir, "%s/%s", p1, p2);
+    if (!tmp) {
+        flb_errno();
+        flb_sds_destroy(dir);
+        return NULL;
+    }
+    dir = tmp;
+
+    return dir;
+}
+
 static void multipart_upload_destroy(struct multipart_upload *m_upload)
 {
     int i;
@@ -131,6 +150,10 @@ static void s3_context_destroy(struct flb_s3 *ctx)
         flb_free(ctx->endpoint);
     }
 
+    if (ctx->buffer_dir) {
+        flb_sds_destroy(ctx->buffer_dir);
+    }
+
     flb_free(ctx);
 }
 
@@ -139,6 +162,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
 {
     int ret;
     const char *tmp;
+    flb_sds_t tmp_sds;
     int i;
     int len;
     struct flb_s3 *ctx = NULL;
@@ -193,10 +217,21 @@ static int cb_s3_init(struct flb_output_instance *ins,
     if (tmp) {
         len = strlen(tmp);
         if (tmp[len - 1] == '/' || tmp[len - 1] == '\\') {
-            flb_plg_error(ctx->ins, "'buffer_dir' can not end in a / of \\");
+            flb_plg_error(ctx->ins, "'chunk_buffer_dir' can not end in a / of \\");
             goto error;
         }
     }
+
+    /*
+     * chunk_buffer_dir is the user input, buffer_dir is what the code uses
+     * We append the bucket name to the dir, to support multiple instances
+     * of this plugin using the same buffer dir
+     */
+    tmp_sds = concat_path(ctx->chunk_buffer_dir, ctx->bucket);
+    if (tmp_sds) {
+        goto error;
+    }
+    ctx->buffer_dir = tmp_sds;
 
     tmp = flb_output_get_property("s3_key_format", ins);
     if (tmp) {
@@ -1213,7 +1248,7 @@ static struct flb_config_map config_map[] = {
 
     {
      FLB_CONFIG_MAP_STR, "chunk_buffer_dir", "/fluent-bit/buffer/s3",
-     0, FLB_TRUE, offsetof(struct flb_s3, buffer_dir),
+     0, FLB_TRUE, offsetof(struct flb_s3, chunk_buffer_dir),
     "Directory to locally buffer data before sending. Plugin uses the S3 Multipart "
     "upload API to send data in chunks of 5 MB at a time- only a small amount of"
     " data will be locally buffered at any given point in time."

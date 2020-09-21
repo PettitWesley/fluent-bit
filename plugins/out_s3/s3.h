@@ -92,6 +92,7 @@ struct flb_s3 {
     char *region;
     char *s3_key_format;
     char *tag_delimiters;
+    char *chunk_buffer_dir;
     char *endpoint;
     int free_endpoint;
     int use_put_object;
@@ -109,7 +110,7 @@ struct flb_s3 {
     flb_sds_t json_date_key;
 
     struct flb_local_buffer store;
-    char *buffer_dir;
+    flb_sds_t *buffer_dir;
 
     /*
      * used to track that unset buffers were found on startup that have not
