@@ -317,6 +317,7 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
     struct flb_upstream_conn *u_conn = NULL;
     flb_sds_t signature = NULL;
     int i;
+    int normalize_uri;
     struct flb_aws_header header;
     struct flb_http_client *c = NULL;
 
@@ -394,7 +395,13 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
     }
 
     if (aws_client->has_auth) {
-        signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
+        if (aws_client->s3_mode == S3_MODE_NONE) {
+            normalize_uri = FLB_TRUE;
+        }
+        else {
+            normalize_uri = FLB_FALSE;
+        }
+        signature = flb_signv4_do(c, FLB_TRUE, normalize_uri, time(NULL),
                                   aws_client->region, aws_client->service,
                                   aws_client->s3_mode,
                                   aws_client->provider);
