@@ -93,29 +93,29 @@ static flb_sds_t upload_data(flb_sds_t etag, int part_num)
 static int save_upload(struct flb_s3 *ctx, struct multipart_upload *m_upload,
                        flb_sds_t etag)
 {
-    flb_sds_t upload_key;
-    flb_sds_t upload_data;
+    flb_sds_t key;
+    flb_sds_t data;
     int ret;
     int len;
     struct flb_local_chunk *chunk = NULL;
 
-    upload_key = upload_key(m_upload);
-    if (!upload_key) {
+    key = upload_key(m_upload);
+    if (!key) {
         flb_plg_debug(ctx->ins, "Could not constuct upload key for buffer dir");
         return -1;
     }
 
-    upload_data = upload_data(etag, m_upload->part_number);
-    if (!upload_data) {
+    data = upload_data(etag, m_upload->part_number);
+    if (!data) {
         flb_plg_debug(ctx->ins, "Could not constuct upload key for buffer dir");
         return -1;
     }
 
-    len = flb_sds_len(upload_data);
+    len = flb_sds_len(data);
 
-    chunk = flb_chunk_get(&ctx->upload_store, upload_key);
+    chunk = flb_chunk_get(&ctx->upload_store, key);
 
-    ret = flb_buffer_put(&ctx->upload_store, chunk, upload_key, upload_data, (size_t) len);
+    ret = flb_buffer_put(&ctx->upload_store, chunk, key, data, (size_t) len);
 
     return ret;
 }
@@ -413,7 +413,7 @@ int upload_part(struct flb_s3 *ctx, struct multipart_upload *m_upload,
             m_upload->bytes += body_size;
 
             /* finally, attempt to persist the data for this upload */
-            ret = save_upload(ctx, m_upload, tmp)
+            ret = save_upload(ctx, m_upload, tmp);
             if (ret == 0) {
                 flb_plg_debug(ctx->ins, "Successfully persisted upload data, UploadId=%s"
                               m_upload->upload_id);
