@@ -110,7 +110,7 @@ struct flb_s3 {
     flb_sds_t json_date_key;
 
     struct flb_local_buffer store;
-    flb_sds_t *buffer_dir;
+    flb_sds_t buffer_dir;
 
     /*
      * used to track that unset buffers were found on startup that have not
