@@ -198,12 +198,12 @@ static int cb_s3_init(struct flb_output_instance *ins,
         }
     }
 
-    tmp = flb_output_get_property("prefix", ins);
+    tmp = flb_output_get_property("s3_key_format", ins);
     if (tmp) {
-        ctx->prefix = (char *) tmp;
-    }
-    else {
-        ctx->prefix = "fluent-bit";
+        if (tmp[0] != '/') {
+            flb_plg_error(ctx->ins, "'s3_key_format' must start with a '/'");
+            goto error;
+        }
     }
 
     tmp = flb_output_get_property("total_file_size", ins);

@@ -90,7 +90,6 @@ struct multipart_upload {
 struct flb_s3 {
     char *bucket;
     char *region;
-    char *prefix;
     char *s3_key_format;
     char *tag_delimiters;
     char *endpoint;
