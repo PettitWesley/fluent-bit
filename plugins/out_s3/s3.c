@@ -271,6 +271,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
         flb_plg_info(ctx->ins, "Using default file size 100MB");
     }
 
+    flb_plg_info(ctx->ins, "Using upload size %lu bytes", ctx->file_size);
+
     tmp = flb_output_get_property("upload_chunk_size", ins);
     if (tmp) {
         ctx->upload_chunk_size = (size_t) flb_utils_size_to_bytes(tmp);
