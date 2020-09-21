@@ -189,7 +189,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
         goto error;
     }
 
-    tmp = flb_output_get_property("buffer_dir", ins);
+    tmp = flb_output_get_property("chunk_buffer_dir", ins);
     if (tmp) {
         len = strlen(tmp);
         if (tmp[len - 1] == '/' || tmp[len - 1] == '\\') {
