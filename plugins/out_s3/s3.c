@@ -542,15 +542,44 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->timer_ms = UPLOAD_TIMER_MAX_WAIT;
     }
 
-    if (ctx->use_put_object == FLB_FALSE) {
+    /* init must use sync mode */
+    ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+
+    /* clean up any old buffers found on startup */
+    if (ctx->has_old_buffers == FLB_TRUE) {
+        flb_plg_info(ctx->ins, "Sending locally buffered data from previous "
+                     "executions to S3; buffer=%s", ctx->store.dir);
+        ctx->has_old_buffers = FLB_FALSE;
+        ret = put_all_chunks(ctx);
+        if (ret < 0) {
+            ctx->has_old_buffers = FLB_TRUE;
+            flb_plg_error(ctx->ins, "Failed to send locally buffered data left over"
+                          " from previous executions; will retry. Buffer=%s", ctx->store.dir);
+        }
+    }
+
+    /* clean up any old uploads found on start up */
+    if (ctx->has_old_uploads == FLB_TRUE) {
+        flb_plg_info(ctx->ins, "Completing multipart uploads from previous "
+                     "executions to S3; buffer=%s", ctx->upload_store.dir);
+        ctx->has_old_uploads = FLB_FALSE;
+
         /*
-         * Run S3 in sync mode.
+         * we don't need to worry if this fails; it will retry each
+         * time the upload callback is called
+         */
+         cb_s3_upload(config, ctx);
+    }
+
+    if (ctx->use_put_object == FLB_TRUE) {
+        /*
+         * Run S3 in async mode.
          * Multipart uploads don't work with async mode right now in high throughput
          * cases. Its not clear why. Realistically, the performance of sync mode
          * will be sufficient for most users, and long term we can do the work
          * to enable async if needed.
          */
-        ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+        ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
     }
 
     /* Export context */
@@ -1100,32 +1129,6 @@ static void cb_s3_flush(const void *data, size_t bytes,
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
         ctx->timer_created = FLB_TRUE;
-    }
-
-    /* clean up any old buffers found on startup */
-    if (ctx->has_old_buffers == FLB_TRUE) {
-        flb_plg_info(ctx->ins, "Sending locally buffered data from previous "
-                     "executions to S3; buffer=%s", ctx->store.dir);
-        ctx->has_old_buffers = FLB_FALSE;
-        ret = put_all_chunks(ctx);
-        if (ret < 0) {
-            ctx->has_old_buffers = FLB_TRUE;
-            flb_plg_error(ctx->ins, "Failed to send locally buffered data left over"
-                          " from previous executions; will retry. Buffer=%s", ctx->store.dir);
-        }
-    }
-
-    /* clean up any old uploads found on start up */
-    if (ctx->has_old_uploads == FLB_TRUE) {
-        flb_plg_info(ctx->ins, "Completing multipart uploads from previous "
-                     "executions to S3; buffer=%s", ctx->upload_store.dir);
-        ctx->has_old_uploads = FLB_FALSE;
-
-        /*
-         * we don't need to worry if this fails; it will retry each
-         * time the upload callback is called
-         */
-         cb_s3_upload(config, ctx);
     }
 
     json = flb_pack_msgpack_to_json_format(data, bytes,
