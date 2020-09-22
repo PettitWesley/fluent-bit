@@ -751,6 +751,7 @@ flb_sds_t flb_get_s3_key(const char *format, time_t time, const char *tag, char 
     /* Find all occurences of $TAG[*] and
      * replaces it with the right token from tag.
      */
+    i = 0;
     while(tag_token != NULL && i < MAX_TAG_PARTS) {
         buf = flb_sds_create_size(10);
         if (!buf) {
