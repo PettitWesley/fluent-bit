@@ -78,9 +78,7 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
     int original_len;
     char *tmp;
 
-    flb_info("tag: %s", key);
     original_len = flb_sds_len(key);
-    flb_info("original_len=%d", original_len);
 
     tmp = strchr(key, '\n');
     if (!tmp) {
@@ -104,8 +102,6 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
         return -1;
     }
     m_upload->upload_id = tmp_sds;
-    flb_info("len=%d", len);
-    flb_info("upload_id=%s", tmp_sds);
 
     return 0;
 }
@@ -299,10 +295,6 @@ static int complete_multipart_upload_payload(struct flb_s3 *ctx,
     flb_sds_t etag;
     size_t size = COMPLETE_MULTIPART_UPLOAD_BASE_LEN;
     char part_num[7];
-    int last_part_num;
-
-    /* part_number on the upload will be set to next expected part number */
-    last_part_num = m_upload->part_number - 1;
 
     size = size + (COMPLETE_MULTIPART_UPLOAD_PART_LEN * last_part_num);
 
@@ -317,8 +309,11 @@ static int complete_multipart_upload_payload(struct flb_s3 *ctx,
         goto error;
     }
 
-    for (i = 0; i < last_part_num; i++) {
+    for (i = 0; i < m_upload->part_number; i++) {
         etag = m_upload->etags[i];
+        if (etag == NULL) {
+            continue;
+        }
         if (!try_to_write(buf, &offset, size,
                           "<Part><ETag>", 12)) {
             goto error;
