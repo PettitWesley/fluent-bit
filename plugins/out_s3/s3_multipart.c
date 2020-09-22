@@ -95,7 +95,7 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
     original_len = flb_sds_len(key);
     original_len -= (len + 1);
 
-    tmp_sds = flb_sds_create_len(key, len);
+    tmp_sds = flb_sds_create_len(tmp, len);
     if (!tmp_sds) {
         flb_errno();
         return -1;
@@ -203,6 +203,9 @@ static struct multipart_upload *upload_from_file(struct flb_s3 *ctx,
         multipart_upload_destroy(m_upload);
         return NULL;
     }
+
+    /* code expects it to be 1 more than the last part read */
+    m_upload->part_number++;
 
     return m_upload;
 }
