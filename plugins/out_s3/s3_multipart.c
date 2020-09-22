@@ -79,6 +79,8 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
     char *tmp;
 
     flb_info("tag: %s", key);
+    original_len = flb_sds_len(key);
+    flb_info("original_len=%d", original_len);
 
     tmp = strchr(key, '\n');
     if (!tmp) {
@@ -94,7 +96,6 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
     m_upload->s3_key = tmp_sds;
 
     tmp++;
-    original_len = flb_sds_len(key);
     original_len -= (len + 1);
 
     tmp_sds = flb_sds_create_len(tmp, len);
