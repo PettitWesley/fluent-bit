@@ -98,7 +98,7 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
     tmp++;
     original_len -= (len + 1);
 
-    tmp_sds = flb_sds_create_len(tmp, len);
+    tmp_sds = flb_sds_create_len(tmp, original_len);
     if (!tmp_sds) {
         flb_errno();
         return -1;
