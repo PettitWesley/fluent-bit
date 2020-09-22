@@ -144,6 +144,8 @@ int create_multipart_upload(struct flb_s3 *ctx,
 int complete_multipart_upload(struct flb_s3 *ctx,
                               struct multipart_upload *m_upload);
 
-static void read_uploads_from_fs(struct flb_s3 *ctx);
+void read_uploads_from_fs(struct flb_s3 *ctx);
+
+void multipart_upload_destroy(struct multipart_upload *m_upload);
 
 #endif
