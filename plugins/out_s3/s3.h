@@ -120,6 +120,8 @@ struct flb_s3 {
      * been sent
      */
     int has_old_buffers;
+    /* old multipart uploads read on start up */
+    int has_old_uploads;
 
     struct mk_list uploads;
 
@@ -141,5 +143,7 @@ int create_multipart_upload(struct flb_s3 *ctx,
 
 int complete_multipart_upload(struct flb_s3 *ctx,
                               struct multipart_upload *m_upload);
+
+static int read_uploads_from_fs(struct flb_s3 *ctx);
 
 #endif

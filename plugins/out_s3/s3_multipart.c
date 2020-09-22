@@ -167,7 +167,8 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
     } while (line != NULL);
 }
 
-static struct multipart_upload *upload_from_file(struct flb_local_chunk *chunk)
+static struct multipart_upload *upload_from_file(struct flb_s3 *ctx,
+                                                 struct flb_local_chunk *chunk)
 {
     struct multipart_upload *m_upload = NULL;
     char *buffered_data = NULL;
@@ -196,6 +197,7 @@ static struct multipart_upload *upload_from_file(struct flb_local_chunk *chunk)
                       chunk->file_path);
         flb_free(buffered_data);
         multipart_upload_destroy(m_upload);
+        return NULL;
     }
 
     parse_etags(m_upload, buffered_data);
@@ -204,9 +206,31 @@ static struct multipart_upload *upload_from_file(struct flb_local_chunk *chunk)
                       chunk->file_path);
         flb_free(buffered_data);
         multipart_upload_destroy(m_upload);
+        return NULL;
     }
 
     return m_upload;
+}
+
+static void read_uploads_from_fs(struct flb_s3 *ctx)
+{
+    struct flb_local_chunk *chunk;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct multipart_upload *m_upload = NULL;
+
+    mk_list_foreach_safe(head, tmp, &ctx->upload_store.chunks) {
+        chunk = mk_list_entry(head, struct flb_local_chunk, _head);
+        m_upload = upload_from_file(ctx, chunk);
+        if (!m_upload) {
+            flb_plg_error(ctx->ins, "Could not process multipart upload data in %s",
+                          chunk->file_path);
+            continue;
+        }
+        mk_list_add(&m_upload->_head, &ctx->uploads);
+        flb_plg_info(ctx->ins, "Successfully read existing upload from file system, s3_key=%s",
+                      m_upload->s3_key);
+    }
 }
 
 /* store list of part number and etag */
