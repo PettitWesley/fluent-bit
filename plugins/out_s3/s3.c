@@ -544,7 +544,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     }
 
     /* init must use sync mode */
-    async_flags = ctx->s3_client->upstream->flags
+    async_flags = ctx->s3_client->upstream->flags;
     ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
 
     /* clean up any old buffers found on startup */
