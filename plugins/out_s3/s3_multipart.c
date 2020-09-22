@@ -84,7 +84,7 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
     }
 
     len = tmp - key;
-    flb_sds_t tmp_sds = flb_sds_create_len(key, len);
+    tmp_sds = flb_sds_create_len(key, len);
     if (!tmp_sds) {
         flb_errno();
         return -1;
@@ -95,7 +95,7 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
     original_len = flb_sds_len(key);
     original_len -= (len + 1);
 
-    flb_sds_t tmp_sds = flb_sds_create_len(key, len);
+    tmp_sds = flb_sds_create_len(key, len);
     if (!tmp_sds) {
         flb_errno();
         return -1;
@@ -113,8 +113,9 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
     char *end;
     flb_sds_t etag;
     int part_num;
+    int len;
 
-    line = strtok(data, '\n');
+    line = strtok(data, "\n");
 
     do {
         start = strstr(line, "part_number=");
@@ -135,7 +136,7 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
         }
         m_upload->part_number = part_num;
 
-        end++
+        end++;
         start = strstr(end, "tag=");
         if (!start) {
             flb_debug("[s3 restart parser] Could not find 'tag=' %s", line);
@@ -163,7 +164,7 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
         flb_debug("[s3 restart parser] found part number %d=%s", part_num, etag);
         m_upload->etags[part_num - 1] = etag;
 
-        line = strtok(NULL, '\n');
+        line = strtok(NULL, "\n");
     } while (line != NULL);
 }
 
