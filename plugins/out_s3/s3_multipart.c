@@ -104,6 +104,8 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
         return -1;
     }
     m_upload->upload_id = tmp_sds;
+    flb_info("len=%d", len);
+    flb_info("upload_id=%s", tmp_sds);
 
     return 0;
 }
