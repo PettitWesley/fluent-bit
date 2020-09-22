@@ -1115,6 +1115,19 @@ static void cb_s3_flush(const void *data, size_t bytes,
         }
     }
 
+    /* clean up any old uploads found on start up */
+    if (ctx->has_old_uploads == FLB_TRUE) {
+        flb_plg_info(ctx->ins, "Completing multipart uploads from previous "
+                     "executions to S3; buffer=%s", ctx->upload_store.dir);
+        ctx->has_old_uploads = FLB_FALSE;
+
+        /*
+         * we don't need to worry if this fails; it will retry each
+         * time the upload callback is called
+         */
+         cb_s3_upload(config, ctx);
+    }
+
     json = flb_pack_msgpack_to_json_format(data, bytes,
                                            FLB_PACK_JSON_FORMAT_LINES,
                                            ctx->json_date_format,

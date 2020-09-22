@@ -148,14 +148,7 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
 
         start += 4;
         len = strlen(start);
-        // end = strchr(start, '\n');
-        // if (!end) {
-        //     flb_debug("[s3 restart parser] Did not find end of line %s", start);
-        //     return;
-        // }
-        // end = '\0';
 
-        // len = end - start;
         if (len <= 0) {
             flb_debug("[s3 restart parser] Could not find etag %s", line);
             return;
@@ -401,6 +394,9 @@ int complete_multipart_upload(struct flb_s3 *ctx,
         flb_sds_destroy(uri);
         return -1;
     }
+
+    flb_info("URI: %s", uri);
+    flb_info("Raw request: %s", body);
 
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_POST,
