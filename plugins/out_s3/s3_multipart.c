@@ -118,16 +118,20 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
     line = strtok(data, "\n");
 
     do {
+        flb_info("line=%s", line);
         start = strstr(line, "part_number=");
         if (!start) {
             return;
         }
+        flb_info("start=%s", start);
         start += 12;
+        flb_info("start=%s", start);
         end = strchr(start, '\t');
         if (!end) {
             flb_debug("[s3 restart parser] Did not find tab separator in line %s", start);
             return;
         }
+        flb_info("end=%s", end);
         end = '\0';
         part_num = atoi(start);
         if (part_num <= 0) {
