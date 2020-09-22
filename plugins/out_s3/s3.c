@@ -784,6 +784,9 @@ static int put_all_chunks(struct flb_s3 *ctx)
 
     mk_list_foreach_safe(head, tmp, &ctx->store.chunks) {
         chunk = mk_list_entry(head, struct flb_local_chunk, _head);
+        if (chunk == NULL) {
+            continue;
+        }
 
         if (chunk->failures >= MAX_UPLOAD_ERRORS) {
             mk_list_del(&chunk->_head);
@@ -967,6 +970,10 @@ static struct multipart_upload *get_upload(struct flb_s3 *ctx,
 
     mk_list_foreach_safe(head, tmp, &ctx->uploads) {
         tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
+        if (tmp_upload == NULL) {
+            continue;
+        }
+
         if (tmp_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
             continue;
         }

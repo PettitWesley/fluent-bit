@@ -220,6 +220,9 @@ void read_uploads_from_fs(struct flb_s3 *ctx)
 
     mk_list_foreach_safe(head, tmp, &ctx->upload_store.chunks) {
         chunk = mk_list_entry(head, struct flb_local_chunk, _head);
+        if (chunk == NULL) {
+            continue;
+        }
         m_upload = upload_from_file(ctx, chunk);
         if (!m_upload) {
             flb_plg_error(ctx->ins, "Could not process multipart upload data in %s",
