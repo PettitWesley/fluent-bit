@@ -68,7 +68,7 @@ static flb_sds_t concat_path(char *p1, char *p2)
     return dir;
 }
 
-static void multipart_upload_destroy(struct multipart_upload *m_upload)
+void multipart_upload_destroy(struct multipart_upload *m_upload)
 {
     int i;
     flb_sds_t etag;

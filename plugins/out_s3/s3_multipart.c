@@ -213,7 +213,7 @@ static struct multipart_upload *upload_from_file(struct flb_s3 *ctx,
     return m_upload;
 }
 
-static void read_uploads_from_fs(struct flb_s3 *ctx)
+void read_uploads_from_fs(struct flb_s3 *ctx)
 {
     struct flb_local_chunk *chunk;
     struct mk_list *tmp;
