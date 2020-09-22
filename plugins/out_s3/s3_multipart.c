@@ -220,9 +220,6 @@ void read_uploads_from_fs(struct flb_s3 *ctx)
 
     mk_list_foreach_safe(head, tmp, &ctx->upload_store.chunks) {
         chunk = mk_list_entry(head, struct flb_local_chunk, _head);
-        if (chunk == NULL) {
-            continue;
-        }
         m_upload = upload_from_file(ctx, chunk);
         if (!m_upload) {
             flb_plg_error(ctx->ins, "Could not process multipart upload data in %s",
@@ -303,6 +300,7 @@ static int remove_upload_from_fs(struct flb_s3 *ctx, struct multipart_upload *m_
     chunk = flb_chunk_get(&ctx->upload_store, key);
 
     if (chunk) {
+        mk_list_del(&chunk->_head);
         ret = flb_remove_chunk_files(chunk);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not delete local buffer file %s",

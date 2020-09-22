@@ -350,9 +350,6 @@ struct flb_local_chunk *flb_chunk_get(struct flb_local_buffer *store, const char
 
     mk_list_foreach_safe(head, tmp, &store->chunks) {
         tmp_chunk = mk_list_entry(head, struct flb_local_chunk, _head);
-        if (tmp_chunk == NULL) {
-            continue;
-        }
         if (strcmp(tmp_chunk->tag, tag) == 0) {
             c = tmp_chunk;
             break;
