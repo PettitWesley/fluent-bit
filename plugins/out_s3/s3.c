@@ -163,6 +163,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     int ret;
     const char *tmp;
     flb_sds_t tmp_sds;
+    int async_flags;
     int i;
     int len;
     struct flb_s3 *ctx = NULL;
@@ -543,6 +544,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     }
 
     /* init must use sync mode */
+    async_flags = ctx->s3_client->upstream->flags
     ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
 
     /* clean up any old buffers found on startup */
@@ -579,7 +581,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
          * will be sufficient for most users, and long term we can do the work
          * to enable async if needed.
          */
-        ctx->s3_client->upstream->flags |= ~(FLB_IO_ASYNC);
+        ctx->s3_client->upstream->flags = async_flags;
     }
 
     /* Export context */
@@ -1276,7 +1278,7 @@ static struct flb_config_map config_map[] = {
     "uploaded to S3. Default: 5M, Max: 50M, Min: 5M."
     },
     {
-     FLB_CONFIG_MAP_INT, "upload_timeout", "60",
+     FLB_CONFIG_MAP_INT, "upload_timeout", "10",
      0, FLB_FALSE, 0,
     "Optionally specify a timeout for uploads using an integer number of minutes. "
     "Whenever this amount of time has elapsed, Fluent Bit will complete an "
