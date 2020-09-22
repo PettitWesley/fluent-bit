@@ -70,6 +70,145 @@ static flb_sds_t upload_key(struct multipart_upload *m_upload)
     return key;
 }
 
+/* the 'tag' or key in the upload_dir is s3_key + \n + upload_id */
+static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key)
+{
+    flb_sds_t tmp_sds;
+    int len = 0;
+    int original_len;
+    char *tmp;
+
+    tmp = strchr(key, '\n');
+    if (!tmp) {
+        return -1;
+    }
+
+    len = tmp - key;
+    flb_sds_t tmp_sds = flb_sds_create_len(key, len);
+    if (!tmp_sds) {
+        flb_errno();
+        return -1;
+    }
+    m_upload->s3_key = tmp_sds;
+
+    tmp++;
+    original_len = flb_sds_len(key);
+    original_len -= (len + 1);
+
+    flb_sds_t tmp_sds = flb_sds_create_len(key, len);
+    if (!tmp_sds) {
+        flb_errno();
+        return -1;
+    }
+    m_upload->upload_id = tmp_sds;
+
+    return 0;
+}
+
+/* parse etags from file data */
+static void parse_etags(struct multipart_upload *m_upload, char *data)
+{
+    char *line = data;
+    char *start;
+    char *end;
+    flb_sds_t etag;
+    int part_num;
+
+    line = strtok(data, '\n');
+
+    do {
+        start = strstr(line, "part_number=");
+        if (!start) {
+            return;
+        }
+        start += 12;
+        end = strchr(start, '\t');
+        if (!end) {
+            flb_debug("[s3 restart parser] Did not find tab separator in line %s", start);
+            return;
+        }
+        end = '\0';
+        part_num = atoi(start);
+        if (part_num <= 0) {
+            flb_debug("[s3 restart parser] Could not parse part_number from %s", start);
+            return;
+        }
+        m_upload->part_number = part_num;
+
+        end++
+        start = strstr(end, "tag=");
+        if (!start) {
+            flb_debug("[s3 restart parser] Could not find 'tag=' %s", line);
+            return;
+        }
+
+        end = strchr(start, '\n');
+        if (!end) {
+            flb_debug("[s3 restart parser] Did not find end of line %s", start);
+            return;
+        }
+        end = '\0';
+
+        len = end - start;
+        if (len <= 0) {
+            flb_debug("[s3 restart parser] Could not find etag %s", line);
+            return;
+        }
+
+        etag = flb_sds_create_len(start, len);
+        if (!etag) {
+            flb_debug("[s3 restart parser] Could create etag");
+            return;
+        }
+        flb_debug("[s3 restart parser] found part number %d=%s", part_num, etag);
+        m_upload->etags[part_num - 1] = etag;
+
+        line = strtok(NULL, '\n');
+    } while (line != NULL);
+}
+
+static struct multipart_upload *upload_from_file(struct flb_local_chunk *chunk)
+{
+    struct multipart_upload *m_upload = NULL;
+    char *buffered_data = NULL;
+    size_t buffer_size = 0;
+    int ret;
+
+    ret = flb_read_file(chunk->file_path, &buffered_data, &buffer_size);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not read locally buffered data %s",
+                      chunk->file_path);
+        return NULL;
+    }
+
+    m_upload = flb_calloc(1, sizeof(struct multipart_upload));
+    if (!m_upload) {
+        flb_errno();
+        flb_free(buffered_data);
+        return NULL;
+    }
+    m_upload->init_time = time(NULL);
+    m_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
+
+    ret = upload_data_from_key(m_upload, chunk->tag);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not extract upload data from %s.tag",
+                      chunk->file_path);
+        flb_free(buffered_data);
+        multipart_upload_destroy(m_upload);
+    }
+
+    parse_etags(m_upload, buffered_data);
+    if (m_upload->part_number == 0) {
+        flb_plg_error(ctx->ins, "Could not extract upload data from %s",
+                      chunk->file_path);
+        flb_free(buffered_data);
+        multipart_upload_destroy(m_upload);
+    }
+
+    return m_upload;
+}
+
 /* store list of part number and etag */
 static flb_sds_t upload_data(flb_sds_t etag, int part_num)
 {
