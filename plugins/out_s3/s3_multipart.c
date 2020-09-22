@@ -139,7 +139,7 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
 
         start = strstr(line, "tag=");
         if (!start) {
-            flb_debug("[s3 restart parser] Could not find 'tag=' %s", line);
+            flb_debug("[s3 restart parser] Could not find 'etag=' %s", line);
             return;
         }
 
@@ -279,7 +279,36 @@ static int save_upload(struct flb_s3 *ctx, struct multipart_upload *m_upload,
 
     ret = flb_buffer_put(&ctx->upload_store, chunk, key, data, (size_t) len);
 
+    flb_sds_destroy(key);
+    flb_sds_destroy(data);
+
     return ret;
+}
+
+static int remove_upload_from_fs(struct flb_s3 *ctx, struct multipart_upload *m_upload)
+{
+    int ret;
+    struct flb_local_chunk *chunk = NULL;
+    flb_sds_t key;
+
+    key = upload_key(m_upload);
+    if (!key) {
+        flb_plg_debug(ctx->ins, "Could not construct upload key");
+        return -1;
+    }
+
+    chunk = flb_chunk_get(&ctx->upload_store, key);
+
+    if (chunk) {
+        ret = flb_remove_chunk_files(chunk);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not delete local buffer file %s",
+                          chunk->file_path);
+        }
+        flb_chunk_destroy(chunk);
+    }
+
+    flb_sds_destroy(key);
 }
 
 /*
