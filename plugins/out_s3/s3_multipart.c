@@ -296,7 +296,7 @@ static int complete_multipart_upload_payload(struct flb_s3 *ctx,
     size_t size = COMPLETE_MULTIPART_UPLOAD_BASE_LEN;
     char part_num[7];
 
-    size = size + (COMPLETE_MULTIPART_UPLOAD_PART_LEN * last_part_num);
+    size = size + (COMPLETE_MULTIPART_UPLOAD_PART_LEN * m_upload->part_number);
 
     buf = flb_malloc(size + 1);
     if (!buf) {
