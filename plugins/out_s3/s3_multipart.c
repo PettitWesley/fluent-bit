@@ -425,9 +425,6 @@ int complete_multipart_upload(struct flb_s3 *ctx,
         return -1;
     }
 
-    flb_info("URI: %s", uri);
-    flb_info("Raw request: %s", body);
-
     s3_client = ctx->s3_client;
     c = s3_client->client_vtable->request(s3_client, FLB_HTTP_POST,
                                           uri, body, size,
