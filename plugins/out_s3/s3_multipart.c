@@ -146,14 +146,16 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
             return;
         }
 
-        end = strchr(start, '\n');
-        if (!end) {
-            flb_debug("[s3 restart parser] Did not find end of line %s", start);
-            return;
-        }
-        end = '\0';
+        start += 4;
+        len = strlen(start);
+        // end = strchr(start, '\n');
+        // if (!end) {
+        //     flb_debug("[s3 restart parser] Did not find end of line %s", start);
+        //     return;
+        // }
+        // end = '\0';
 
-        len = end - start;
+        // len = end - start;
         if (len <= 0) {
             flb_debug("[s3 restart parser] Could not find etag %s", line);
             return;
