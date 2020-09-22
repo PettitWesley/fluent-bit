@@ -78,6 +78,8 @@ static int upload_data_from_key(struct multipart_upload *m_upload, flb_sds_t key
     int original_len;
     char *tmp;
 
+    flb_info("tag: %s", key);
+
     tmp = strchr(key, '\n');
     if (!tmp) {
         return -1;
