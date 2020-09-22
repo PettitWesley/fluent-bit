@@ -139,9 +139,9 @@ static void parse_etags(struct multipart_upload *m_upload, char *data)
             return;
         }
         m_upload->part_number = part_num;
+        flb_info("end + 1=%s", end + 1);
 
-        end++;
-        start = strstr(end, "tag=");
+        start = strstr(end + 1, "tag=");
         if (!start) {
             flb_debug("[s3 restart parser] Could not find 'tag=' %s", line);
             return;
