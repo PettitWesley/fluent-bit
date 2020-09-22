@@ -309,6 +309,8 @@ static int remove_upload_from_fs(struct flb_s3 *ctx, struct multipart_upload *m_
     }
 
     flb_sds_destroy(key);
+
+    return 0;
 }
 
 /*
@@ -440,6 +442,8 @@ int complete_multipart_upload(struct flb_s3 *ctx,
                          "for %s, UploadId=%s", m_upload->s3_key,
                          m_upload->upload_id);
             flb_http_client_destroy(c);
+            /* remove this upload from the file system */
+            remove_upload_from_fs(ctx, m_upload);
             return 0;
         }
         flb_aws_print_xml_error(c->resp.payload, c->resp.payload_size,
