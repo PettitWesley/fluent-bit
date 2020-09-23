@@ -68,6 +68,8 @@ static int cb_firehose_init(struct flb_output_instance *ins,
 
     ctx->ins = ins;
 
+    flb_plg_warn(ctx->ins, "PRE-RELEASE VERSION. USE AT YOUR OWN RISK.");
+
     /* Populate context with config map defaults and incoming properties */
     ret = flb_output_config_map_set(ins, (void *) ctx);
     if (ret == -1) {
@@ -295,6 +297,8 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     struct flush *buf;
     (void) i_ins;
     (void) config;
+
+    flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
 
     buf = new_flush_buffer();
     if (!buf) {

@@ -178,6 +178,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
     }
     ctx->ins = ins;
 
+    flb_plg_warn(ctx->ins, "PRE-RELEASE VERSION. USE AT YOUR OWN RISK.");
+
     mk_list_init(&ctx->uploads);
 
     ret = flb_output_config_map_set(ins, (void *) ctx);
@@ -611,6 +613,8 @@ static int upload_data(struct flb_s3 *ctx, struct flb_local_chunk *chunk,
     int timeout_check = FLB_FALSE;
     time_t create_time;
     int ret;
+
+    flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
 
     if (ctx->use_put_object == FLB_TRUE) {
         goto put_object;
