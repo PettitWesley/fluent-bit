@@ -527,7 +527,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     if (ctx->timer_ms > UPLOAD_TIMER_MAX_WAIT) {
         ctx->timer_ms = UPLOAD_TIMER_MAX_WAIT;
     }
-    else if (ctx->timer_ms == 0) {
+    else if (ctx->timer_ms < UPLOAD_TIMER_MIN_WAIT) {
         ctx->timer_ms = UPLOAD_TIMER_MIN_WAIT;
     }
 
@@ -603,6 +603,7 @@ static int upload_data(struct flb_s3 *ctx, struct s3_file *chunk,
     flb_info("use_put_object: %d", ctx->use_put_object);
     flb_info("file_size: %d", ctx->file_size);
     flb_info("chunk_size: %d", ctx->upload_chunk_size);
+    flb_info("incoming data: %d", body_size);
 
     flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
 
