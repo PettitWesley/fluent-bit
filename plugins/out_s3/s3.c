@@ -600,6 +600,10 @@ static int upload_data(struct flb_s3 *ctx, struct s3_file *chunk,
     time_t create_time;
     int ret;
 
+    flb_info("use_put_object: %d", ctx->use_put_object);
+    flb_info("file_size: %d", ctx->file_size);
+    flb_info("chunk_size: %d", ctx->upload_chunk_size);
+
     flb_plg_info(ctx->ins, "PRE-RELEASE VERSION");
 
     if (ctx->use_put_object == FLB_TRUE) {
@@ -609,10 +613,12 @@ static int upload_data(struct flb_s3 *ctx, struct s3_file *chunk,
     if (m_upload == NULL) {
         if (chunk != NULL && time(NULL) > (chunk->create_time + ctx->upload_timeout)) {
             /* timeout already reached, just PutObject */
+            flb_info("PutObject because timeout");
             goto put_object;
         }
         else if (body_size >= ctx->file_size) {
             /* already big enough, just use PutObject API */
+            flb_info("PutObject because > file_size");
             goto put_object;
         }
         else if(body_size > MIN_CHUNKED_UPLOAD_SIZE) {
@@ -620,6 +626,7 @@ static int upload_data(struct flb_s3 *ctx, struct s3_file *chunk,
             goto multipart;
         }
         else {
+            flb_info("PutObject because else");
             goto put_object;
         }
     }
