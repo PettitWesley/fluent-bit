@@ -764,6 +764,7 @@ flb_sds_t flb_get_s3_key(const char *format, time_t time, const char *tag, char 
      */
     i = 0;
     while(tag_token != NULL && i < MAX_TAG_PARTS) {
+        flb_info("tag_token=%s", tag_token);
         buf = flb_sds_create_size(10);
         if (!buf) {
             goto error;
