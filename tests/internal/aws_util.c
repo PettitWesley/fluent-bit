@@ -120,6 +120,8 @@ static void test_flb_get_s3_key_invalid_tag_delimiter()
     struct tm day = { 0, 0, 0, 15, 7, 120};
     time_t t = mktime(&day);
     s3_key_format = flb_get_s3_key(S3_KEY_FORMAT_TAG_PART, t, MULTI_DELIMITER_TAG, INVALID_TAG_DELIMITERS);
+    flb_warn("Expected: %s", S3_OBJECT_KEY_INVALID_DELIMITER);
+    flb_warn("Actual: %s", s3_key_format);
     TEST_CHECK(strcmp(s3_key_format, S3_OBJECT_KEY_INVALID_DELIMITER)  == 0);
 
     flb_sds_destroy(s3_key_format);
