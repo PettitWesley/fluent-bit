@@ -261,6 +261,9 @@ struct flb_aws_provider *flb_standard_chain_provider_create(struct flb_config
         return NULL;
     }
 
+    flb_info("[chain] sts_endpoint=%s", sts_endpoint);
+    flb_info("[chain] sts_endpoint=%p", sts_endpoint);
+
     provider->provider_vtable = &standard_chain_provider_vtable;
     provider->implementation = implementation;
 
