@@ -536,6 +536,8 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
     struct flb_aws_provider *provider = NULL;
     struct flb_upstream *upstream = NULL;
 
+    flb_info("[eks] sts_endpoint=%s", sts_endpoint);
+
     provider = flb_calloc(1, sizeof(struct flb_aws_provider));
 
     if (!provider) {
@@ -591,8 +593,11 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
     }
 
     if(!implementation->endpoint) {
+        flb_info("[eks] could not create endpoint");
         goto error;
     }
+
+    flb_info("[eks] implementation->endpoint=%s", implementation->endpoint);
 
     implementation->sts_client = generator->create();
     if (!implementation->sts_client) {
