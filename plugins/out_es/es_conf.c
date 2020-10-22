@@ -166,6 +166,9 @@ struct flb_elasticsearch *flb_es_conf_create(struct flb_output_instance *ins,
             if (tmp) {
                 ctx->aws_sts_endpoint = (char *) tmp;
             }
+            else {
+                ctx->aws_sts_endpoint = NULL;
+            }
 
             flb_info("[es] aws_sts_endpoint=%s", ctx->aws_sts_endpoint);
             flb_info("[es] aws_sts_endpoint=%p", ctx->aws_sts_endpoint);
