@@ -297,6 +297,7 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     event = &buf->events[buf->event_index];
     event->json = tmp_buf_ptr;
     event->len = written;
+    /* TODO: I think timestamp field can be removed, not used/needed */
     event->timestamp.tv_sec = tms->tm.tv_sec;
     event->timestamp.tv_nsec = tms->tm.tv_nsec;
 
@@ -305,10 +306,18 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
 
 /* Resets or inits a flush struct */
 static void reset_flush_buf(struct flb_firehose *ctx, struct flush *buf) {
+    int i;
+    struct event *evt;
     buf->event_index = 0;
     buf->tmp_buf_offset = 0;
     buf->data_size = PUT_RECORD_BATCH_HEADER_LEN + PUT_RECORD_BATCH_FOOTER_LEN;
     buf->data_size += strlen(ctx->delivery_stream);
+
+    for (i = 0; i < buf->events_capacity; i++) {
+        evt = &buf->events[i];
+        evt->json = NULL;
+        evt->len = 0;
+    }
 }
 
 /* constructs a put payload, and then sends */
