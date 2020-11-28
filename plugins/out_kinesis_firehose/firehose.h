@@ -57,12 +57,14 @@ struct flush {
 
     int records_sent;
     int records_processed;
+    int has_data;
 };
 
 struct event {
     char *json;
     size_t len;
     struct timespec timestamp;
+    int aggregated;
 };
 
 struct flb_firehose {
@@ -70,7 +72,7 @@ struct flb_firehose {
      * TLS instances can not be re-used. So we have one for:
      * - Base cred provider (needed for EKS provider)
      * - STS Assume role provider
-     * - The CloudWatch Logs client for this plugin
+     * - The Firehose client for this plugin
      */
     struct flb_tls cred_tls;
     struct flb_tls sts_tls;
@@ -88,6 +90,7 @@ struct flb_firehose {
     const char *log_key;
     char *sts_endpoint;
     int custom_endpoint;
+    int simple_aggregation;
 
     /* must be freed on shutdown if custom_endpoint is not set */
     char *endpoint;

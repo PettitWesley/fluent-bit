@@ -142,6 +142,8 @@ static int end_put_payload(struct flb_firehose *ctx, struct flush *buf,
  * 0 = success, record added
  * 1 = we ran out of space, send and retry
  * 2 = record could not be processed, discard it
+ * 3 = simple_aggregation is On, and we ran out of space in this record. 
+ * Increment the index and retry add. Send if we are at max payload criteria. 
  * Returns 0 on success, -1 on general errors,
  * and 1 if we ran out of space to write the event
  * which means a send must occur
@@ -312,11 +314,13 @@ static void reset_flush_buf(struct flb_firehose *ctx, struct flush *buf) {
     buf->tmp_buf_offset = 0;
     buf->data_size = PUT_RECORD_BATCH_HEADER_LEN + PUT_RECORD_BATCH_FOOTER_LEN;
     buf->data_size += strlen(ctx->delivery_stream);
+    buf->has_data = FLB_FALSE;
 
     for (i = 0; i < buf->events_capacity; i++) {
         evt = &buf->events[i];
         evt->json = NULL;
         evt->len = 0;
+        evt->aggregated = 0;
     }
 }
 
@@ -327,13 +331,10 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
     int i;
     struct event *event;
 
-    if (buf->event_index <= 0) {
+    if (buf->has_data == FLB_FALSE) {
         /*
-         * event_index should always be 1 more than the actual last event index
-         * when this function is called.
-         * Except in the case where send_log_events() is called at the end of
-         * process_and_send. If all records were already sent, event_index
-         * will be 0. Hence this check.
+         * Covers the case where send_log_events() is called at the end of
+         * process_and_send. If all records were already sent, no data is left
          */
         return 0;
     }
@@ -429,13 +430,30 @@ retry_add_event:
         flb_plg_warn(ctx->ins, "Discarding large or unprocessable record, %s",
                      ctx->delivery_stream);
         return 0;
+    } else if (ret == 3) {
+        /*
+         * Simple aggregation case - we ran out of space in this record
+         */ 
+        event = &buf->events[buf->event_index];
+        event_bytes = event->len + PUT_RECORD_BATCH_PER_RECORD_LEN;
+        buf->data_size += event_bytes;
+        buf->event_index++;
+        flb_plg_debug(ctx->ins, "aggregated %d events into one Firehose Record", event->aggregated);
+
+        if (buf->event_index == MAX_EVENTS_PER_PUT) {
+            retry_add = FLB_TRUE;
+            goto send;
+        }
+        goto retry_add_event;
     }
+
+    buf->has_data = FLB_TRUE;
 
     event = &buf->events[buf->event_index];
     event_bytes = event->len + PUT_RECORD_BATCH_PER_RECORD_LEN;
 
     if ((buf->data_size + event_bytes) > PUT_RECORD_BATCH_PAYLOAD_SIZE) {
-        if (buf->event_index <= 0) {
+        if (event_bytes > PUT_RECORD_BATCH_PAYLOAD_SIZE) {
             /* somehow the record was larger than our entire request buffer */
             flb_plg_warn(ctx->ins, "[size=%zu] Discarding massive log record, %s",
                          event_bytes, ctx->delivery_stream);
@@ -446,9 +464,10 @@ retry_add_event:
         goto send;
     }
 
-    /* send is not needed yet, return to caller */
-    buf->data_size += event_bytes;
-    buf->event_index++;
+    if (ctx->simple_aggregation == FLB_FALSE) {
+        buf->data_size += event_bytes;
+        buf->event_index++;
+    }
 
     if (buf->event_index == MAX_EVENTS_PER_PUT) {
         goto send;
