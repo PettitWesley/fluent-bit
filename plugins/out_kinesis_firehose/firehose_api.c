@@ -192,12 +192,19 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
          * and last character
          */
         written -= 2;
-        tmp_buf_ptr++; /* pass over the opening quote */
-        buf->tmp_buf_offset++;
+        memmove(tmp_buf_ptr, tmp_buf_ptr + 1, written);
+    }
+
+    if (ctx->simple_aggregation == FLB_TRUE) {
+        event = &buf->events[buf->event_index];
+        written += event->len;
     }
 
     /* is (written + 1) because we still have to append newline */
     if ((written + 1) >= MAX_EVENT_SIZE) {
+        if (ctx->simple_aggregation == FLB_TRUE) {
+            
+        }
         flb_plg_warn(ctx->ins, "[size=%zu] Discarding record which is larger than "
                      "max size allowed by Firehose, %s", written + 1,
                      ctx->delivery_stream);
@@ -303,6 +310,8 @@ static int process_event(struct flb_firehose *ctx, struct flush *buf,
     event->timestamp.tv_sec = tms->tm.tv_sec;
     event->timestamp.tv_nsec = tms->tm.tv_nsec;
 
+    event->aggregated++;
+
     return 0;
 }
 
@@ -337,6 +346,10 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
          * process_and_send. If all records were already sent, no data is left
          */
         return 0;
+    }
+
+    if (buf->event_index == 0 && ctx->simple_aggregation == FLB_TRUE) {
+        flb_plg_debug(ctx->ins, "aggregated %d events into one Firehose Record", buf->events[0].aggregated);
     }
 
     /* alloc out_buf if needed */
