@@ -460,6 +460,8 @@ int s3_store_file_upload_put(struct flb_s3 *ctx,
         }
         flb_sds_destroy(name);
 
+        flb_debug("---->Setting metadata---->");
+
         /* Write key as metadata */
         ret = flb_fstore_file_meta_set(ctx->fs, fsf,
                                     key, flb_sds_len(key));
