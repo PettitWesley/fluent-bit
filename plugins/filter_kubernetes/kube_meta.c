@@ -179,6 +179,7 @@ static int get_api_server_info(struct flb_kube *ctx,
         if (ret > 0) {
             fd = open(uri, O_RDONLY, 0);
             if (fd != -1) {
+                flb_info("Reading %s", uri);
                 if (fstat(fd, &sb) == 0) {
                     payload = flb_malloc(sb.st_size);
                     if (!payload) {
@@ -192,6 +193,8 @@ static int get_api_server_info(struct flb_kube *ctx,
                     }
                 }
                 close(fd);
+            } else {
+                flb_info("Could not read %s", uri);
             }
         }
 
