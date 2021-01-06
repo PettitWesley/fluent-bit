@@ -1032,6 +1032,7 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
      */
 #if defined(CIO_HAVE_FALLOCATE)
     if (new_size > cf->alloc_size) {
+        printf("We are using fallocate");
         /*
          * To increase the file size we use fallocate() since this option
          * will send a proper ENOSPC error if the file system ran out of
@@ -1045,6 +1046,7 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
     else
 #endif
     {
+        printf("We are using ftruncate");
         ret = ftruncate(cf->fd, new_size);
     }
 
