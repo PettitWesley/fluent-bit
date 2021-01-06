@@ -1026,12 +1026,17 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
 {
     int ret;
 
+    printf("-----Changing fs size: %zu => %zu\n", cf->alloc_size, new_size);
+    fflush(stdout);
+
     /*
      * fallocate() is not portable an Linux only. Since macOS does not have
      * fallocate() we use ftruncate().
      */
 #if defined(CIO_HAVE_FALLOCATE)
     if (new_size > cf->alloc_size) {
+        printf("-----Using fallocate %s\n", cf->path);
+        fflush(stdout);
         /*
          * To increase the file size we use fallocate() since this option
          * will send a proper ENOSPC error if the file system ran out of
@@ -1045,6 +1050,8 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
     else
 #endif
     {
+        printf("-----Using ftruncate %s\n", cf->path);
+        fflush(stdout);
         ret = ftruncate(cf->fd, new_size);
     }
 

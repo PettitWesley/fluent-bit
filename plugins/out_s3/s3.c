@@ -1109,6 +1109,8 @@ static void cb_s3_upload(struct flb_config *config, void *data)
     int async_flags;
 
     flb_plg_debug(ctx->ins, "Running upload timer callback..");
+    printf("-----Running upload timer callback..\n", fsf->stream->name);
+    fflush(stdout);
 
     /* upload timer must use sync mode */
     if (ctx->use_put_object == FLB_TRUE) {
