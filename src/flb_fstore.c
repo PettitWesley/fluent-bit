@@ -77,7 +77,21 @@ int flb_fstore_file_meta_set(struct flb_fstore *fs,
 {
     int ret;
 
+    printf("-----flb_fstore_file_meta_set(): fs=%p, fsf=%p, meta=%p, size=%zu\n", fs, fsf, meta, size);
+    fflush(stdout);
+
+    printf("-----we fail on this line fails if fsf->stream->name is freed: %s\n", fsf->stream->name);
+    fflush(stdout);
+    printf("-----we fail on this line fails if fsf->chunk->name is freed: %s\n", fsf->chunk->name);
+    fflush(stdout);
+
     ret = cio_meta_write(fsf->chunk, meta, size);
+    printf("-----cio_meta_write() returned %d\n", ret);
+    fflush(stdout);
+    printf("-----we fail on this line fails if fsf->stream->name is freed: %s\n", fsf->stream->name);
+    fflush(stdout);
+    printf("-----we fail on this line fails if fsf->chunk->name is freed: %s\n", fsf->chunk->name);
+    fflush(stdout);
     if (ret == -1) {
         flb_error("[fstore] could not write metadata to file: %s:%s",
                   fsf->stream->name, fsf->chunk->name);
