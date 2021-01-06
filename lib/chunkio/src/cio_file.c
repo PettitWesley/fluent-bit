@@ -1032,7 +1032,7 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
      */
 #if defined(CIO_HAVE_FALLOCATE)
     if (new_size > cf->alloc_size) {
-        printf("\n\n-----We are using fallocate----\n\n");
+        printf("\n\n-----We are using fallocate %s----\n\n", cf->path);
         fflush(stdout);
         /*
          * To increase the file size we use fallocate() since this option
@@ -1047,7 +1047,7 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
     else
 #endif
     {
-        printf("\n\n-----We are using ftruncate----\n\n");
+        printf("\n\n-----We are using ftruncate %s----\n\n", cf->path);
         fflush(stdout);
         ret = ftruncate(cf->fd, new_size);
     }
