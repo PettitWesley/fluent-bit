@@ -77,6 +77,9 @@ int flb_fstore_file_meta_set(struct flb_fstore *fs,
 {
     int ret;
 
+    flb_debug("[fstore] writing metadata to file: %s, root_dir=%s",
+              fsf->chunk->name, fs->root_path);
+
     ret = cio_meta_write(fsf->chunk, meta, size);
     if (ret == -1) {
         flb_error("[fstore] could not write metadata to file: %s, root_dir=%s",
