@@ -835,7 +835,7 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
     struct cio_file *cf = ch->backend;
 
     if (cio_file_is_up(ch, cf) == CIO_FALSE) {
-        printf("[cio_file] Failed to write meta because chunk is not up");
+        printf("\n[cio_file] Failed to write meta because chunk is not up\n");
         fflush(stdout);
         return -1;
     }
@@ -856,7 +856,7 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
         new_content_data = meta + size;
         memmove(new_content_data, cur_content_data, cf->data_size);
         adjust_layout(ch, cf, size);
-        printf("[cio_file] cio_file_write_metadata() succeeded");
+        printf("\n[cio_file] cio_file_write_metadata() succeeded\n");
         fflush(stdout);
         return 0;
     }
@@ -877,7 +877,7 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
 #ifndef MREMAP_MAYMOVE
         if (munmap(cf->map, cf->alloc_size) == -1) {
             cio_errno();
-            printf("[cio_file] munmap failed.");
+            printf("\n[cio_file] munmap failed.\n");
             fflush(stdout);
             return -1;
         }
@@ -888,8 +888,8 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
 #endif
         if (tmp == MAP_FAILED) {
             cio_errno();
-            printf("[cio meta] data exceeds available space "
-                          "(alloc=%lu current_size=%lu meta_size=%lu)",
+            printf("\n[cio meta] data exceeds available space "
+                          "(alloc=%lu current_size=%lu meta_size=%lu)\n",
                           cf->alloc_size, cf->data_size, size);
             fflush(stdout);
             cio_log_error(ch->ctx,
@@ -905,7 +905,7 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
         /* Alter file size (file system) */
         ret = cio_file_fs_size_change(cf, new_size);
         if (ret == -1) {
-            printf("cio_file_fs_size_change() failed; new_size=%zu", new_size);
+            printf("\ncio_file_fs_size_change() failed; new_size=%zu\n", new_size);
             fflush(stdout);
             cio_errno();
             return -1;
@@ -924,7 +924,7 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
     memcpy(meta, buf, size);
     adjust_layout(ch, cf, size);
 
-    printf("cio_file_write_metadata() succeeded");
+    printf("\ncio_file_write_metadata() succeeded\n");
     fflush(stdout);
 
     return 0;
@@ -1056,7 +1056,7 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
          */
         ret = fallocate(cf->fd, 0, 0, new_size);
         if (ret < 0) {
-            printf("[cio file] fallocate failed, new_size=%zu", new_size);
+            printf("\n[cio file] fallocate failed, new_size=%zu\n", new_size);
             fflush(stdout);
         }
     }
@@ -1065,7 +1065,7 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
     {
         ret = ftruncate(cf->fd, new_size);
         if (ret < 0) {
-            printf("[cio file] ftruncate failed, new_size=%zu", new_size);
+            printf("\n[cio file] ftruncate failed, new_size=%zu\n", new_size);
             fflush(stdout);
         }
     }
@@ -1080,8 +1080,8 @@ char *cio_file_hash(struct cio_file *cf)
 
 void cio_file_hash_print(struct cio_file *cf)
 {
-    printf("crc cur=%lu\n", cf->crc_cur);
-    printf("%08lx\n", (long unsigned int ) cf->crc_cur);
+    printf("\ncrc cur=%lu\n", cf->crc_cur);
+    printf("\n%08lx\n", (long unsigned int ) cf->crc_cur);
 }
 
 /* Dump files from given stream */
@@ -1118,7 +1118,7 @@ void cio_file_scan_dump(struct cio_ctx *ctx, struct cio_stream *st)
         memcpy(&crc_fs, p, sizeof(crc_fs));
         crc_fs = ntohl(crc_fs);
 
-        printf("        %-60s", tmp);
+        printf("\n        %-60s", tmp);
 
         /*
          * the crc32 specified in the file is stored in 'val' now, if
@@ -1133,11 +1133,11 @@ void cio_file_scan_dump(struct cio_ctx *ctx, struct cio_stream *st)
              */
             crc = cio_crc32_finalize(crc);
             if (crc != crc_fs) {
-                printf("checksum error=%08x expected=%08x, ",
+                printf("\nchecksum error=%08x expected=%08x, ",
                        (uint32_t) crc_fs, (uint32_t) crc);
             }
         }
-        printf("meta_len=%d, data_size=%lu, crc=%08x\n",
+        printf("\nmeta_len=%d, data_size=%lu, crc=%08x\n",
                meta_len, cf->data_size, (uint32_t) crc_fs);
 
         if (set_down == CIO_TRUE) {
