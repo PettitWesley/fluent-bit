@@ -330,7 +330,7 @@ static int mmap_file(struct cio_ctx *ctx, struct cio_chunk *ch, size_t size)
         ret = cio_file_fs_size_change(cf, size);
         if (ret == -1) {
             cio_errno();
-            cio_log_error(ctx, "cannot adjust chunk size '%s' to %lu bytes",
+            cio_log_error(ctx, "[cio_file] cannot adjust chunk size '%s' to %lu bytes",
                           cf->path, size);
             return CIO_ERROR;
         }
@@ -342,7 +342,7 @@ static int mmap_file(struct cio_ctx *ctx, struct cio_chunk *ch, size_t size)
     if (cf->map == MAP_FAILED) {
         cio_errno();
         cf->map = NULL;
-        cio_log_error(ctx, "cannot mmap/read chunk '%s'", cf->path);
+        cio_log_error(ctx, "[cio_file] cannot mmap/read chunk '%s'", cf->path);
         return CIO_ERROR;
     }
     cf->alloc_size = size;
@@ -351,7 +351,7 @@ static int mmap_file(struct cio_ctx *ctx, struct cio_chunk *ch, size_t size)
     if (fs_size > 0) {
         content_size = cio_file_st_get_content_size(cf->map, fs_size);
         if (content_size == -1) {
-            cio_log_error(ctx, "invalid content size %s", cf->path);
+            cio_log_error(ctx, "[cio_file] invalid content size %s", cf->path);
             munmap(cf->map, cf->alloc_size);
             cf->map = NULL;
             cf->data_size = 0;
@@ -368,7 +368,7 @@ static int mmap_file(struct cio_ctx *ctx, struct cio_chunk *ch, size_t size)
 
     ret = cio_file_format_check(ch, cf, cf->flags);
     if (ret == -1) {
-        cio_log_error(ctx, "format check failed: %s/%s",
+        cio_log_error(ctx, "[cio_file] format check failed: %s/%s",
                       ch->st->name, ch->name);
         munmap(cf->map, cf->alloc_size);
         cf->map = NULL;
@@ -406,7 +406,7 @@ static int file_open(struct cio_ctx *ctx, struct cio_file *cf)
 
     if (cf->fd == -1) {
         cio_errno();
-        cio_log_error(ctx, "cannot open/create %s", cf->path);
+        cio_log_error(ctx, "[cio_file] cannot open/create %s", cf->path);
         return -1;
     }
 
@@ -835,6 +835,8 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
     struct cio_file *cf = ch->backend;
 
     if (cio_file_is_up(ch, cf) == CIO_FALSE) {
+        printf("[cio_file] Failed to write meta because chunk is not up");
+        fflush(stdout);
         return -1;
     }
 
@@ -854,7 +856,8 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
         new_content_data = meta + size;
         memmove(new_content_data, cur_content_data, cf->data_size);
         adjust_layout(ch, cf, size);
-
+        printf(ch->ctx, "[cio_file] cio_file_write_metadata() succeeded");
+        fflush(stdout);
         return 0;
     }
 
@@ -874,6 +877,8 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
 #ifndef MREMAP_MAYMOVE
         if (munmap(cf->map, cf->alloc_size) == -1) {
             cio_errno();
+            printf("[cio_file] munmap failed.");
+            fflush(stdout);
             return -1;
         }
         tmp = mmap(0, new_size, PROT_READ | PROT_WRITE, MAP_SHARED, cf->fd, 0);
@@ -883,6 +888,10 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
 #endif
         if (tmp == MAP_FAILED) {
             cio_errno();
+            printf("[cio meta] data exceeds available space "
+                          "(alloc=%lu current_size=%lu meta_size=%lu)",
+                          cf->alloc_size, cf->data_size, size);
+            fflush(stdout);
             cio_log_error(ch->ctx,
                           "[cio meta] data exceeds available space "
                           "(alloc=%lu current_size=%lu meta_size=%lu)",
@@ -896,6 +905,8 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
         /* Alter file size (file system) */
         ret = cio_file_fs_size_change(cf, new_size);
         if (ret == -1) {
+            printf("cio_file_fs_size_change() failed; new_size=%zu", new_size);
+            fflush(stdout);
             cio_errno();
             return -1;
         }
@@ -912,6 +923,9 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
     /* copy new metadata */
     memcpy(meta, buf, size);
     adjust_layout(ch, cf, size);
+
+    printf("cio_file_write_metadata() succeeded");
+    fflush(stdout);
 
     return 0;
 }
@@ -1041,11 +1055,19 @@ int cio_file_fs_size_change(struct cio_file *cf, size_t new_size)
          * fallocate() is not portable, Linux only.
          */
         ret = fallocate(cf->fd, 0, 0, new_size);
+        if (ret < 0) {
+            printf("[cio file] fallocate failed, new_size=%zu", new_size);
+            fflush(stdout);
+        }
     }
     else
 #endif
     {
         ret = ftruncate(cf->fd, new_size);
+        if (ret < 0) {
+            printf("[cio file] ftruncate failed, new_size=%zu", new_size);
+            fflush(stdout);
+        }
     }
 
     return ret;

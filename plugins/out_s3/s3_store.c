@@ -470,7 +470,7 @@ int s3_store_file_upload_put(struct flb_s3 *ctx,
         ret = flb_fstore_file_meta_set(ctx->fs, fsf,
                                     key, flb_sds_len(key));
         if (ret == -1) {
-            flb_plg_error(ctx->ins, "error writing tag metadata");
+            flb_plg_error(ctx->ins, "error writing upload metadata");
             return -1;
         }
     }
