@@ -856,7 +856,7 @@ int cio_file_write_metadata(struct cio_chunk *ch, char *buf, size_t size)
         new_content_data = meta + size;
         memmove(new_content_data, cur_content_data, cf->data_size);
         adjust_layout(ch, cf, size);
-        printf(ch->ctx, "[cio_file] cio_file_write_metadata() succeeded");
+        printf("[cio_file] cio_file_write_metadata() succeeded");
         fflush(stdout);
         return 0;
     }
