@@ -90,6 +90,7 @@ struct s3_file *s3_store_file_get(struct flb_s3 *ctx, const char *tag,
         fsf = mk_list_entry(head, struct flb_fstore_file, _head);
 
         /* skip and warn on partially initialized chunks */
+        flb_plg_debug(ctx->ins, "--->Debug version: Wed Jan 20");
         if (fsf->data == NULL) {
             flb_plg_warn(ctx->ins, "BAD: found flb_fstore_file with NULL data reference, tag=%s, file=%s, will try to delete", tag, fsf->name);
             flb_fstore_file_delete(ctx->fs, fsf);
