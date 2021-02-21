@@ -401,7 +401,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    flb_plg_debug(ctx->ins, "Sent %d events to CloudWatch", event_count);
+    flb_plg_info(ctx->ins, "Sent %d events to CloudWatch", event_count);
 
     FLB_OUTPUT_RETURN(FLB_OK);
 }
@@ -597,7 +597,7 @@ struct flb_output_plugin out_cloudwatch_logs_plugin = {
     .cb_init      = cb_cloudwatch_init,
     .cb_flush     = cb_cloudwatch_flush,
     .cb_exit      = cb_cloudwatch_exit,
-    .flags        = FLB_OUTPUT_NO_MULTIPLEX,
+    .flags        = 0,
 
     /* Configuration */
     .config_map     = config_map,
