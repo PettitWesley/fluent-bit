@@ -667,36 +667,36 @@ static int cb_s3_init(struct flb_output_instance *ins,
     ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
 
     /* clean up any old buffers found on startup */
-    if (ctx->has_old_buffers == FLB_TRUE) {
-        flb_plg_info(ctx->ins,
-                     "Sending locally buffered data from previous "
-                     "executions to S3; buffer=%s",
-                     ctx->fs->root_path);
-        ctx->has_old_buffers = FLB_FALSE;
-        ret = put_all_chunks(ctx);
-        if (ret < 0) {
-            ctx->has_old_buffers = FLB_TRUE;
-            flb_plg_error(ctx->ins,
-                          "Failed to send locally buffered data left over "
-                          "from previous executions; will retry. Buffer=%s",
-                          ctx->fs->root_path);
-        }
-    }
+    // if (ctx->has_old_buffers == FLB_TRUE) {
+    //     flb_plg_info(ctx->ins,
+    //                  "Sending locally buffered data from previous "
+    //                  "executions to S3; buffer=%s",
+    //                  ctx->fs->root_path);
+    //     ctx->has_old_buffers = FLB_FALSE;
+    //     ret = put_all_chunks(ctx);
+    //     if (ret < 0) {
+    //         ctx->has_old_buffers = FLB_TRUE;
+    //         flb_plg_error(ctx->ins,
+    //                       "Failed to send locally buffered data left over "
+    //                       "from previous executions; will retry. Buffer=%s",
+    //                       ctx->fs->root_path);
+    //     }
+    // }
 
     /* clean up any old uploads found on start up */
-    if (ctx->has_old_uploads == FLB_TRUE) {
-        flb_plg_info(ctx->ins,
-                     "Completing multipart uploads from previous "
-                     "executions to S3; buffer=%s",
-                     ctx->stream_upload->path);
-        ctx->has_old_uploads = FLB_FALSE;
+    // if (ctx->has_old_uploads == FLB_TRUE) {
+    //     flb_plg_info(ctx->ins,
+    //                  "Completing multipart uploads from previous "
+    //                  "executions to S3; buffer=%s",
+    //                  ctx->stream_upload->path);
+    //     ctx->has_old_uploads = FLB_FALSE;
 
-        /*
-         * we don't need to worry if this fails; it will retry each
-         * time the upload callback is called
-         */
-         cb_s3_upload(config, ctx);
-    }
+    //     /*
+    //      * we don't need to worry if this fails; it will retry each
+    //      * time the upload callback is called
+    //      */
+    //      cb_s3_upload(config, ctx);
+    // }
 
     if (ctx->use_put_object == FLB_TRUE) {
         /*
