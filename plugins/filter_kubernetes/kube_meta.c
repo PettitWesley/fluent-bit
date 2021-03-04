@@ -163,6 +163,8 @@ static int get_api_server_info(struct flb_kube *ctx,
     *out_buf = NULL;
     *out_size = 0;
 
+    flb_plg_info(ctx->ins, "DEBUG: get_api_server_info(), namespace=%s, podname=%s", namespace, podname);
+
     /*
      * If a file exists called namespace_podname.meta, load it and use it.
      * If not, fall back to API. This is primarily for diagnostic purposes,
@@ -174,9 +176,12 @@ static int get_api_server_info(struct flb_kube *ctx,
         size_t payload_size = 0;
         struct stat sb;
 
+        flb_plg_info(ctx->ins, "DEBUG: looking in cache dir");
+
         ret = snprintf(uri, sizeof(uri) - 1, "%s/%s_%s.meta",
                        ctx->meta_preload_cache_dir, namespace, podname);
         if (ret > 0) {
+            flb_plg_info(ctx->ins, "DEBUG: looking for: %s", uri);
             fd = open(uri, O_RDONLY, 0);
             if (fd != -1) {
                 if (fstat(fd, &sb) == 0) {
@@ -188,10 +193,21 @@ static int get_api_server_info(struct flb_kube *ctx,
                         ret = read(fd, payload, sb.st_size);
                         if (ret == sb.st_size) {
                             payload_size = ret;
+                            flb_plg_info(ctx->ins, "DEBUG: read() SUCCESSFUL: %s", uri);
+                        } else {
+                            flb_errno();
+                            flb_plg_info(ctx->ins, "DEBUG: Could not read(): %s, ret=%d", uri, ret);
                         }
                     }
+                } else {
+                    flb_errno();
+                    flb_plg_info(ctx->ins, "DEBUG: Could not fstat(): %s", uri);
                 }
                 close(fd);
+            } else {
+                flb_errno();
+                flb_plg_info(ctx->ins, "DEBUG: Could not open(): %s", uri);
+
             }
         }
 
@@ -203,9 +219,13 @@ static int get_api_server_info(struct flb_kube *ctx,
         if (payload) {
             flb_free(payload);
         }
+    } else {
+        flb_plg_info(ctx->ins, "DEBUG: **NOT** looking in cache dir");
     }
 
     if (packed == -1) {
+        flb_errno();
+        flb_plg_info(ctx->ins, "DEBUG: flb_pack_json() failed on: %s", uri);
         if (!ctx->upstream) {
             return -1;
         }
