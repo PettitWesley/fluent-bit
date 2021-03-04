@@ -651,7 +651,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
 
     /* set to sync mode and initialize credentials */
     ctx->provider->provider_vtable->sync(ctx->provider);
-    ctx->provider->provider_vtable->init(ctx->provider);
+    // ctx->provider->provider_vtable->init(ctx->provider);
 
     ctx->timer_created = FLB_FALSE;
     ctx->timer_ms = (int) (ctx->upload_timeout / 6) * 1000;
