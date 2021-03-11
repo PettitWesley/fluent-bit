@@ -57,7 +57,6 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     const char *tmp;
     char *session_name = NULL;
     struct flb_cloudwatch *ctx = NULL;
-    struct cw_flush *buf = NULL;
     int ret;
     (void) config;
     (void) data;
@@ -193,6 +192,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
             flb_errno();
             goto error;
         }
+        ctx->stream.sequence_token = "somerandomsequencetoken23498234";
         ctx->stream_created = FLB_FALSE;
     }
 
@@ -318,7 +318,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     }
 
     if (ctx->disable_sequence_token == FLB_TRUE) {
-        flb_plg_warn(ctx->ins, "Enabling full concurrency...")
+        flb_plg_warn(ctx->ins, "Enabling full concurrency...");
     } else {
         /*
           * Remove async flag from upstream

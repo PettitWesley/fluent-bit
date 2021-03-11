@@ -92,7 +92,7 @@ struct log_stream {
     struct mk_list _head;
 };
 
-void log_stream_destroy(struct log_stream *stream);
+void log_stream_destroy(struct flb_cloudwatch *ctx, struct log_stream *stream);
 
 struct flb_cloudwatch {
     /*
