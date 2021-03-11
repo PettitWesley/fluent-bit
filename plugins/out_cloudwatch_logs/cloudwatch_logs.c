@@ -162,6 +162,12 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         ctx->create_group = FLB_TRUE;
     }
 
+    ctx->disable_sequence_token = FLB_FALSE;
+    tmp = flb_output_get_property("disable_sequence_token", ins);
+    if (tmp && (strcasecmp(tmp, "On") == 0 || strcasecmp(tmp, "true") == 0)) {
+        ctx->disable_sequence_token = FLB_TRUE;
+    }
+
     ctx->log_retention_days = 0;
     tmp = flb_output_get_property("log_retention_days", ins);
     if (tmp) {
@@ -311,12 +317,16 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         goto error;
     }
 
-    /*
-     * Remove async flag from upstream
-     * CW output runs in sync mode; because the CW API currently requires
-     * PutLogEvents requests to a log stream to be made serially
-     */
-    upstream->flags &= ~(FLB_IO_ASYNC);
+    if (ctx->disable_sequence_token == FLB_TRUE) {
+        flb_plg_warn(ctx->ins, "Enabling full concurrency...")
+    } else {
+        /*
+          * Remove async flag from upstream
+          * CW output runs in sync mode; because the CW API currently requires
+          * PutLogEvents requests to a log stream to be made serially
+          */
+        upstream->flags &= ~(FLB_IO_ASYNC);
+    }
 
     ctx->cw_client->upstream = upstream;
     flb_output_upstream_set(upstream, ctx->ins);
@@ -466,7 +476,7 @@ void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
             mk_list_foreach_safe(head, tmp, &ctx->streams) {
                 stream = mk_list_entry(head, struct log_stream, _head);
                 mk_list_del(&stream->_head);
-                log_stream_destroy(stream);
+                log_stream_destroy(ctx, stream);
             }
         }
         flb_free(ctx);
@@ -481,14 +491,16 @@ static int cb_cloudwatch_exit(void *data, struct flb_config *config)
     return 0;
 }
 
-void log_stream_destroy(struct log_stream *stream)
+void log_stream_destroy(struct flb_cloudwatch *ctx, struct log_stream *stream)
 {
     if (stream) {
         if (stream->name) {
             flb_sds_destroy(stream->name);
         }
         if (stream->sequence_token) {
-            flb_sds_destroy(stream->sequence_token);
+            if (ctx->disable_sequence_token == FLB_FALSE) {
+                flb_sds_destroy(stream->sequence_token);
+            }
         }
         flb_free(stream);
     }
@@ -559,6 +571,12 @@ static struct flb_config_map config_map[] = {
      0, FLB_FALSE, 0,
      "Automatically create the log group (log streams will always automatically"
      " be created)"
+    },
+
+    {
+     FLB_CONFIG_MAP_BOOL, "disable_sequence_token", "false",
+     0, FLB_FALSE, 0,
+     "Disable use of sequence tokens in PutLogEvents requests"
     },
 
     {

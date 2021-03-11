@@ -122,6 +122,8 @@ struct flb_cloudwatch {
     /* Should the plugin create the log group */
     int create_group;
 
+    int disable_sequence_token;
+
     /* If set to a number greater than zero, and newly create log group's retention policy is set to this many days. */
     int log_retention_days;
 
