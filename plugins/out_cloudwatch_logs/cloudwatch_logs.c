@@ -499,6 +499,7 @@ void log_stream_destroy(struct flb_cloudwatch *ctx, struct log_stream *stream)
         }
         if (stream->sequence_token) {
             if (ctx->disable_sequence_token == FLB_FALSE) {
+                flb_warn("Freeing sequence token");
                 flb_sds_destroy(stream->sequence_token);
             }
         }
