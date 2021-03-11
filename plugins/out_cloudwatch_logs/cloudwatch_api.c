@@ -1349,7 +1349,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                                 "response: response body is empty");
                 }
             } else {
-                flb_plg_error(ctx->ins, "ignoring sequence token");
+                flb_plg_debug(ctx->ins, "ignoring sequence token");
             }
             flb_http_client_destroy(c);
             return 0;
