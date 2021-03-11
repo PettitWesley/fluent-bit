@@ -92,8 +92,6 @@ struct log_stream {
     struct mk_list _head;
 };
 
-void log_stream_destroy(struct flb_cloudwatch *ctx, struct log_stream *stream);
-
 struct flb_cloudwatch {
     /*
      * TLS instances can not be re-used. So we have one for:
@@ -153,5 +151,7 @@ struct flb_cloudwatch {
 };
 
 void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx);
+
+void log_stream_destroy(struct flb_cloudwatch *ctx, struct log_stream *stream);
 
 #endif
