@@ -386,11 +386,17 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
 
     struct cw_flush *buf;
 
+    buf = new_buffer();
+    if (!buf) {
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
     buf->put_events_calls = 0;
 
     if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
         ret = create_log_group(ctx);
         if (ret < 0) {
+            cw_flush_destroy(buf);
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
     }
@@ -398,15 +404,18 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     stream = get_log_stream(ctx, tag, tag_len);
     if (!stream) {
         FLB_OUTPUT_RETURN(FLB_RETRY);
+        cw_flush_destroy(buf);
     }
 
     event_count = process_and_send(ctx, i_ins->p->name, buf, stream, data, bytes);
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send events");
+        cw_flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     flb_plg_debug(ctx->ins, "Sent %d events to CloudWatch", event_count);
+    cw_flush_destroy(buf);
 
     FLB_OUTPUT_RETURN(FLB_OK);
 }
@@ -420,10 +429,6 @@ void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
     if (ctx != NULL) {
         if (ctx->base_aws_provider) {
             flb_aws_provider_destroy(ctx->base_aws_provider);
-        }
-
-        if (ctx->buf) {
-            cw_flush_destroy(ctx->buf);
         }
 
         if (ctx->aws_provider) {
