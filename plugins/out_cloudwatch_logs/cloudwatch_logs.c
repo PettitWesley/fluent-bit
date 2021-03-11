@@ -322,40 +322,6 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     flb_output_upstream_set(upstream, ctx->ins);
     ctx->cw_client->host = ctx->endpoint;
 
-    /* alloc the payload/processing buffer */
-    buf = flb_calloc(1, sizeof(struct cw_flush));
-    if (!buf) {
-        flb_errno();
-        goto error;
-    }
-
-    buf->out_buf = flb_malloc(PUT_LOG_EVENTS_PAYLOAD_SIZE);
-    if (!buf->out_buf) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        goto error;
-    }
-    buf->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
-
-    buf->tmp_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
-    if (!buf->tmp_buf) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        goto error;
-    }
-    buf->tmp_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
-
-    buf->events = flb_malloc(sizeof(struct cw_event) * MAX_EVENTS_PER_PUT);
-    if (!buf->events) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        goto error;
-    }
-    buf->events_capacity = MAX_EVENTS_PER_PUT;
-
-    ctx->buf = buf;
-
-
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -366,6 +332,43 @@ error:
     flb_plg_error(ctx->ins, "Initialization failed");
     flb_cloudwatch_ctx_destroy(ctx);
     return -1;
+}
+
+struct cw_flush *new_buffer()
+{
+    struct cw_flush *buf;
+
+    buf = flb_calloc(1, sizeof(struct cw_flush));
+    if (!buf) {
+        flb_errno();
+        return NULL;
+    }
+
+    buf->out_buf = flb_malloc(PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    if (!buf->out_buf) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        return NULL;
+    }
+    buf->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
+
+    buf->tmp_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    if (!buf->tmp_buf) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        return NULL;
+    }
+    buf->tmp_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
+
+    buf->events = flb_malloc(sizeof(struct cw_event) * MAX_EVENTS_PER_PUT);
+    if (!buf->events) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        return NULL;
+    }
+    buf->events_capacity = MAX_EVENTS_PER_PUT;
+
+    return buf;
 }
 
 static void cb_cloudwatch_flush(const void *data, size_t bytes,
@@ -381,7 +384,9 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
-    ctx->buf->put_events_calls = 0;
+    struct cw_flush *buf;
+
+    buf->put_events_calls = 0;
 
     if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
         ret = create_log_group(ctx);
@@ -395,7 +400,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    event_count = process_and_send(ctx, i_ins->p->name, ctx->buf, stream, data, bytes);
+    event_count = process_and_send(ctx, i_ins->p->name, buf, stream, data, bytes);
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send events");
         FLB_OUTPUT_RETURN(FLB_RETRY);

@@ -137,8 +137,6 @@ struct flb_cloudwatch {
     /* if the log stream is dynamic, we'll use this */
     struct mk_list streams;
 
-    /* buffers for data processing and request payload */
-    struct cw_flush *buf;
     /* The namespace to use for the metric */
     flb_sds_t metric_namespace;
 
