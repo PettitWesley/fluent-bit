@@ -476,7 +476,7 @@ void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
             mk_list_foreach_safe(head, tmp, &ctx->streams) {
                 stream = mk_list_entry(head, struct log_stream, _head);
                 mk_list_del(&stream->_head);
-                log_stream_destroy(ctx, stream);
+                log_stream_destroy(stream);
             }
         }
         flb_free(ctx);
@@ -491,17 +491,15 @@ static int cb_cloudwatch_exit(void *data, struct flb_config *config)
     return 0;
 }
 
-void log_stream_destroy(struct flb_cloudwatch *ctx, struct log_stream *stream)
+void log_stream_destroy(struct log_stream *stream)
 {
     if (stream) {
         if (stream->name) {
             flb_sds_destroy(stream->name);
         }
         if (stream->sequence_token) {
-            if (ctx->disable_sequence_token == FLB_FALSE) {
-                flb_warn("Freeing sequence token");
-                flb_sds_destroy(stream->sequence_token);
-            }
+            flb_sds_destroy(stream->sequence_token);
+            
         }
         flb_free(stream);
     }

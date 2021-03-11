@@ -55,6 +55,8 @@
 #define ONE_DAY_IN_MILLISECONDS          86400000
 #define FOUR_HOURS_IN_SECONDS            14400
 
+#define FAKE_SEQUENCE_TOKEN             "randomsequencetoken23423984"
+
 
 static struct flb_aws_header create_group_header = {
     .key = "X-Amz-Target",
@@ -973,7 +975,7 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
             /* check if stream is expired, if so, clean it up */
             if (stream->expiration < now) {
                 mk_list_del(&stream->_head);
-                log_stream_destroy(ctx, stream);
+                log_stream_destroy(stream);
             }
         }
     }
@@ -989,13 +991,17 @@ struct log_stream *get_dynamic_log_stream(struct flb_cloudwatch *ctx,
 
     ret = create_log_stream(ctx, new_stream);
     if (ret < 0) {
-        log_stream_destroy(ctx, new_stream);
+        log_stream_destroy(new_stream);
         return NULL;
     }
     new_stream->expiration = time(NULL) + FOUR_HOURS_IN_SECONDS;
 
     if (ctx->disable_sequence_token == FLB_TRUE) {
-        new_stream->sequence_token = "randomsequencetoken2309472309";
+        new_stream->sequence_token = flb_sds_create(FAKE_SEQUENCE_TOKEN);
+        if (new_stream->sequence_token == NULL) {
+            log_stream_destroy(new_stream);
+            return NULL;
+        }
     }
 
     mk_list_add(&new_stream->_head, &ctx->streams);

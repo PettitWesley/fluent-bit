@@ -152,6 +152,6 @@ struct flb_cloudwatch {
 
 void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx);
 
-void log_stream_destroy(struct flb_cloudwatch *ctx, struct log_stream *stream);
+void log_stream_destroy(struct log_stream *stream);
 
 #endif
