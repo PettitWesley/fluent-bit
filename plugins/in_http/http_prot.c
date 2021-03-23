@@ -86,7 +86,7 @@ int process_pack(struct flb_http *ctx, flb_sds_t tag, char *buf, size_t size)
                          result.data.type);
             continue;
         }
-        flb_plg_debug(ctx->ins, "found msgpack type: %i", result.data.type));
+        flb_plg_debug(ctx->ins, "found msgpack type: %i", result.data.type);
 
         msgpack_sbuffer_init(&mp_sbuf);
         msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
