@@ -122,8 +122,6 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
 
         obj = &result.data;
 
-        obj->via.map.size
-
         flb_plg_info(ctx->ins, "array size: %d", obj->via.map.size);
 
         msgpack_sbuffer_init(&mp_sbuf);
