@@ -109,6 +109,7 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
     msgpack_unpacked result;
     struct flb_time tm;
     msgpack_object  *obj;
+    msgpack_object  *record;
 
     flb_time_get(&tm);
 
@@ -122,20 +123,24 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
 
         obj = &result.data;
 
-        flb_plg_info(ctx->ins, "array size: %d", obj->via.map.size);
+        flb_plg_info(ctx->ins, "array size: %d", obj->via.array.size);
 
-        msgpack_sbuffer_init(&mp_sbuf);
-        msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
+        for (int i = 0; i < obj->via.array.size; i++)
+        {
+            record = obj->via.array.ptr[i];
+            msgpack_sbuffer_init(&mp_sbuf);
+            msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
 
-        /* Pack record with timestamp */
-        msgpack_pack_array(&mp_pck, 2);
-        flb_time_append_to_msgpack(&tm, &mp_pck, 0);
-        msgpack_pack_object(&mp_pck, result.data); /* Ingest real record into the engine */
+            /* Pack record with timestamp */
+            msgpack_pack_array(&mp_pck, 2);
+            flb_time_append_to_msgpack(&tm, &mp_pck, 0);
+            msgpack_pack_object(&mp_pck, record); /* Ingest real record into the engine */
 
-        flb_info("record: %.*s", mp_sbuf.size, mp_sbuf.data);
+            flb_info("record: %.*s", mp_sbuf.size, mp_sbuf.data);
 
-        msgpack_unpacked_destroy(&result);
-        msgpack_sbuffer_destroy(&mp_sbuf);
+            msgpack_unpacked_destroy(&result);
+            msgpack_sbuffer_destroy(&mp_sbuf);
+        }
     }
 
     flb_plg_warn(ctx->ins, "done processing pack");
