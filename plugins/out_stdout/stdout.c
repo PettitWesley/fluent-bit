@@ -101,7 +101,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     return 0;
 }
 
-int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t size)
+static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t size)
 {
     size_t off = 0;
     msgpack_sbuffer mp_sbuf;
