@@ -146,6 +146,7 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
             // write(STDOUT_FILENO, json, flb_sds_len(json));
             // flb_sds_destroy(json);
             json =  flb_msgpack_to_json_str(record.via.map.size, &record);
+            write(STDOUT_FILENO, json, strlen(json));
 
             msgpack_unpacked_destroy(&result);
             msgpack_sbuffer_destroy(&mp_sbuf);
