@@ -110,6 +110,7 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
     struct flb_time tm;
     msgpack_object  *obj;
     msgpack_object  record;
+    char *json;
 
     flb_time_get(&tm);
 
@@ -137,6 +138,14 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
             msgpack_pack_object(&mp_pck, record); /* Ingest real record into the engine */
 
             flb_info("record: %.*s", mp_sbuf.size, mp_sbuf.data);
+
+            //  json = flb_pack_msgpack_to_json_format(data, bytes,
+            //                                    ctx->out_format,
+            //                                    ctx->json_date_format,
+            //                                    ctx->date_key);
+            // write(STDOUT_FILENO, json, flb_sds_len(json));
+            // flb_sds_destroy(json);
+            json =  flb_msgpack_to_json_str(record.via.map.size, &record);
 
             msgpack_unpacked_destroy(&result);
             msgpack_sbuffer_destroy(&mp_sbuf);
