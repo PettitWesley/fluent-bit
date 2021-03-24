@@ -109,7 +109,7 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
     msgpack_unpacked result;
     struct flb_time tm;
     msgpack_object  *obj;
-    msgpack_object  *record;
+    msgpack_object  record;
 
     flb_time_get(&tm);
 
