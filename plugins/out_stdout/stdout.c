@@ -139,12 +139,13 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
 
             flb_info("record: %.*s", mp_sbuf.size, mp_sbuf.data);
 
-             json = flb_pack_msgpack_to_json_format(mp_sbuf.data, mp_sbuf.size,
-                                               ctx->out_format,
-                                               ctx->json_date_format,
-                                               ctx->date_key);
-            write(STDOUT_FILENO, json, flb_sds_len(json));
-            flb_sds_destroy(json);
+            //  json = flb_pack_msgpack_to_json_format(mp_sbuf.data, mp_sbuf.size,
+            //                                    ctx->out_format,
+            //                                    ctx->json_date_format,
+            //                                    ctx->date_key);
+
+            // write(STDOUT_FILENO, json, flb_sds_len(json));
+            // flb_sds_destroy(json);
             // json =  flb_msgpack_to_json_str(record.via.map.size, &record);
             // write(STDOUT_FILENO, json, strlen(json));
 
@@ -211,52 +212,52 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_time tmp;
     msgpack_object *p;
 
-    char *str = "[{\"time\": \"2020-11-12T00:30:48.883Z\", \"type\": \"platform.start\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\", \"version\": \"$LATEST\"}}, {\"time\": \"2020-11-12T00:30:48.993Z\", \"type\": \"platform.logsSubscription\", \"record\": {\"name\": \"logs_api_http_extension.py\", \"state\": \"Subscribed\", \"types\": [\"platform\", \"function\"]}}, {\"time\": \"2020-11-12T00:30:48.993Z\", \"type\": \"platform.extension\", \"record\": {\"name\": \"logs_api_http_extension.py\", \"state\": \"Ready\", \"events\": [\"INVOKE\", \"SHUTDOWN\"]}}, {\"time\": \"2020-11-12T00:30:49.017Z\", \"type\": \"platform.end\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\"}}, {\"time\": \"2020-11-12T00:30:49.017Z\", \"type\": \"platform.report\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\", \"metrics\": {\"durationMs\": 15.74, \"billedDurationMs\": 100, \"memorySizeMB\": 128, \"maxMemoryUsedMB\": 62, \"initDurationMs\": 226.3}}}]";
+    // char *str = "[{\"time\": \"2020-11-12T00:30:48.883Z\", \"type\": \"platform.start\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\", \"version\": \"$LATEST\"}}, {\"time\": \"2020-11-12T00:30:48.993Z\", \"type\": \"platform.logsSubscription\", \"record\": {\"name\": \"logs_api_http_extension.py\", \"state\": \"Subscribed\", \"types\": [\"platform\", \"function\"]}}, {\"time\": \"2020-11-12T00:30:48.993Z\", \"type\": \"platform.extension\", \"record\": {\"name\": \"logs_api_http_extension.py\", \"state\": \"Ready\", \"events\": [\"INVOKE\", \"SHUTDOWN\"]}}, {\"time\": \"2020-11-12T00:30:49.017Z\", \"type\": \"platform.end\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\"}}, {\"time\": \"2020-11-12T00:30:49.017Z\", \"type\": \"platform.report\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\", \"metrics\": {\"durationMs\": 15.74, \"billedDurationMs\": 100, \"memorySizeMB\": 128, \"maxMemoryUsedMB\": 62, \"initDurationMs\": 226.3}}}]";
 
-    parse_payload_json(ctx, "tag", str, (size_t) strlen(str));
-
-    FLB_OUTPUT_RETURN(FLB_OK);
-
-    // if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
-    //     json = flb_pack_msgpack_to_json_format(data, bytes,
-    //                                            ctx->out_format,
-    //                                            ctx->json_date_format,
-    //                                            ctx->date_key);
-    //     write(STDOUT_FILENO, json, flb_sds_len(json));
-    //     flb_sds_destroy(json);
-
-    //     /*
-    //      * If we are 'not' in json_lines mode, we need to add an extra
-    //      * breakline.
-    //      */
-    //     if (ctx->out_format != FLB_PACK_JSON_FORMAT_LINES) {
-    //         printf("\n");
-    //     }
-    //     fflush(stdout);
-    // }
-    // else {
-    //     /* A tag might not contain a NULL byte */
-    //     buf = flb_malloc(tag_len + 1);
-    //     if (!buf) {
-    //         flb_errno();
-    //         FLB_OUTPUT_RETURN(FLB_RETRY);
-    //     }
-    //     memcpy(buf, tag, tag_len);
-    //     buf[tag_len] = '\0';
-    //     msgpack_unpacked_init(&result);
-    //     while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
-    //         printf("[%zd] %s: [", cnt++, buf);
-    //         flb_time_pop_from_msgpack(&tmp, &result, &p);
-    //         printf("%"PRIu32".%09lu, ", (uint32_t)tmp.tm.tv_sec, tmp.tm.tv_nsec);
-    //         msgpack_object_print(stdout, *p);
-    //         printf("]\n");
-    //     }
-    //     msgpack_unpacked_destroy(&result);
-    //     flb_free(buf);
-    // }
-    // fflush(stdout);
+    // parse_payload_json(ctx, "tag", str, (size_t) strlen(str));
 
     // FLB_OUTPUT_RETURN(FLB_OK);
+
+    if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
+        json = flb_pack_msgpack_to_json_format(data, bytes,
+                                               ctx->out_format,
+                                               ctx->json_date_format,
+                                               ctx->date_key);
+        write(STDOUT_FILENO, json, flb_sds_len(json));
+        flb_sds_destroy(json);
+
+        /*
+         * If we are 'not' in json_lines mode, we need to add an extra
+         * breakline.
+         */
+        if (ctx->out_format != FLB_PACK_JSON_FORMAT_LINES) {
+            printf("\n");
+        }
+        fflush(stdout);
+    }
+    else {
+        /* A tag might not contain a NULL byte */
+        buf = flb_malloc(tag_len + 1);
+        if (!buf) {
+            flb_errno();
+            FLB_OUTPUT_RETURN(FLB_RETRY);
+        }
+        memcpy(buf, tag, tag_len);
+        buf[tag_len] = '\0';
+        msgpack_unpacked_init(&result);
+        while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
+            printf("[%zd] %s: [", cnt++, buf);
+            flb_time_pop_from_msgpack(&tmp, &result, &p);
+            printf("%"PRIu32".%09lu, ", (uint32_t)tmp.tm.tv_sec, tmp.tm.tv_nsec);
+            msgpack_object_print(stdout, *p);
+            printf("]\n");
+        }
+        msgpack_unpacked_destroy(&result);
+        flb_free(buf);
+    }
+    fflush(stdout);
+
+    FLB_OUTPUT_RETURN(FLB_OK);
 }
 
 static int cb_stdout_exit(void *data, struct flb_config *config)
