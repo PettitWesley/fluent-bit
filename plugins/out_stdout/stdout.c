@@ -24,6 +24,15 @@
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
+
+#include <fluent-bit/flb_input_plugin.h>
+#include <fluent-bit/flb_version.h>
+#include <fluent-bit/flb_error.h>
+#include <fluent-bit/flb_pack.h>
+
+#include <monkey/monkey.h>
+#include <monkey/mk_core.h>
+
 #include <msgpack.h>
 
 #include "stdout.h"
@@ -94,6 +103,78 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     return 0;
 }
 
+int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t size)
+{
+    size_t off = 0;
+    msgpack_sbuffer mp_sbuf;
+    msgpack_packer mp_pck;
+    msgpack_unpacked result;
+    struct flb_time tm;
+
+    flb_time_get(&tm);
+
+    msgpack_unpacked_init(&result);
+    while (msgpack_unpack_next(&result, buf, size, &off) == MSGPACK_UNPACK_SUCCESS) {
+        if (result.data.type == MSGPACK_OBJECT_ARRAY) {
+            flb_plg_warn(ctx->ins, "processing opening array",
+                         result.data.type);
+            continue;
+        }
+        flb_plg_debug(ctx->ins, "found msgpack type: %i", result.data.type);
+
+        msgpack_sbuffer_init(&mp_sbuf);
+        msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
+
+        /* Pack record with timestamp */
+        msgpack_pack_array(&mp_pck, 2);
+        flb_time_append_to_msgpack(&tm, &mp_pck, 0);
+        msgpack_pack_object(&mp_pck, result.data); /* Ingest real record into the engine */
+
+        flb_info("record: %.*s", mp_sbuf.size, mp_sbuf.data);
+
+        msgpack_unpacked_destroy(&result);
+        msgpack_sbuffer_destroy(&mp_sbuf);
+    }
+
+    return 0;
+}
+
+static ssize_t parse_payload_json(struct flb_stdout *ctx, flb_sds_t tag,
+                                  char *payload, size_t size)
+{
+    int ret;
+    int out_size;
+    char *pack;
+    struct flb_pack_state pack_state;
+
+    /* Initialize packer */
+    flb_pack_state_init(&pack_state);
+
+    /* Pack JSON as msgpack */
+    ret = flb_pack_json_state(payload, size,
+                              &pack, &out_size, &pack_state);
+    flb_pack_state_reset(&pack_state);
+
+    /* Handle exceptions */
+    if (ret == FLB_ERR_JSON_PART) {
+        flb_plg_warn(ctx->ins, "JSON data is incomplete, skipping");
+        return -1;
+    }
+    else if (ret == FLB_ERR_JSON_INVAL) {
+        flb_plg_warn(ctx->ins, "invalid JSON message, skipping");
+        return -1;
+    }
+    else if (ret == -1) {
+        return -1;
+    }
+
+    /* Process the packaged JSON and return the last byte used */
+    process_pack(ctx, tag, pack, out_size);
+    flb_free(pack);
+
+    return 0;
+}
+
 static void cb_stdout_flush(const void *data, size_t bytes,
                             const char *tag, int tag_len,
                             struct flb_input_instance *i_ins,
@@ -109,6 +190,10 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+
+    char *str = "[{\"time\": \"2020-11-12T00:30:48.883Z\", \"type\": \"platform.start\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\", \"version\": \"$LATEST\"}}, {\"time\": \"2020-11-12T00:30:48.993Z\", \"type\": \"platform.logsSubscription\", \"record\": {\"name\": \"logs_api_http_extension.py\", \"state\": \"Subscribed\", \"types\": [\"platform\", \"function\"]}}, {\"time\": \"2020-11-12T00:30:48.993Z\", \"type\": \"platform.extension\", \"record\": {\"name\": \"logs_api_http_extension.py\", \"state\": \"Ready\", \"events\": [\"INVOKE\", \"SHUTDOWN\"]}}, {\"time\": \"2020-11-12T00:30:49.017Z\", \"type\": \"platform.end\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\"}}, {\"time\": \"2020-11-12T00:30:49.017Z\", \"type\": \"platform.report\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\", \"metrics\": {\"durationMs\": 15.74, \"billedDurationMs\": 100, \"memorySizeMB\": 128, \"maxMemoryUsedMB\": 62, \"initDurationMs\": 226.3}}}]";
+
+    parse_payload_json(ctx, "tag", str, (size_t) strlen(str));
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
