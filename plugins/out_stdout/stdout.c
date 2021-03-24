@@ -118,7 +118,7 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
                          result.data.type);
             continue;
         }
-        flb_plg_debug(ctx->ins, "found msgpack type: %i", result.data.type);
+        flb_plg_info(ctx->ins, "found msgpack type: %i", result.data.type);
 
         msgpack_sbuffer_init(&mp_sbuf);
         msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
@@ -192,6 +192,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     char *str = "[{\"time\": \"2020-11-12T00:30:48.883Z\", \"type\": \"platform.start\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\", \"version\": \"$LATEST\"}}, {\"time\": \"2020-11-12T00:30:48.993Z\", \"type\": \"platform.logsSubscription\", \"record\": {\"name\": \"logs_api_http_extension.py\", \"state\": \"Subscribed\", \"types\": [\"platform\", \"function\"]}}, {\"time\": \"2020-11-12T00:30:48.993Z\", \"type\": \"platform.extension\", \"record\": {\"name\": \"logs_api_http_extension.py\", \"state\": \"Ready\", \"events\": [\"INVOKE\", \"SHUTDOWN\"]}}, {\"time\": \"2020-11-12T00:30:49.017Z\", \"type\": \"platform.end\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\"}}, {\"time\": \"2020-11-12T00:30:49.017Z\", \"type\": \"platform.report\", \"record\": {\"requestId\": \"49ae0e5f-bc60-4521-81e3-6e41d6bcb55c\", \"metrics\": {\"durationMs\": 15.74, \"billedDurationMs\": 100, \"memorySizeMB\": 128, \"maxMemoryUsedMB\": 62, \"initDurationMs\": 226.3}}}]";
 
     parse_payload_json(ctx, "tag", str, (size_t) strlen(str));
+
+    FLB_OUTPUT_RETURN(FLB_OK);
 
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
         json = flb_pack_msgpack_to_json_format(data, bytes,
