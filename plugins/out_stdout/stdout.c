@@ -108,17 +108,23 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
     msgpack_packer mp_pck;
     msgpack_unpacked result;
     struct flb_time tm;
+    msgpack_object  *obj;
 
     flb_time_get(&tm);
 
     msgpack_unpacked_init(&result);
     while (msgpack_unpack_next(&result, buf, size, &off) == MSGPACK_UNPACK_SUCCESS) {
         if (result.data.type == MSGPACK_OBJECT_ARRAY) {
-            flb_plg_warn(ctx->ins, "processing opening array",
+            flb_plg_warn(ctx->ins, "processing opening array: %i",
                          result.data.type);
-            continue;
         }
         flb_plg_info(ctx->ins, "found msgpack type: %i", result.data.type);
+
+        obj = &result.data;
+
+        obj->via.map.size
+
+        flb_plg_info(ctx->ins, "array size: %d", obj->via.map.size);
 
         msgpack_sbuffer_init(&mp_sbuf);
         msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
@@ -133,6 +139,8 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
         msgpack_unpacked_destroy(&result);
         msgpack_sbuffer_destroy(&mp_sbuf);
     }
+
+    flb_plg_warn(ctx->ins, "done processing pack");
 
     return 0;
 }
