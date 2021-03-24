@@ -128,6 +128,7 @@ static int process_pack(struct flb_stdout *ctx, flb_sds_t tag, char *buf, size_t
 
         for (int i = 0; i < obj->via.array.size; i++)
         {
+            flb_info("i: %d, size: %d", i, obj->via.array.size);
             record = obj->via.array.ptr[i];
             msgpack_sbuffer_init(&mp_sbuf);
             msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
