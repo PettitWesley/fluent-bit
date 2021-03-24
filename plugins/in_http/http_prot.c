@@ -75,6 +75,8 @@ int process_pack(struct flb_http *ctx, flb_sds_t tag, char *buf, size_t size)
     msgpack_sbuffer mp_sbuf;
     msgpack_packer mp_pck;
     msgpack_unpacked result;
+    msgpack_object  *obj;
+    msgpack_object  record;
     struct flb_time tm;
 
     flb_time_get(&tm);
@@ -82,31 +84,41 @@ int process_pack(struct flb_http *ctx, flb_sds_t tag, char *buf, size_t size)
     msgpack_unpacked_init(&result);
     while (msgpack_unpack_next(&result, buf, size, &off) == MSGPACK_UNPACK_SUCCESS) {
         if (result.data.type == MSGPACK_OBJECT_ARRAY) {
-            flb_plg_warn(ctx->ins, "processing opening array",
+            flb_plg_info(ctx->ins, "found array array",
                          result.data.type);
-            continue;
-        }
-        flb_plg_debug(ctx->ins, "found msgpack type: %i", result.data.type);
+            obj = &result.data;
 
-        msgpack_sbuffer_init(&mp_sbuf);
-        msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
+            flb_plg_info(ctx->ins, "array size: %d", obj->via.array.size);
 
-        /* Pack record with timestamp */
-        msgpack_pack_array(&mp_pck, 2);
-        flb_time_append_to_msgpack(&tm, &mp_pck, 0);
-        msgpack_pack_object(&mp_pck, result.data); /* Ingest real record into the engine */
+            for (int i = 0; i < obj->via.array.size; i++)
+            {
+                flb_plg_info(ctx->ins, "ingesting record %d", i);
+                record = obj->via.array.ptr[i];
+                msgpack_sbuffer_init(&mp_sbuf);
+                msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
 
-        if (tag) {
-            flb_input_chunk_append_raw(ctx->ins, tag, flb_sds_len(tag),
-                                    mp_sbuf.data, mp_sbuf.size);
+                /* Pack record with timestamp */
+                msgpack_pack_array(&mp_pck, 2);
+                flb_time_append_to_msgpack(&tm, &mp_pck, 0);
+                msgpack_pack_object(&mp_pck, record); /* Ingest real record into the engine */
+
+                if (tag) {
+                    flb_input_chunk_append_raw(ctx->ins, tag, flb_sds_len(tag),
+                                               mp_sbuf.data, mp_sbuf.size);
+                }
+                else {
+                    /* use default plugin Tag (it internal name, e.g: http.0 */
+                    flb_input_chunk_append_raw(ctx->ins, NULL, 0, mp_sbuf.data, mp_sbuf.size);
+                }
+
+                msgpack_sbuffer_destroy(&mp_sbuf);
+            }
+        } else {
+            flb_plg_warn(ctx->ins, "found msgpack type: %i", result.data.type);
         }
-        else {
-            /* use default plugin Tag (it internal name, e.g: http.0 */
-            flb_input_chunk_append_raw(ctx->ins, NULL, 0, mp_sbuf.data, mp_sbuf.size);
-        }
-        msgpack_unpacked_destroy(&result);
-        msgpack_sbuffer_destroy(&mp_sbuf);
     }
+
+    msgpack_unpacked_destroy(&result);
 
     return 0;
 }
