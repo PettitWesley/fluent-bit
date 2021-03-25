@@ -551,6 +551,7 @@ static int msgpack2json(char *buf, int *off, size_t left,
         break;
 
     case MSGPACK_OBJECT_STR:
+        flb_info("string: %.*s", o->via.str.size, o->via.str.ptr);
         if (try_to_write(buf, off, left, "\"", 1) &&
             (o->via.str.size > 0 ?
              try_to_write_str(buf, off, left, o->via.str.ptr, o->via.str.size)
