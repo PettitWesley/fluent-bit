@@ -526,10 +526,12 @@ int flb_engine_start(struct flb_config *config)
     event->mask = MK_EVENT_EMPTY;
     event->status = MK_EVENT_NONE;
 
+    flb_info("Setting flush to 10ms");
+
     flb_time_from_double(&t_flush, config->flush);
     config->flush_fd = mk_event_timeout_create(evl,
-                                               t_flush.tm.tv_sec,
-                                               t_flush.tm.tv_nsec,
+                                               0,
+                                               10000000,
                                                event);
     if (config->flush_fd == -1) {
         flb_utils_error(FLB_ERR_CFG_FLUSH_CREATE);
