@@ -220,6 +220,7 @@ int process_pack(struct flb_http *ctx, flb_sds_t tag, char *buf, size_t size)
 
                 msgpack_sbuffer_destroy(&mp_sbuf);
             }
+            flb_plg_debug(ctx->ins, "Ingested %d records", i);
 
             break;
         } 
