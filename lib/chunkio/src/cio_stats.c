@@ -43,7 +43,7 @@ void cio_stats_get(struct cio_ctx *ctx, struct cio_stats *stats)
         stats->streams_total++;
 
         /* Iterate chunks */
-        print("cio_stats_get() len(stream->chunks) == %d", mk_list_size(&stream->chunks));
+        printf("cio_stats_get() len(stream->chunks) == %d", mk_list_size(&stream->chunks));
         mk_list_foreach(f_head, &stream->chunks) {
             stats->chunks_total++;
 
