@@ -34,7 +34,8 @@ void cio_stats_get(struct cio_ctx *ctx, struct cio_stats *stats)
 
     memset(stats, 0, sizeof(struct cio_stats));
 
-    flb_info("cio_stats_get() len(ctx->streams) == %d", mk_list_size(&ctx->streams));
+    printf("cio_stats_get() len(ctx->streams) == %d", mk_list_size(&ctx->streams));
+    fflush(stdout);
 
     /* Iterate each stream */
     mk_list_foreach(head, &ctx->streams) {
@@ -42,7 +43,7 @@ void cio_stats_get(struct cio_ctx *ctx, struct cio_stats *stats)
         stats->streams_total++;
 
         /* Iterate chunks */
-        flb_info("cio_stats_get() len(stream->chunks) == %d", mk_list_size(&stream->chunks));
+        print("cio_stats_get() len(stream->chunks) == %d", mk_list_size(&stream->chunks));
         mk_list_foreach(f_head, &stream->chunks) {
             stats->chunks_total++;
 
@@ -63,6 +64,8 @@ void cio_stats_get(struct cio_ctx *ctx, struct cio_stats *stats)
             }
         }
     }
+    fflush(stdout);
+
 }
 
 void cio_stats_print_summary(struct cio_ctx *ctx)
