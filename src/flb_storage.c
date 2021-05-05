@@ -236,6 +236,7 @@ static void cb_storage_metrics_collect(struct flb_config *ctx, void *data)
 {
     msgpack_sbuffer mp_sbuf;
     msgpack_packer mp_pck;
+    int ret;
 
     /* Prepare new outgoing buffer */
     msgpack_sbuffer_init(&mp_sbuf);
@@ -248,7 +249,9 @@ static void cb_storage_metrics_collect(struct flb_config *ctx, void *data)
 
 #ifdef FLB_HAVE_HTTP_SERVER
     if (ctx->http_server == FLB_TRUE) {
-        flb_hs_push_storage_metrics(ctx->http_ctx, mp_sbuf.data, mp_sbuf.size);
+        ret = flb_hs_push_storage_metrics(ctx->http_ctx, mp_sbuf.data, mp_sbuf.size);
+        flb_info("flb_hs_push_storage_metrics() ret=%d", ret);
+        flb_debug("storage metrics msgpack= %.*s", (int) mp_sbuf.size, mp_sbuf.data);
     }
 #endif
     msgpack_sbuffer_destroy(&mp_sbuf);

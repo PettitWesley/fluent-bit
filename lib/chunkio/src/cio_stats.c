@@ -34,12 +34,15 @@ void cio_stats_get(struct cio_ctx *ctx, struct cio_stats *stats)
 
     memset(stats, 0, sizeof(struct cio_stats));
 
+    flb_info("cio_stats_get() len(ctx->streams) == %d", mk_list_size(&ctx->streams));
+
     /* Iterate each stream */
     mk_list_foreach(head, &ctx->streams) {
         stream = mk_list_entry(head, struct cio_stream, _head);
         stats->streams_total++;
 
         /* Iterate chunks */
+        flb_info("cio_stats_get() len(stream->chunks) == %d", mk_list_size(&stream->chunks));
         mk_list_foreach(f_head, &stream->chunks) {
             stats->chunks_total++;
 

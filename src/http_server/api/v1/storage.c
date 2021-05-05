@@ -36,10 +36,12 @@ static struct flb_hs_buf *storage_metrics_get_latest()
 
     metrics_list = pthread_getspecific(hs_storage_metrics_key);
     if (!metrics_list) {
+        flb_info("storage_metrics_get_latest() metrics_list == NULL");
         return NULL;
     }
 
     if (mk_list_size(metrics_list) == 0) {
+        flb_info("storage_metrics_get_latest() len(metrics_list) == 0 ");
         return NULL;
     }
 
