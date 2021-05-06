@@ -256,12 +256,12 @@ static ssize_t parse_payload_json(struct flb_http *ctx, flb_sds_t tag,
     /* Handle exceptions */
     if (ret == FLB_ERR_JSON_PART) {
         flb_plg_warn(ctx->ins, "JSON data is incomplete, skipping");
+        flb_plg_warn(ctx->ins, "%.*s\n", (int) size, payload);
         return -1;
     }
     else if (ret == FLB_ERR_JSON_INVAL) {
         flb_plg_warn(ctx->ins, "invalid JSON message, skipping");
-        printf("%.*s\n", (int) size, payload);
-        fflush(stdout);
+        flb_plg_warn(ctx->ins, "%.*s\n", (int) size, payload);
         return -1;
     }
     else if (ret == -1) {
