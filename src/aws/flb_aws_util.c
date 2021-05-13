@@ -180,6 +180,12 @@ struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client
         }
     }
 
+    if (c == NULL) {
+        flb_debug("[aws_client] auto-retrying");
+        c = request_do(aws_client, method, uri, body, body_len,
+                       dynamic_headers, dynamic_headers_len);
+    }
+
     return c;
 }
 
