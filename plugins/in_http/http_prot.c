@@ -347,6 +347,8 @@ int http_prot_handle(struct flb_http *ctx, struct http_conn *conn,
     flb_sds_t tag;
     struct mk_http_header *header;
 
+    flb_info("received: `%.*s`\n", request->data.len, request->data.data);
+
     if (request->uri.data[0] != '/') {
         send_response(conn, 400, "error: invalid request\n");
         return -1;
@@ -428,6 +430,8 @@ int http_prot_handle(struct flb_http *ctx, struct http_conn *conn,
         send_response(conn, 400, "error: invalid HTTP method\n");
         return -1;
     }
+
+    flb_info("payload=%d bytes, content-length=%.*s bytes\n", request->data.len, request->_content_length.len, request->_content_length.data);
 
     ret = process_payload(ctx, conn, tag, session, request);
     flb_sds_destroy(tag);
