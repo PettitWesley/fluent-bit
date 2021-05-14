@@ -32,6 +32,9 @@
 
 #define HTTP_CONTENT_JSON  0
 
+static ssize_t parse_payload_json(struct flb_http *ctx, flb_sds_t tag,
+                                  char *payload, size_t size);
+
 static int send_response(struct http_conn *conn, int http_status, char *message)
 {
     int len;
@@ -260,7 +263,7 @@ static char *contains_string(const char *haystack, const char *needle, size_t le
         return NULL;
 }
 
-static void process_payload(struct flb_http *ctx, flb_sds_t tag,
+static void parse_payload(struct flb_http *ctx, flb_sds_t tag,
                             char *payload, size_t size)
 {
     char *actual_payload = payload;
@@ -285,7 +288,7 @@ static void process_payload(struct flb_http *ctx, flb_sds_t tag,
             while (i < size && payload[i] != '{') {
                 i++;
             }
-            actual_payload = payload[i];
+            actual_payload = &payload[i];
             contains_post = contains_string(actual_payload, "POST", size);            
         }
     } 
@@ -363,7 +366,7 @@ static int process_payload(struct flb_http *ctx, struct http_conn *conn,
     }
 
     if (type == HTTP_CONTENT_JSON) {
-        process_payload(ctx, tag, request->data.data, request->data.len);
+        parse_payload(ctx, tag, request->data.data, request->data.len);
     }
 
     return 0;
