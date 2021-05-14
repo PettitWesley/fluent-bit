@@ -282,14 +282,13 @@ static void parse_payload(struct flb_http *ctx, flb_sds_t tag,
         while (contains_post != NULL) {
             actual_payload = &payload[i];
             contains_post = contains_string(actual_payload, "POST", size);
-            
+
             actual_size = contains_post - actual_payload;
             parse_payload_json(ctx, tag, actual_payload, actual_size);
 
             i += actual_size;
             /* advance pointer until we reach the start of the next JSON body */
             while (i < size && payload[i] != '{') {
-                flb_info("payload[i]=%c", payload[i]);
                 i++;
             }        
         }
