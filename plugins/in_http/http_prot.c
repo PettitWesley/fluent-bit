@@ -25,6 +25,7 @@
 
 #include <monkey/monkey.h>
 #include <monkey/mk_core.h>
+#include <string.h>
 
 #include "http.h"
 #include "http_conn.h"
@@ -237,6 +238,63 @@ int process_pack(struct flb_http *ctx, flb_sds_t tag, char *buf, size_t size)
     return 0;
 }
 
+/* 
+ * implementation of strnstr from: https://stackoverflow.com/questions/23999797/implementing-strnstr
+ */
+static char *contains_string(const char *haystack, const char *needle, size_t len)
+{
+        int i;
+        size_t needle_len;
+
+        if (0 == (needle_len = strnlen(needle, len)))
+                return (char *)haystack;
+
+        for (i=0; i<=(int)(len-needle_len); i++)
+        {
+                if ((haystack[0] == needle[0]) &&
+                        (0 == strncmp(haystack, needle, needle_len)))
+                        return (char *)haystack;
+
+                haystack++;
+        }
+        return NULL;
+}
+
+static void process_payload(struct flb_http *ctx, flb_sds_t tag,
+                            char *payload, size_t size)
+{
+    char *actual_payload = payload;
+    size_t actual_size = 0;
+    size_t i = 0;
+    char *contains_post;
+
+    contains_post = contains_string(payload, "POST", size);
+
+    if (contains_post != NULL) {
+        /* 
+         * multiple post requests came over the same connection
+         * need to split them up before processing
+         */
+        flb_plg_debug(ctx->ins, "Got request with multiple payload bodies joined together");
+        while (contains_post != NULL) {
+            actual_size = contains_post - actual_payload;
+            parse_payload_json(ctx, tag, actual_payload, actual_size);
+
+            i += actual_size;
+            /* advance pointer until we reach the start of the next JSON body */
+            while (i < size && payload[i] != '{') {
+                i++;
+            }
+            actual_payload = payload[i];
+            contains_post = contains_string(actual_payload, "POST", size);            
+        }
+    } 
+    else {
+        parse_payload_json(ctx, tag, payload, size);
+    }
+
+}
+
 static ssize_t parse_payload_json(struct flb_http *ctx, flb_sds_t tag,
                                   char *payload, size_t size)
 {
@@ -305,11 +363,12 @@ static int process_payload(struct flb_http *ctx, struct http_conn *conn,
     }
 
     if (type == HTTP_CONTENT_JSON) {
-        parse_payload_json(ctx, tag, request->data.data, request->data.len);
+        process_payload(ctx, tag, request->data.data, request->data.len);
     }
 
     return 0;
 }
+
 
 static inline int mk_http_point_header(mk_ptr_t *h,
                                        struct mk_http_parser *parser, int key)
