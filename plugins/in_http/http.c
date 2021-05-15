@@ -77,7 +77,7 @@ static int in_http_init(struct flb_input_instance *ins,
     /* Set the context */
     flb_input_set_context(ins, ctx);
 
-    flb_plg_info("Actual buffer size = %zu bytes", ctx->buffer_max_size);
+    flb_plg_info("Actual buffer size = %zu bytes", ctx->ins, ctx->buffer_max_size);
 
     ctx->evl = config->evl;
 
