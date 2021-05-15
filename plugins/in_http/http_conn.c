@@ -43,7 +43,7 @@ static int http_conn_event(void *data)
         available = (conn->buf_size - conn->buf_len) - 1;
         if (available < 1) {
             if (conn->buf_size + ctx->buffer_chunk_size > ctx->buffer_max_size) {
-                flb_plg_trace(ctx->ins,
+                flb_plg_error(ctx->ins,
                               "fd=%i incoming data exceed limit (%zu KB)",
                               event->fd, (ctx->buffer_max_size / 1024));
                 http_conn_del(conn);
