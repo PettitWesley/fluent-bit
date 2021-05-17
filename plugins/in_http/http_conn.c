@@ -88,6 +88,7 @@ static int http_conn_event(void *data)
             /* Do more logic parsing and checks for this request */
             http_prot_handle(ctx, conn, session, request);
         }
+        conn->buf_len = 0;
 
         /* FIXME: add Protocol handler here */
         return bytes;
