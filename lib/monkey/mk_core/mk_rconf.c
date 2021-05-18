@@ -605,6 +605,8 @@ struct mk_rconf *mk_rconf_open(const char *path)
     /* Read entrypoint */
     ret = mk_rconf_read(conf, path);
     if (ret == -1) {
+        printf("mk_rconf_read failed %s\n", path);
+        fflush(stdout);
         mk_rconf_free(conf);
         return NULL;
     }
