@@ -197,6 +197,8 @@ static int mk_rconf_read(struct mk_rconf *conf, const char *path)
         if (ret == -1 && errno == ENOENT) {
             /* Try to resolve the real path (if exists) */
             if (path[0] == '/') {
+                printf("ENOENT on path %s\n", path);
+                fflush(stdout);
                 return -1;
             }
 
@@ -276,7 +278,7 @@ static int mk_rconf_read(struct mk_rconf *conf, const char *path)
                 if (indent) {
                     mk_mem_free(indent);
                 }
-                printf("Could not load something in %s\n", buf + 9);
+                printf("Could not read @INCLUDE %s\n", buf + 9);
                 fflush(stdout);
                 mk_mem_free(buf);
                 return -1;
