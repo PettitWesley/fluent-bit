@@ -209,6 +209,8 @@ static int flb_config_static_read(struct mk_rconf *conf,
                     mk_mem_free(indent);
                 }
                 mk_mem_free(buf);
+                printf("Problem with %s\n", fname);
+                fflush(stdout);
                 return -1;
             }
             continue;
