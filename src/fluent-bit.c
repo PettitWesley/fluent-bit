@@ -664,6 +664,8 @@ static int flb_service_conf(struct flb_config *config, char *file)
 #endif
 
     if (!fconf) {
+        printf("Could not read %s", file);
+        fflush(stdout);
         return -1;
     }
 
