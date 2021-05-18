@@ -399,6 +399,8 @@ struct mk_rconf *flb_config_static_open(const char *file)
     /* Read entrypoint */
     ret = flb_config_static_read(conf, k, v);
     if (ret == -1) {
+        printf("Could not load something in %s\n", file);
+        fflush(stdout);
         mk_rconf_free(conf);
         return NULL;
     }
