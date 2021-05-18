@@ -276,6 +276,8 @@ static int mk_rconf_read(struct mk_rconf *conf, const char *path)
                 if (indent) {
                     mk_mem_free(indent);
                 }
+                printf("Could not load something in %s\n", buf + 9);
+                fflush(stdout);
                 mk_mem_free(buf);
                 return -1;
             }
