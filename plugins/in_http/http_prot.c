@@ -244,6 +244,8 @@ static ssize_t parse_payload_json(struct flb_http *ctx, flb_sds_t tag,
     char *pack;
     struct flb_pack_state pack_state;
 
+    flb_info("Received: `%.*s`\n", size, payload);
+
     /* Initialize packer */
     flb_pack_state_init(&pack_state);
 
