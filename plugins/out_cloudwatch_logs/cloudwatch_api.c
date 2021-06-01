@@ -1333,6 +1333,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         flb_plg_debug(ctx->ins, "PutLogEvents http status=%d", c->resp.status);
 
         if (c->resp.status == 200) {
+            flb_plg_debug(ctx->ins, "full resp data: `%.*s`", c->resp.data_len, c->resp.data);
             /* success */
             flb_plg_debug(ctx->ins, "Sent events to %s", stream->name);
             if (c->resp.payload_size > 0) {
@@ -1351,7 +1352,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
             }
             else {
                 flb_plg_error(ctx->ins, "Could not find sequence token in "
-                              "response: response body is empty");
+                              "response: response body is empty: full data: `%.*s`", c->resp.data_len, c->resp.data);
             }
             flb_http_client_destroy(c);
             return 0;
