@@ -1283,6 +1283,16 @@ int create_log_stream(struct flb_cloudwatch *ctx, struct log_stream *stream)
     return -1;
 }
 
+int replacechar(char *str, char orig, char rep) {
+    char *ix = str;
+    int n = 0;
+    while((ix = strchr(ix, orig)) != NULL) {
+        *ix++ = rep;
+        n++;
+    }
+    return n;
+}
+
 /*
  * Returns -1 on failure, 0 on success, and 1 for a sequence token error,
  * which means the caller can retry.
@@ -1351,8 +1361,12 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                 }
             }
             else {
-                flb_plg_error(ctx->ins, "Could not find sequence token in "
+                flb_plg_debug(ctx->ins, "Could not find sequence token in "
                               "response: response body is empty: full data: `%.*s`", c->resp.data_len, c->resp.data);
+                c->resp.data[c->resp.data_len - 1] = '\0';
+                replacechar(c->resp.data, '\n', '\t');
+                flb_plg_error(ctx->ins, "Could not find sequence token in "
+                              "response: response body is empty: full data: `%s`", c->resp.data);
             }
             flb_http_client_destroy(c);
             return 0;
