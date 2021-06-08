@@ -1344,6 +1344,8 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
 
         if (c->flags & FLB_HTTP_10) {
                 flb_plg_error(ctx->ins, "FLB_HTTP_10 flag is set");
+        } else {
+                flb_plg_info(ctx->ins, "FLB_HTTP_10 flag is NOT set");
         }
 
         if (c->resp.status == 200) {
