@@ -378,6 +378,8 @@ int process_event(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     ret = flb_msgpack_to_json(tmp_buf_ptr,
                                   buf->tmp_buf_size - buf->tmp_buf_offset,
                                   obj);
+    flb_plg_warn(ctx->ins, "flb_msgpack_to_json() offset=%zu, avail=%zu, index=%d, ret=%d", 
+    buf->tmp_buf_offset, buf->tmp_buf_size - buf->tmp_buf_offset, buf->event_index, ret);
     if (ret < 0) {
         /*
          * negative value means failure to write to buffer,
