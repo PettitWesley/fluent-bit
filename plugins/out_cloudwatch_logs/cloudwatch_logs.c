@@ -383,6 +383,8 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
 
     ctx->buf->put_events_calls = 0;
 
+    flb_plg_debug(ctx->ins, "PRE-RELEASE version for #3638");
+
     if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
         ret = create_log_group(ctx);
         if (ret < 0) {
@@ -401,7 +403,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    //TODO: this one is innaccurate if events are skipped
+    // TODO: this msg is innaccurate if events are skipped
     flb_plg_debug(ctx->ins, "Sent %d events to CloudWatch", event_count);
 
     FLB_OUTPUT_RETURN(FLB_OK);
