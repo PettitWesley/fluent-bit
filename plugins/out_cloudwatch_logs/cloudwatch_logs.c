@@ -97,6 +97,16 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         ctx->log_stream_prefix = tmp;
     }
 
+    tmp = flb_output_get_property("log_stream_name_key", ins);
+    if (tmp) {
+        ctx->log_stream_name_key = tmp;
+    }
+
+    tmp = flb_output_get_property("log_group_name_key", ins);
+    if (tmp) {
+        ctx->log_group_name_key = tmp;
+    }
+
     if (!ctx->log_stream_name && !ctx->log_stream_prefix) {
         flb_plg_error(ctx->ins, "Either 'log_stream_name' or 'log_stream_prefix'"
                       " is required");
@@ -368,6 +378,140 @@ error:
     return -1;
 }
 
+static flb_sds_t get_value(struct flb_cloudwatch *ctx,
+                           char *key_name, msgpack_object map, size_t map_size)
+{
+    msgpack_object_kv *kv;
+    msgpack_object  key;
+    msgpack_object  val;
+    char *key_str = NULL;
+    size_t key_str_size = 0;
+    char *val_str = NULL;
+    size_t val_str_size = 0;
+    int j;
+    int check = FLB_FALSE;
+    flb_sds_t key_value;
+
+    kv = map.via.map.ptr;
+
+    for(j=0; j < map_size; j++) {
+        check = FLB_FALSE;
+        key = (kv+j)->key;
+        if (key.type == MSGPACK_OBJECT_BIN) {
+            key_str  = (char *) key.via.bin.ptr;
+            key_str_size = key.via.bin.size;
+            check = FLB_TRUE;
+        }
+        if (key.type == MSGPACK_OBJECT_STR) {
+            key_str  = (char *) key.via.str.ptr;
+            key_str_size = key.via.str.size;
+            check = FLB_TRUE;
+        }
+
+        if (check == FLB_TRUE) {
+            if (strncmp(ctx->log_key, key_str, key_str_size) == 0) {
+                val = (kv+j)->val;
+                if (val.type == MSGPACK_OBJECT_BIN) {
+                    val_str  = (char *) val.via.bin.ptr;
+                    val_str_size = val.via.bin.size;
+                }
+                if (val.type == MSGPACK_OBJECT_STR) {
+                    val_str  = (char *) val.via.str.ptr;
+                    val_str_size = val.via.str.size;
+                }
+                key_value = flb_sds_create_len(val_str, val_str_size);
+                if (!key_value) {
+                    flb_errno();
+                    return NULL;
+                }
+                return key_value;
+            }
+        }
+
+    }
+    flb_plg_error(ctx->ins, "Could not find key '%s' in record", key_name);
+    return NULL;
+}
+
+static struct cw_info *get_log_names(struct flb_cloudwatch *ctx,
+                                     const void *data, size_t bytes)
+{
+    size_t off = 0;
+    int i = 0;
+    size_t map_size;
+    msgpack_unpacked result;
+    msgpack_object  *obj;
+    msgpack_object  map;
+    msgpack_object root;
+    int ret;
+    struct flb_time tms;
+    flb_sds_t group = NULL;
+    flb_sds_t stream = NULL;
+    struct cw_info *info;
+
+    /* unpack msgpack and get log group/stream names from first record */
+
+    msgpack_unpacked_init(&result);
+    while (msgpack_unpack_next(&result, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS) {
+        /*
+         * Each record is a msgpack array [timestamp, map] of the
+         * timestamp and record map.
+         */
+        root = result.data;
+        if (root.via.array.size != 2) {
+            continue;
+        }
+
+        /* unpack the array of [timestamp, map] */
+        flb_time_pop_from_msgpack(&tms, &result, &obj);
+
+        /* Get the record/map */
+        map = root.via.array.ptr[1];
+        map_size = map.via.map.size;
+
+        if (ctx->log_group_name_key) {
+            group = get_value(ctx, ctx->log_group_name_key, map, map_size);
+            if (!group) {
+                flb_plg_error(ctx->ins, "Failed to get log group name from record");
+                goto error;
+            }
+        }
+
+        if (ctx->log_stream_name_key) {
+            stream = get_value(ctx, ctx->log_stream_name_key, map, map_size);
+            if (!stream) {
+                flb_plg_error(ctx->ins, "Failed to get log stream name from record");
+                goto error;
+            }
+        }
+
+        if (stream || group) {
+            info = flb_malloc(sizeof(struct cw_info));
+            if (!info) {
+                flb_errno();
+                goto error;
+            }
+            info->group_name = group;
+            info->stream_name = stream;
+            msgpack_unpacked_destroy(&result);
+            return info;
+        }
+
+        break;
+
+    }
+
+error:
+    if (group) {
+        flb_sds_destroy(group);
+    }
+    if (stream) {
+        flb_sds_destroy(stream);
+    }
+    msgpack_unpacked_destroy(&result);
+    return NULL;
+}
+
 static void cb_cloudwatch_flush(const void *data, size_t bytes,
                                 const char *tag, int tag_len,
                                 struct flb_input_instance *i_ins,
@@ -378,10 +522,21 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     int ret;
     int event_count;
     struct log_stream *stream = NULL;
+    struct cw_info *info = NULL;
     (void) i_ins;
     (void) config;
 
     ctx->buf->put_events_calls = 0;
+
+    if (ctx->log_group_name_key || ctx->log_stream_name_key) {
+        info = get_log_names(ctx, data, bytes);
+        if (!info) {
+            flb_plg_error(ctx->ins, "Failed to get log group/stream name from record, tag=%s", tag);
+            FLB_OUTPUT_RETURN(FLB_ERROR);
+        }
+        flb_plg_info(ctx->ins, "group=%s", info->group_name);
+        flb_plg_info(ctx->ins, "stream=%s", info->stream_name);
+    }
 
     if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
         ret = create_log_group(ctx);
@@ -511,6 +666,27 @@ static struct flb_config_map config_map[] = {
      "Prefix for CloudWatch Log Stream Name; the tag is appended to the prefix"
      " to form the stream name"
     },
+
+    {
+     FLB_CONFIG_MAP_STR, "log_group_name_key", NULL,
+     0, FLB_FALSE, 0,
+     "The log group name will be the value of this key in the log record."
+     "This feature works differently than the equivalent option in Fluentd cloudwatch output."
+     "The key is only checked once per flush. All records with the same tag must have the"
+     "same value for this key. This should not be a problem in most k8s/container envs."
+     "If this key is not found, plugin will fallback to log_group_name value."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "log_stream_name_key", NULL,
+     0, FLB_FALSE, 0,
+     "The log stream name will be the value of this key in the log record."
+     "This feature works differently than the equivalent option in Fluentd cloudwatch output."
+     "The key is only checked once per flush. All records with the same tag must have the"
+     "same value for this key. This should not be a problem in most k8s/container envs."
+     "If this key is not found, plugin will fallback to log_stream_name/log_stream_prefix value."
+    },
+
 
     {
      FLB_CONFIG_MAP_STR, "log_key", NULL,

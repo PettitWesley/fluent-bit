@@ -73,6 +73,12 @@ struct cw_event {
     unsigned long long timestamp;
 };
 
+/* used when log group/stream is dynamic and obtained from the records */
+struct cw_info {
+    flb_sds_t group_name;
+    flb_sds_t stream_name;
+};
+
 struct log_stream {
     flb_sds_t name;
     flb_sds_t sequence_token;
@@ -112,6 +118,8 @@ struct flb_cloudwatch {
     const char *log_stream_name;
     const char *log_stream_prefix;
     const char *log_group;
+    const char *log_group_name_key;
+    const char *log_stream_name_key;
     const char *region;
     const char *sts_endpoint;
     const char *log_format;
