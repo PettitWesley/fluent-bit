@@ -762,7 +762,7 @@ static void cb_es_flush(const void *data, size_t bytes,
     struct flb_http_client *c;
     flb_sds_t signature = NULL;
 
-    flb_plg_debug(ctx->ins, "DNS mode: %c", ctx->u.net.dns_mode);
+    flb_plg_debug(ctx->ins, "DNS mode: %c", ctx->u->net.dns_mode);
 
     /* Get upstream connection */
     u_conn = flb_upstream_conn_get(ctx->u);
