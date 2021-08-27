@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_signv4.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <mbedtls/base64.h>
+#include <stdlib.h>
 
 #include "es.h"
 #include "es_conf.h"
@@ -199,6 +200,14 @@ struct flb_elasticsearch *flb_es_conf_create(struct flb_output_instance *ins,
         return NULL;
     }
     ctx->u = upstream;
+
+    char *dns_mode = getenv("DNS_MODE");
+
+    if (dns_mode != NULL && strncmp(dns_mode, "T", 1) == 0) {
+        ctx->u->net.dns_mode = "T";
+    } else {
+        ctx->u->net.dns_mode = "U";
+    }
 
     /* Set instance flags into upstream */
     flb_output_upstream_set(ctx->u, ins);
