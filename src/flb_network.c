@@ -831,6 +831,14 @@ static struct flb_dns_lookup_context *flb_net_dns_lookup_context_create(
     optmask = ARES_OPT_FLAGS;
     opts.tries = 2;
 
+    char *dns_mode_env = getenv("DNS_MODE_USE_TCP");
+
+    if (dns_mode_env != NULL) {
+        dns_mode = FLB_DNS_USE_TCP;
+    } else {
+        dns_mode = FLB_DNS_USE_UDP;
+    }
+
     if (dns_mode == FLB_DNS_USE_TCP) {
         flb_debug("DNS: tcp only mode");
         opts.flags = ARES_FLAG_USEVC;
