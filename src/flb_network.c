@@ -620,7 +620,7 @@ struct flb_dns_lookup_context *flb_net_dns_lookup_context_create(struct mk_event
 
     /* c-ares options: make sure it uses TCP and limit number of tries to 2 */
     optmask = ARES_OPT_FLAGS;
-    opts.flags = ARES_FLAG_USEVC;
+    /*opts.flags = ARES_FLAG_USEVC; */
     opts.tries = 2;
 
     result = ares_init_options((ares_channel *) &context->ares_channel,
