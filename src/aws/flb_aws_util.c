@@ -308,6 +308,14 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
         goto error;
     }
 
+    /*  Try setting resp.max_size to 0 to allow unlimited resizing */
+    const size_t max_resp_size = 0; // 0 means unlimited
+    if (!flb_http_buffer_size(c, max_resp_size)) {
+        flb_info("[aws_client] Increased max response buffer size to %zu", max_resp_size);
+    } else {
+        flb_error("[aws_client] Failed to increase max response buffer size to %zu", max_resp_size);
+    }
+
     /* Add AWS Fluent Bit user agent */
     if (aws_client->extra_user_agent == NULL) {
         ret = flb_http_add_header(c, "User-Agent", 10,
