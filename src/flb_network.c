@@ -832,7 +832,10 @@ static struct flb_dns_lookup_context *flb_net_dns_lookup_context_create(
     opts.tries = 2;
 
     if (dns_mode == FLB_DNS_USE_TCP) {
+        flb_warn("Forcing TCP for DNS");
         opts.flags = ARES_FLAG_USEVC;
+    } else {
+        flb_info("Allowing UDP for DNS");
     }
 
     *result = ares_init_options((ares_channel *) &lookup_context->ares_channel,
