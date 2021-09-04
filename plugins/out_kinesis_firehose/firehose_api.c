@@ -507,8 +507,8 @@ int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
         flb_time_pop_from_msgpack(&tms, &result, &obj);
 
         if (buf->record_time == 0) {
-            buf->record_time = (unsigned long long) (tms->tm.tv_sec * 1000 +
-                                                     tms->tm.tv_nsec/1000000);
+            buf->record_time = (unsigned long long) (tms.tm.tv_sec * 1000 +
+                                                     tms.tm.tv_nsec/1000000);
         }
 
         /* Get the record/map */
