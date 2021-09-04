@@ -43,6 +43,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "firehose_api.h"
 
@@ -309,6 +310,7 @@ static void reset_flush_buf(struct flb_firehose *ctx, struct flush *buf) {
     buf->tmp_buf_offset = 0;
     buf->data_size = PUT_RECORD_BATCH_HEADER_LEN + PUT_RECORD_BATCH_FOOTER_LEN;
     buf->data_size += strlen(ctx->delivery_stream);
+    buf->record_time = 0;
 }
 
 /* constructs a put payload, and then sends */
@@ -317,6 +319,7 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
     int offset;
     int i;
     struct event *event;
+    struct timeval start;
 
     if (buf->event_index <= 0) {
         /*
@@ -373,6 +376,8 @@ static int send_log_events(struct flb_firehose *ctx, struct flush *buf) {
         return -1;
     }
     flb_plg_debug(ctx->ins, "Sending %d records", i);
+    gettimeofday(&start, NULL);
+    buf->request_time = (unsigned long long) start.tv_sec * 1000 + start.tv_usec / 1000;
     ret = put_record_batch(ctx, buf, (size_t) offset, i);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send log records");
@@ -500,6 +505,11 @@ int process_and_send_records(struct flb_firehose *ctx, struct flush *buf,
 
         /* unpack the array of [timestamp, map] */
         flb_time_pop_from_msgpack(&tms, &result, &obj);
+
+        if (buf->record_time == 0) {
+            buf->record_time = (unsigned long long) (tms->tm.tv_sec * 1000 +
+                                                     tms->tm.tv_nsec/1000000);
+        }
 
         /* Get the record/map */
         map = root.via.array.ptr[1];
@@ -816,6 +826,7 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     struct flb_aws_client *firehose_client;
     flb_sds_t error;
     int failed_records = 0;
+    struct timeval stop; 
 
     flb_plg_debug(ctx->ins, "Sending log records to delivery stream %s",
                   ctx->delivery_stream);
@@ -862,6 +873,10 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
             }
             flb_plg_debug(ctx->ins, "Sent events to %s", ctx->delivery_stream);
             flb_http_client_destroy(c);
+            gettimeofday(&stop, NULL);
+            buf->response_time = (unsigned long long) stop.tv_sec * 1000 + stop.tv_usec / 1000;
+            flb_plg_info(ctx->ins, "[Unix Millisecond Timestamps]\nrecord_time=%llu, request_start=%llu, request_end=%llu\nrequest_end - record_time = %llu ms",
+                          buf->record_time, buf->request_time, buf->response_time, buf->response_time - buf->record_time);
             return 0;
         }
 

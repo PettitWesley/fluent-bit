@@ -57,6 +57,11 @@ struct flush {
 
     int records_sent;
     int records_processed;
+
+    /* unix millisecond timestamp of first record in batch */
+    unsigned long long record_time;
+    unsigned long long request_time;
+    unsigned long long response_time;
 };
 
 struct event {
