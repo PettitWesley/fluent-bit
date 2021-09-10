@@ -1296,6 +1296,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     flb_sds_t tmp;
     flb_sds_t error;
     int num_headers = 1;
+    int retry = FLB_TRUE;
 
     buf->put_events_calls++;
 
@@ -1319,6 +1320,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         num_headers = 2;
     }
 
+retry_request:
     if (plugin_under_test() == FLB_TRUE) {
         c = mock_http_call("TEST_PUT_LOG_EVENTS_ERROR", "PutLogEvents");
     }
@@ -1349,9 +1351,29 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                                   "response: %s", c->resp.payload);
                 }
             }
-            else {
-                flb_plg_error(ctx->ins, "Could not find sequence token in "
-                              "response: response body is empty");
+        
+            if (c->resp.data == NULL || c->resp.data_len == 0 || strstr(c->resp.data, AMZN_REQUEST_ID_HEADER) == NULL) {
+                /* code was 200, but response is invalid, treat as failure */
+                if (retry == FLB_TRUE) {
+                    flb_plg_debug(ctx->ins, "Recieved code 200 but response was invalid, %s header not found",
+                                  AMZN_REQUEST_ID_HEADER);
+                }
+                else {
+                    flb_plg_error(ctx->ins, "Recieved code 200 but response was invalid, %s header not found",
+                                  AMZN_REQUEST_ID_HEADER);
+                }
+                if (c->resp.data != NULL) {
+                    flb_plg_debug(ctx->ins, "Could not find sequence token in "
+                                  "response: response body is empty: full data: `%.*s`", c->resp.data_len, c->resp.data);
+                }
+                flb_http_client_destroy(c);
+
+                if (retry == FLB_TRUE) {
+                    flb_plg_debug(ctx->ins, "issuing immediate retry for invalid request");
+                    retry = FLB_FALSE;
+                    goto retry_request;
+                }
+                return -1;
             }
             flb_http_client_destroy(c);
             return 0;
