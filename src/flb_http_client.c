@@ -1102,7 +1102,7 @@ int flb_http_proxy_auth(struct flb_http_client *c,
 int flb_http_do(struct flb_http_client *c, size_t *bytes)
 {
     int ret;
-    int r_bytes;
+    c->resp.r_bytes = 0;
     int crlf = 2;
     int new_size;
     ssize_t available;
@@ -1190,18 +1190,18 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
             available = flb_http_buffer_available(c) - 1;
         }
 
-        r_bytes = flb_io_net_read(c->u_conn,
+        c->resp.r_bytes = flb_io_net_read(c->u_conn,
                                   c->resp.data + c->resp.data_len,
                                   available);
-        if (r_bytes <= 0) {
+        if (c->resp.r_bytes <= 0) {
             if (c->flags & FLB_HTTP_10) {
                 break;
             }
         }
 
         /* Always append a NULL byte */
-        if (r_bytes >= 0) {
-            c->resp.data_len += r_bytes;
+        if (c->resp.r_bytes >= 0) {
+            c->resp.data_len += c->resp.r_bytes;
             c->resp.data[c->resp.data_len] = '\0';
 
             ret = process_data(c);

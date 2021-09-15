@@ -79,6 +79,7 @@ struct flb_http_response {
     size_t data_len;
     size_t data_size;
     size_t data_size_max;
+    int r_bytes;
 };
 
 /* It hold information about a possible HTTP proxy set by the caller */
