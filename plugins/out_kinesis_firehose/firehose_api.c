@@ -817,10 +817,8 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
     struct flb_aws_client *firehose_client;
     flb_sds_t error;
     int failed_records = 0;
-    int retry = FLB_TRUE;
 
 
-retry_request:
     flb_plg_debug(ctx->ins, "Sending log records to delivery stream %s",
                   ctx->delivery_stream);
 
@@ -842,17 +840,7 @@ retry_request:
             if (c->resp.payload_size > 0) {
                 failed_records = process_api_response(ctx, c);
                 if (failed_records < 0) {
-                    if (c->resp.data == NULL || c->resp.data_len == 0 || strstr(c->resp.data, AMZN_REQUEST_ID_HEADER) == NULL) {
-                        if (retry == FLB_TRUE) {
-                            flb_plg_warn(ctx->ins, "Retrying: received invalid PutRecordBatch response: `%s`, payload_size=%d, data_len=%d, r_bytes=%d", c->resp.data, c->resp.payload_size, c->resp.data_len, c->resp.r_bytes);
-                            retry = FLB_FALSE;
-                            flb_http_client_destroy(c);
-                            goto retry_request;
-                        }
-
-                    }
                     flb_plg_warn(ctx->ins, "response could not be parsed: received invalid PutRecordBatch response: `%s`, payload_size=%d, data_len=%d, r_bytes=%d", c->resp.data, c->resp.payload_size, c->resp.data_len, c->resp.r_bytes);
-
                     flb_http_client_destroy(c);
                     return -1;
                 }
