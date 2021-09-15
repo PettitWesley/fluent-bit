@@ -805,6 +805,28 @@ static struct flb_http_client *mock_http_call(char *error_env_var)
     return c;
 }
 
+static void sanitize_buffer(char *buf, size_t len)
+{
+    int i;
+    char c;
+
+    for (i = 0; i < len; i++) {
+        c = buf[i];
+        switch (c)
+        {
+        case '\0':
+            buf[i] = '@';
+            break;
+        case '\r':
+            buf[i] = '%';
+            break;
+        case '\t':
+            buf[i] = '#';
+            break;
+        }
+    }
+}
+
 
 /*
  * Returns -1 on failure, 0 on success
@@ -840,7 +862,9 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
             if (c->resp.payload_size > 0) {
                 failed_records = process_api_response(ctx, c);
                 if (failed_records < 0) {
-                    flb_plg_warn(ctx->ins, "response could not be parsed: received invalid PutRecordBatch response: `%s`, payload_size=%d, data_len=%d, r_bytes=%d", c->resp.data, c->resp.payload_size, c->resp.data_len, c->resp.r_bytes);
+                    flb_plg_error(ctx->ins, "response parsing issue: `%s`, payload_size=%d, data_len=%d, r_bytes=%d, content_length=%d, chunked_encoding=%d", c->resp.data, c->resp.payload_size, c->resp.data_len, c->resp.r_bytes, c->resp.content_length, c->resp.chunked_encoding);
+                    sanitize_buffer(c->resp.data, c->resp.data_len);
+                    flb_plg_error(ctx->ins, "response parsing issue: sanitized: %.*s", c->resp.data_len, c->resp.data);
                     flb_http_client_destroy(c);
                     return -1;
                 }
@@ -861,7 +885,9 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
                 }
             }
             flb_plg_debug(ctx->ins, "Sent events to %s", ctx->delivery_stream);
-            flb_plg_debug(ctx->ins, "data: `%s`, payload_size=%d, data_len=%d, r_bytes=%d", c->resp.data, c->resp.payload_size, c->resp.data_len, c->resp.r_bytes);
+            flb_plg_debug(ctx->ins, "data: `%s`, payload_size=%d, data_len=%d, r_bytes=%d, content_length=%d, chunked_encoding=%d", c->resp.data, c->resp.payload_size, c->resp.data_len, c->resp.r_bytes, c->resp.content_length, c->resp.chunked_encoding);
+            sanitize_buffer(c->resp.data, c->resp.data_len);
+            flb_plg_debug(ctx->ins, "sanitized: %.*s", c->resp.data_len, c->resp.data);
             flb_http_client_destroy(c);
             return 0;
         }
@@ -889,7 +915,9 @@ int put_record_batch(struct flb_firehose *ctx, struct flush *buf,
             }
             else {
                 /* error could not be parsed, print raw response to debug */
-                flb_plg_warn(ctx->ins, "failure: `%s`, payload_size=%d, data_len=%d, r_bytes=%d", c->resp.data, c->resp.payload_size, c->resp.data_len, c->resp.r_bytes);
+                flb_plg_warn(ctx->ins, "failure: `%s`, payload_size=%d, data_len=%d, r_bytes=%d, content_length=%d, chunked_encoding=%d", c->resp.data, c->resp.payload_size, c->resp.data_len, c->resp.r_bytes, c->resp.content_length, c->resp.chunked_encoding);
+                sanitize_buffer(c->resp.data, c->resp.data_len);
+                flb_plg_warn(ctx->ins, "sanitized: %.*s", c->resp.data_len, c->resp.data);
             }
         }
     }
