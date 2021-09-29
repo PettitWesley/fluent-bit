@@ -39,6 +39,9 @@
 #include <fluent-bit/flb_output_thread.h>
 #include <fluent-bit/flb_mp.h>
 #include <fluent-bit/flb_pack.h>
+#include <fluent-bit/flb_input_chunk.h>
+
+#include <monkey/mk_core/mk_list.h>
 
 FLB_TLS_DEFINE(struct flb_out_coro_params, out_coro_params);
 static int flush_counter = 0;
@@ -184,10 +187,15 @@ int flb_output_task_flush(struct flb_task *task,
                           struct flb_config *config)
 {
     flush_counter++;
-    flb_debug("[output][data_trace][chunk_ptr=%p][task_id=%i] flb_output_task_flush: engine is flushing task=%i, chunk=(%s), size=%zu to firehose", task->ic, task->id, task->id, flb_input_chunk_get_name(task->ic), task->size);
+
+    flb_debug("[output][data_trace][chunk_ptr=%p][task_id=%i] flb_output_task_flush: engine is flushing task=%i, chunk=(%s), size=%zu, #of records=%d, to firehose", task->ic, task->id, task->id, flb_input_chunk_get_name(task->ic), task->size, task->records);
 
     int ret;
     struct flb_output_coro *out_coro;
+
+#ifdef FLB_HAVE_TRACE_DATA_FLOW
+    clock_t flush_init_time = clock();
+#endif
 
     if (flb_output_is_threaded(out_ins) == FLB_TRUE) {
         flb_task_users_inc(task);
@@ -214,6 +222,18 @@ int flb_output_task_flush(struct flb_task *task,
         flb_task_users_inc(task);
         flb_coro_resume(out_coro->coro);
     }
+
+#ifdef FLB_HAVE_TRACE_DATA_FLOW
+    flush_init_time = clock() - flush_init_time;
+    double flush_init_seconds = ((double)flush_init_time / CLOCKS_PER_SEC);
+    flb_debug("[output][data_trace][chunk_ptr=%p][task_id=%i] flb_output_task_flush: engine initiate flush: time_period=%.6f seconds, for task id=%p, chunk=%s with %zu bytes of total=%d records", task->ic, task->id, flush_init_seconds, task->id, flb_input_chunk_get_name(task->ic), task->size, task->records);
+    struct flb_input_file_segment *segment = mk_list_entry_first(&(((struct flb_input_chunk *)(task->ic))->segments), struct flb_input_file_segment, _head);
+    struct flb_time current_time, result_time, inotify_time;
+    flb_time_get(&current_time);
+    flb_time_from_double(&inotify_time, segment->inotify_time);
+    flb_time_diff(&current_time,&inotify_time, &result_time);
+    flb_debug("[output][data_trace][chunk_ptr=%p][task_id=%i] flb_output_task_flush: From Input to Output: total_time=%.3f seconds, source timestamp=%s, for task id=%p, chunk=%s with %zu bytes of total=%d records", task->ic, task->id, flb_time_to_double(&result_time), segment->first_log_record, task->id, flb_input_chunk_get_name(task->ic), task->size, task->records);
+#endif
 
     return 0;
 }

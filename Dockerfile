@@ -33,7 +33,6 @@ RUN rm -rf /tmp/src/build/*
 
 WORKDIR /tmp/src/build/
 RUN cmake -DFLB_RELEASE=On \
-          -DFLB_TRACE=Off \
           -DFLB_JEMALLOC=On \
           -DFLB_TLS=On \
           -DFLB_SHARED_LIB=Off \
@@ -41,7 +40,10 @@ RUN cmake -DFLB_RELEASE=On \
           -DFLB_HTTP_SERVER=On \
           -DFLB_IN_SYSTEMD=On \
           -DFLB_OUT_KAFKA=On \
-          -DFLB_OUT_PGSQL=On ../
+          -DFLB_OUT_PGSQL=On \
+          -DFLB_DEBUG=On \
+          -DFLB_TRACE=On \
+          -DFLB_TRACE_DATA_FLOW=On ../
 
 RUN make -j $(getconf _NPROCESSORS_ONLN)
 RUN install bin/fluent-bit /fluent-bit/bin/

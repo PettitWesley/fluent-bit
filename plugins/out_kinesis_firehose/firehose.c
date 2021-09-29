@@ -39,6 +39,7 @@
 #include <msgpack.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "firehose.h"
 #include "firehose_api.h"
@@ -322,6 +323,7 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     struct flb_coro *coro = NULL;
     struct flb_output_coro *out_coro = NULL;
 
+    clock_t request_time = clock();
     buf = new_flush_buffer();
     if (!buf) {
         flb_plg_error(ctx->ins, "Failed to construct flush buffer");
@@ -340,7 +342,9 @@ static void cb_firehose_flush(const void *data, size_t bytes,
 
     if (coro != NULL && coro->data != NULL) {
         struct flb_output_coro *out_coro = (struct flb_output_coro *) coro->data;
-        flb_debug("[output][data_trace][chunk_ptr=%p][task_id=%i] cb_firehose_flush: response created for task=%i, chunk=(%s): records_processed=%i, records_sent=%i, ret=%i", out_coro->task->ic, out_coro->task->id, out_coro->task->id, flb_input_chunk_get_name(out_coro->task->ic), buf->records_processed, buf->records_sent, ret);
+        request_time = clock() - request_time;
+        double request_seconds = ((double)request_time / CLOCKS_PER_SEC);
+        flb_debug("[output][data_trace][chunk_ptr=%p][task_id=%i] cb_firehose_flush: response created for task=%i, chunk=(%s): records_processed=%i, records_sent=%i, ret=%i, latency=%.3f", out_coro->task->ic, out_coro->task->id, out_coro->task->id, flb_input_chunk_get_name(out_coro->task->ic), buf->records_processed, buf->records_sent, ret, request_seconds);
     }
 
     firehose_flush_response_counter++;

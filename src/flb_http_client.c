@@ -112,7 +112,7 @@ static int header_available(struct flb_http_client *c, int bytes)
 }
 
 /* Try to find a header value in the buffer */
-static int header_lookup(struct flb_http_client *c,
+int header_lookup(struct flb_http_client *c,
                          const char *header, int header_len,
                          const char **out_val, int *out_len)
 {
