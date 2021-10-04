@@ -933,6 +933,7 @@ static int adjust_counters(struct flb_tail_config *ctx, struct flb_tail_file *fi
 
 int flb_tail_file_chunk(struct flb_tail_file *file)
 {
+    clock_t flb_tail_file_start_time = clock();
     int ret;
     char *tmp;
     size_t size;
@@ -1062,7 +1063,8 @@ int flb_tail_file_chunk(struct flb_tail_file *file)
             /* adjust file counters, returns FLB_TAIL_OK or FLB_TAIL_ERROR */
             ret = adjust_counters(ctx, file);
         }
-        flb_debug("[tail][data_trace] flb_tail_file_chunk: new data read. vals=[file_fd=%d, file_buf=%p, file_buf_size=%zu, new_file_buf_len=%zu, new_bytes_read=%zu, proc_bytes=%lu, file_size=%zu, file_pending=%lu, ret=%d]", file->fd, file->buf_data, file->buf_size, file->buf_len, bytes, processed_bytes, file->size, file->pending_bytes, ret);
+        double t1_latency = (double)(clock() - flb_tail_file_start_time) / CLOCKS_PER_SEC;
+        flb_info("[tail][data_trace] flb_tail_file_chunk: new data read. time t1=%3f, t1vals=[file_fd=%d, file_buf=%p, file_buf_size=%zu, new_file_buf_len=%zu, new_bytes_read=%zu, proc_bytes=%lu, file_size=%zu, file_pending=%lu, ret=%d]", t1_latency, file->fd, file->buf_data, file->buf_size, file->buf_len, bytes, processed_bytes, file->size, file->pending_bytes, ret);
 
         /* Data was consumed but likely some bytes still remain */
         return ret;
@@ -1070,7 +1072,7 @@ int flb_tail_file_chunk(struct flb_tail_file *file)
     else if (bytes == 0) {
         /* We reached the end of file, let's wait for some incoming data */
         ret = adjust_counters(ctx, file);
-        flb_debug("[tail][data_trace] flb_tail_file_chunk: no new data read, wait. vals=[file_fd=%d, file_buf=%p, file_buf_size=%zu, new_file_buf_len=%zu, new_bytes_read=%zu, file_size=%zu, file_pending=%lu, ret=%d]", file->fd, file->buf_data, file->buf_size, file->buf_len, bytes, file->size, file->pending_bytes, ret);        
+        flb_info("[tail][data_trace] flb_tail_file_chunk: no new data read, wait. vals=[file_fd=%d, file_buf=%p, file_buf_size=%zu, new_file_buf_len=%zu, new_bytes_read=%zu, file_size=%zu, file_pending=%lu, ret=%d]", file->fd, file->buf_data, file->buf_size, file->buf_len, bytes, file->size, file->pending_bytes, ret);
         if (ret == FLB_TAIL_OK) {
             return FLB_TAIL_WAIT;
         }

@@ -843,6 +843,9 @@ int flb_input_chunk_append_raw(struct flb_input_instance *in,
                                const char *tag, size_t tag_len,
                                const void *buf, size_t buf_size)
 {
+
+    clock_t input_chunk_append_start_time = clock();
+
     int ret;
     int set_down = FLB_FALSE;
     int min;
@@ -1082,6 +1085,8 @@ int flb_input_chunk_append_raw(struct flb_input_instance *in,
         }
         return 0;
     }
+    double input_chunk_append_time = (double)(clock() - input_chunk_append_start_time) / CLOCKS_PER_SEC;
+    flb_info("[data_trace][flb_input_chunk.c][flb_input_chunk_append_raw]  input took time t2=%.3f seconds to append %zu processed-bytes to current chunk, chunk size=%zu", input_chunk_append_time, diff, size);
 
     flb_input_chunk_protect(in);
     return 0;
