@@ -714,10 +714,12 @@ int flb_ml_append_object(struct flb_ml *ml, uint64_t stream_id,
             ret = ml_append_try_parser(lru_parser, lru_parser->last_stream_id, type,
                                        tm, NULL, 0, obj);
             if (ret == 0) {
+                flb_info("lru_parser worked");
                 processed = FLB_TRUE;
                 break;
             }
             else {
+                flb_info("lru_parser didn't work");
                 flb_ml_flush_parser_instance(ml,
                                              lru_parser,
                                              lru_parser->last_stream_id);
@@ -743,6 +745,7 @@ int flb_ml_append_object(struct flb_ml *ml, uint64_t stream_id,
                 group->lru_parser->last_stream_id = stream_id;
                 lru_parser = parser_i;
                 processed = FLB_TRUE;
+                flb_info("another parser worked");
                 break;
             }
             else {
