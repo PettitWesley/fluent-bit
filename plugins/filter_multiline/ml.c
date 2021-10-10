@@ -197,7 +197,7 @@ static int cb_ml_filter(const void *data, size_t bytes,
         } else {
             flb_plg_warn(ctx->ins, "could not convert msgpack to json");
         }
-        
+
         ret = flb_ml_append_object(ctx->m, ctx->stream_id, &tm, obj);
         if (ret != 0) {
             flb_plg_info(ctx->ins,
@@ -220,6 +220,7 @@ static int cb_ml_filter(const void *data, size_t bytes,
         tmp_buf = flb_malloc(ctx->mp_sbuf.size);
         if (!tmp_buf) {
             flb_errno();
+            flb_plg_info(ctx->ins, "FLB_FILTER_MODIFIED because tmp_buf");
             return FLB_FILTER_NOTOUCH;
         }
         tmp_size = ctx->mp_sbuf.size;
@@ -227,11 +228,12 @@ static int cb_ml_filter(const void *data, size_t bytes,
         *out_buf = tmp_buf;
         *out_bytes = tmp_size;
         ctx->mp_sbuf.size = 0;
-
+        flb_plg_info(ctx->ins, "FLB_FILTER_MODIFIED");
         return FLB_FILTER_MODIFIED;
     }
 
     /* unlikely to happen.. but just in case */
+    flb_plg_info(ctx->ins, "FLB_FILTER_NOTOUCH");
     return FLB_FILTER_NOTOUCH;
 }
 
