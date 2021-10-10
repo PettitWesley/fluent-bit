@@ -171,6 +171,8 @@ static int cb_ml_filter(const void *data, size_t bytes,
     size_t tmp_size;
     struct ml_ctx *ctx = filter_context;
     struct flb_time tm;
+    char *json = NULL;
+    char *needle = NULL;
 
     /* reset mspgack size content */
     ctx->mp_sbuf.size = 0;
@@ -178,10 +180,26 @@ static int cb_ml_filter(const void *data, size_t bytes,
     /* process records */
     msgpack_unpacked_init(&result);
     while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
+
+        json = flb_msgpack_to_json_str(1000, obj)
+        if (json != NULL) {
+            flb_plg_info(ctx->ins, "incoming record: `%s`", json);
+            needle = strchr(json, '\n');
+            if (needle) {
+                flb_plg_info(ctx->ins, "newline char at %d: `%s`", (int) needle - json, needle);
+            }
+            needle = strchr(json, '\r');
+            if (needle) {
+                flb_plg_info(ctx->ins, "carriage char at %d: `%s`", (int) needle - json, needle);
+            }
+        } else {
+            flb_plg_warn(ctx->ins, "could not convert msgpack to json");
+        }
+
         flb_time_pop_from_msgpack(&tm, &result, &obj);
         ret = flb_ml_append_object(ctx->m, ctx->stream_id, &tm, obj);
         if (ret != 0) {
-            flb_plg_debug(ctx->ins,
+            flb_plg_info(ctx->ins,
                           "could not append object from tag: %s", tag);
         }
     }
