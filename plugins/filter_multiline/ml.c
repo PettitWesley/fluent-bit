@@ -181,6 +181,8 @@ static int cb_ml_filter(const void *data, size_t bytes,
     msgpack_unpacked_init(&result);
     while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
 
+        flb_time_pop_from_msgpack(&tm, &result, &obj);
+
         json = flb_msgpack_to_json_str(1000, obj);
         if (json != NULL) {
             flb_plg_info(ctx->ins, "incoming record: `%s`", json);
@@ -195,8 +197,7 @@ static int cb_ml_filter(const void *data, size_t bytes,
         } else {
             flb_plg_warn(ctx->ins, "could not convert msgpack to json");
         }
-
-        flb_time_pop_from_msgpack(&tm, &result, &obj);
+        
         ret = flb_ml_append_object(ctx->m, ctx->stream_id, &tm, obj);
         if (ret != 0) {
             flb_plg_info(ctx->ins,
