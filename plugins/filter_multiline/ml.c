@@ -186,11 +186,11 @@ static int cb_ml_filter(const void *data, size_t bytes,
             flb_plg_info(ctx->ins, "incoming record: `%s`", json);
             needle = strchr(json, '\n');
             if (needle) {
-                flb_plg_info(ctx->ins, "newline char at %d: `%s`", (int) needle - json, needle);
+                flb_plg_info(ctx->ins, "newline char at %d: `%s`",  needle - json, needle);
             }
             needle = strchr(json, '\r');
             if (needle) {
-                flb_plg_info(ctx->ins, "carriage char at %d: `%s`", (int) needle - json, needle);
+                flb_plg_info(ctx->ins, "carriage char at %d: `%s`", needle - json, needle);
             }
         } else {
             flb_plg_warn(ctx->ins, "could not convert msgpack to json");
