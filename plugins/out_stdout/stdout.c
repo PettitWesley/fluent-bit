@@ -140,6 +140,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     struct flb_time tmp;
     msgpack_object *p;
 
+    flb_plg_info(ctx->ins, "flush data size: %zu", bytes);
+
 #ifdef FLB_HAVE_METRICS
     /* Check if the event type is metrics, handle the payload differently */
     if (flb_input_event_type_is_metric(ins)) {
