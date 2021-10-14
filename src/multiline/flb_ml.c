@@ -677,8 +677,8 @@ int flb_ml_append_object(struct flb_ml *ml, uint64_t stream_id,
     int type;
     int processed = FLB_FALSE;
     struct mk_list *head;
-    struct mk_list *head_group;
-    struct flb_ml_group *group;
+    struct mk_list *head_group = NULL;
+    struct flb_ml_group *group = NULL;
     struct flb_ml_parser_ins *lru_parser = NULL;
     struct flb_ml_parser_ins *parser_i;
     struct flb_ml_stream *mst;
