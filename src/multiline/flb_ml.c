@@ -732,6 +732,10 @@ int flb_ml_append_object(struct flb_ml *ml, uint64_t stream_id,
         }
     }
 
+    flb_info("head_group=%p, group=%p", head_group, group);
+
+    flb_info("&group->parsers=%p", &group->parsers);
+
     mk_list_foreach(head_group, &group->parsers) {
             parser_i = mk_list_entry(head_group, struct flb_ml_parser_ins, _head);
             if (lru_parser && parser_i == lru_parser) {
