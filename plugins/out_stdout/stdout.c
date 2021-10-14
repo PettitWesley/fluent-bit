@@ -35,7 +35,7 @@ static int flush_callback(struct flb_ml_parser *parser,
                           struct flb_ml_stream *mst,
                           void *data, char *buf_data, size_t buf_size)
 {
-    struct ml_ctx *ctx = data;
+    struct flb_stdout *ctx = data;
 
     if (ctx->debug_flush) {
         flb_ml_flush_stdout(parser, mst, data, buf_data, buf_size);
