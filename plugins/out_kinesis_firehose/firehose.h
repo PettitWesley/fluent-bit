@@ -93,6 +93,11 @@ struct flb_firehose {
     /* must be freed on shutdown if custom_endpoint is not set */
     char *endpoint;
 
+    /* multiline */
+    struct flb_aws_multiline *aws_ml;
+    struct mk_list *multiline_parsers;
+    flb_sds_t key_content;
+
     /* Plugin output instance reference */
     struct flb_output_instance *ins;
 };
