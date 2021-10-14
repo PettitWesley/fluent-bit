@@ -27,6 +27,7 @@
 #include <fluent-bit/flb_metrics.h>
 #include <fluent-bit/multiline/flb_ml.h>
 #include <fluent-bit/multiline/flb_ml_parser.h>
+#include <fluent-bit/flb_aws_util.h>
 
 #include <msgpack.h>
 #include "stdout.h"
@@ -251,6 +252,8 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         flb_errno();
         return -1; 
     }
+
+    flb_info("aws_ml=%p", ctx->aws_ml);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
