@@ -91,15 +91,13 @@ static int multiline_load_parsers(struct flb_stdout *ctx)
 }
 
 static int multiline(struct flb_stdout *ctx,
-                     const void *data, size_t bytes)
+                     const void *data, size_t bytes, const char *tag)
 {
     int ret;
     int ok = MSGPACK_UNPACK_SUCCESS;
     size_t off = 0;
     msgpack_unpacked result;
     msgpack_object *obj;
-    char *tmp_buf;
-    size_t tmp_size;
     struct flb_time tm;
 
     /* reset mspgack size content */
@@ -137,7 +135,6 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     struct flb_stdout *ctx = NULL;
     int len;
     uint64_t stream_id;
-    struct ml_ctx *ctx;
     (void) ins;
     (void) config;
     (void) data;
@@ -289,7 +286,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 #endif
 
-    ret = multiline(ctx, data, bytes);
+    ret = multiline(ctx, data, bytes, tag);
 
     if (ret == 0) {
         final_data = ctx->mp_sbuf.data;
@@ -375,7 +372,7 @@ static struct flb_config_map config_map[] = {
      0, FLB_TRUE, offsetof(struct ml_ctx, debug_flush),
      "enable debugging for concatenation flush to stdout"
     },
-    
+
     {
      FLB_CONFIG_MAP_CLIST, "multiline.parser", NULL,
      FLB_CONFIG_MAP_MULT, FLB_TRUE, offsetof(struct ml_ctx, multiline_parsers),

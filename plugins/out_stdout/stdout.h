@@ -32,6 +32,7 @@ struct flb_stdout {
     struct flb_output_instance *ins;
 
     /* Multiline core engine */
+    int debug_flush;
     uint64_t stream_id;
     struct flb_ml *m;
     struct mk_list *multiline_parsers;
