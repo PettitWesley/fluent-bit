@@ -25,9 +25,108 @@
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_config_map.h>
 #include <fluent-bit/flb_metrics.h>
+#include <fluent-bit/multiline/flb_ml.h>
+#include <fluent-bit/multiline/flb_ml_parser.h>
 
 #include <msgpack.h>
 #include "stdout.h"
+
+static int flush_callback(struct flb_ml_parser *parser,
+                          struct flb_ml_stream *mst,
+                          void *data, char *buf_data, size_t buf_size)
+{
+    struct ml_ctx *ctx = data;
+
+    if (ctx->debug_flush) {
+        flb_ml_flush_stdout(parser, mst, data, buf_data, buf_size);
+    }
+
+    /* Append incoming record to our msgpack context buffer */
+    msgpack_sbuffer_write(&ctx->mp_sbuf, buf_data, buf_size);
+
+    return 0;
+}
+
+static int multiline_load_parsers(struct flb_stdout *ctx)
+{
+    int ret;
+    struct mk_list *head;
+    struct mk_list *head_p;
+    struct flb_config_map_val *mv;
+    struct flb_slist_entry *val = NULL;
+    struct flb_ml_parser_ins *parser_i;
+
+    if (!ctx->multiline_parsers) {
+        return -1;
+    }
+
+    /*
+     * Iterate all 'multiline.parser' entries. Every entry is considered
+     * a group which can have multiple multiline parser instances.
+     */
+    flb_config_map_foreach(head, mv, ctx->multiline_parsers) {
+        mk_list_foreach(head_p, mv->val.list) {
+            val = mk_list_entry(head_p, struct flb_slist_entry, _head);
+
+            /* Create an instance of the defined parser */
+            parser_i = flb_ml_parser_instance_create(ctx->m, val->str);
+            if (!parser_i) {
+                return -1;
+            }
+
+            /* Always override parent parser values */
+            if (ctx->key_content) {
+                ret = flb_ml_parser_instance_set(parser_i,
+                                                 "key_content",
+                                                 ctx->key_content);
+                if (ret == -1) {
+                    flb_plg_error(ctx->ins, "could not override 'key_content'");
+                    return -1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+static int multiline(struct flb_stdout *ctx,
+                     const void *data, size_t bytes)
+{
+    int ret;
+    int ok = MSGPACK_UNPACK_SUCCESS;
+    size_t off = 0;
+    msgpack_unpacked result;
+    msgpack_object *obj;
+    char *tmp_buf;
+    size_t tmp_size;
+    struct flb_time tm;
+
+    /* reset mspgack size content */
+    ctx->mp_sbuf.size = 0;
+
+    /* process records */
+    msgpack_unpacked_init(&result);
+    while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
+        flb_time_pop_from_msgpack(&tm, &result, &obj);
+        ret = flb_ml_append_object(ctx->m, ctx->stream_id, &tm, obj);
+        if (ret != 0) {
+            flb_plg_warn(ctx->ins,
+                          "could not ingest record from tag into multiline parser: %s", tag);
+        }
+    }
+    msgpack_unpacked_destroy(&result);
+
+    /* flush all pending buffered data */
+    flb_ml_flush_pending_now(ctx->m);
+
+    if (ctx->mp_sbuf.size > 0) {
+        return 0;
+    }
+
+    /* multiline failed to parse any records */
+    return -1;
+}
 
 
 static int cb_stdout_init(struct flb_output_instance *ins,
@@ -36,6 +135,9 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     int ret;
     const char *tmp;
     struct flb_stdout *ctx = NULL;
+    int len;
+    uint64_t stream_id;
+    struct ml_ctx *ctx;
     (void) ins;
     (void) config;
     (void) data;
@@ -46,6 +148,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         return -1;
     }
     ctx->ins = ins;
+    ctx->debug_flush = FLB_FALSE;
 
     ret = flb_output_config_map_set(ins, (void *) ctx);
     if (ret == -1) {
@@ -90,6 +193,38 @@ static int cb_stdout_init(struct flb_output_instance *ins,
         }
     }
 
+    /* Init buffers */
+    msgpack_sbuffer_init(&ctx->mp_sbuf);
+    msgpack_packer_init(&ctx->mp_pck, &ctx->mp_sbuf, msgpack_sbuffer_write);
+
+    /* Create multiline context */
+    ctx->m = flb_ml_create(config, ctx->ins->name);
+    if (!ctx->m) {
+        /*
+        * we don't free the context since upon init failure, the exit
+         * callback will be triggered with our context set above.
+         */
+        return -1;
+    }
+
+    /* Load the parsers/config */
+    ret = multiline_load_parsers(ctx);
+    if (ret == -1) {
+        return -1;
+    }
+
+    /* Create a stream for this file */
+    len = strlen(ins->name);
+    ret = flb_ml_stream_create(ctx->m,
+                               ins->name, len,
+                               flush_callback, ctx,
+                               &stream_id);
+    if (ret != 0) {
+        flb_plg_error(ctx->ins, "could not create multiline stream");
+        return -1;
+    }
+    ctx->stream_id = stream_id;
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -125,6 +260,7 @@ static void print_metrics_text(struct flb_output_instance *ins,
 }
 #endif
 
+
 static void cb_stdout_flush(const void *data, size_t bytes,
                             const char *tag, int tag_len,
                             struct flb_input_instance *ins,
@@ -139,6 +275,9 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
+    const void *final_data = data;
+    size_t final_bytes = bytes;
+    int ret;
 
     flb_plg_info(ctx->ins, "flush data size: %zu", bytes);
 
@@ -150,9 +289,16 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 #endif
 
+    ret = multiline(ctx, data, bytes);
+
+    if (ret == 0) {
+        final_data = ctx->mp_sbuf.data;
+        final_bytes = ctx->mp_sbuf.size;
+    }
+
     /* Assuming data is a log entry...*/
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
-        json = flb_pack_msgpack_to_json_format(data, bytes,
+        json = flb_pack_msgpack_to_json_format(final_data, final_bytes,
                                                ctx->out_format,
                                                ctx->json_date_format,
                                                ctx->date_key);
@@ -221,6 +367,25 @@ static struct flb_config_map config_map[] = {
      FLB_CONFIG_MAP_STR, "json_date_key", "date",
      0, FLB_TRUE, offsetof(struct flb_stdout, json_date_key),
     "Specifies the format of the date. Supported formats are double, iso8601 and epoch."
+    },
+
+        /* Multiline Core Engine based API */
+    {
+     FLB_CONFIG_MAP_BOOL, "debug_flush", "false",
+     0, FLB_TRUE, offsetof(struct ml_ctx, debug_flush),
+     "enable debugging for concatenation flush to stdout"
+    },
+    
+    {
+     FLB_CONFIG_MAP_CLIST, "multiline.parser", NULL,
+     FLB_CONFIG_MAP_MULT, FLB_TRUE, offsetof(struct ml_ctx, multiline_parsers),
+     "specify one or multiple multiline parsers: docker, cri, go, java, etc."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "multiline.key_content", NULL,
+     0, FLB_TRUE, offsetof(struct ml_ctx, key_content),
+     "specify the key name that holds the content to process."
     },
 
     /* EOF */

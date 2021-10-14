@@ -30,6 +30,16 @@ struct flb_stdout {
     flb_sds_t json_date_key;
     flb_sds_t date_key;
     struct flb_output_instance *ins;
+
+    /* Multiline core engine */
+    uint64_t stream_id;
+    struct flb_ml *m;
+    struct mk_list *multiline_parsers;
+    flb_sds_t key_content;
+
+    /* packaging buffers */
+    msgpack_sbuffer mp_sbuf;  /* temporary msgpack buffer */
+    msgpack_packer mp_pck;    /* temporary msgpack packer */
 };
 
 #endif
