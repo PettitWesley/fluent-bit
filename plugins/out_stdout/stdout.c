@@ -243,6 +243,7 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     ctx->stream_id = stream_id;
 
     ctx->aws_ml = flb_aws_multiline_create(ctx->ins,
+                                           config,
                                            ctx->multiline_parsers,
                                            ctx->key_content);
 

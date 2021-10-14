@@ -44,10 +44,11 @@ struct flb_aws_multiline {
 };
 
 struct flb_aws_multiline *flb_aws_multiline_create(struct flb_output_instance *ins,
+                                                   struct flb_config *config,
                                                    struct mk_list *multiline_parsers,
                                                    flb_sds_t key_content);
 
-int flb_aws_multiline_parse(struct flb_aws_multiline *ctx
+int flb_aws_multiline_parse(struct flb_aws_multiline *ctx,
                             const void *data, size_t bytes, const char *tag,
                             void **out_buf, size_t *out_bytes);
 

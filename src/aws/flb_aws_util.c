@@ -60,7 +60,7 @@ static int flush_callback(struct flb_ml_parser *parser,
     return 0;
 }
 
-static int multiline_load_parsers(struct flb_stdout *ctx)
+static int multiline_load_parsers(struct flb_aws_multiline *ctx)
 {
     int ret;
     struct mk_list *head;
@@ -104,6 +104,7 @@ static int multiline_load_parsers(struct flb_stdout *ctx)
 }
 
 struct flb_aws_multiline *flb_aws_multiline_create(struct flb_output_instance *ins,
+                                                   struct flb_config *config,
                                                    struct mk_list *multiline_parsers,
                                                    flb_sds_t key_content)
 {
