@@ -213,7 +213,11 @@ int flb_aws_multiline_parse(struct flb_aws_multiline *ctx,
     return -1;
 }
 
-void flb_aws_multiline_destroy(struct flb_aws_multiline *ctx);
+void flb_aws_multiline_destroy(struct flb_aws_multiline *ctx)
+{
+    /* TODO */
+    return;
+}
 
 
 /*
