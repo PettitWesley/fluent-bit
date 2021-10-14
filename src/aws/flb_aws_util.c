@@ -109,6 +109,9 @@ struct flb_aws_multiline *flb_aws_multiline_create(struct flb_output_instance *i
                                                    flb_sds_t key_content)
 {
     struct flb_aws_multiline *ctx;
+    int ret;
+    int len;
+    uint64_t stream_id;
 
     ctx = flb_calloc(1, sizeof(struct flb_aws_multiline));
     if (!ctx) {
@@ -154,7 +157,7 @@ struct flb_aws_multiline *flb_aws_multiline_create(struct flb_output_instance *i
     return ctx;
 }
 
-int flb_aws_multiline_parse(struct flb_aws_multiline *ctx
+int flb_aws_multiline_parse(struct flb_aws_multiline *ctx,
                             const void *data, size_t bytes, const char *tag,
                             void **out_buf, size_t *out_bytes)
 {
