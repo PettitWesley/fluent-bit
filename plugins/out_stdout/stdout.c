@@ -91,7 +91,8 @@ static int multiline_load_parsers(struct flb_stdout *ctx)
 }
 
 static int multiline(struct flb_stdout *ctx,
-                     const void *data, size_t bytes, const char *tag)
+                     const void *data, size_t bytes, const char *tag,
+                     void **out_buf, size_t *out_bytes)
 {
     int ret;
     int ok = MSGPACK_UNPACK_SUCCESS;
@@ -99,6 +100,8 @@ static int multiline(struct flb_stdout *ctx,
     msgpack_unpacked result;
     msgpack_object *obj;
     struct flb_time tm;
+    char *tmp_buf;
+    size_t tmp_size;
 
     /* reset mspgack size content */
     ctx->mp_sbuf.size = 0;
@@ -119,6 +122,23 @@ static int multiline(struct flb_stdout *ctx,
     flb_ml_flush_pending_now(ctx->m);
 
     if (ctx->mp_sbuf.size > 0) {
+        /*
+         * If multiline will report a new set of records because the
+         * original data was modified, we make a copy to a new memory
+         * area, to make it safe for multiple co-routines to use this object.
+         */
+
+        tmp_buf = flb_malloc(ctx->mp_sbuf.size);
+        if (!tmp_buf) {
+            flb_errno();
+            return -1;
+        }
+        tmp_size = ctx->mp_sbuf.size;
+        memcpy(tmp_buf, ctx->mp_sbuf.data, tmp_size);
+        *out_buf = tmp_buf;
+        *out_bytes = tmp_size;
+        ctx->mp_sbuf.size = 0;
+
         return 0;
     }
 
@@ -286,12 +306,8 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 #endif
 
-    ret = multiline(ctx, data, bytes, tag);
+    multiline(ctx, data, bytes, tag, final_data, final_bytes);
 
-    if (ret == 0) {
-        final_data = ctx->mp_sbuf.data;
-        final_bytes = ctx->mp_sbuf.size;
-    }
 
     /* Assuming data is a log entry...*/
     if (ctx->out_format != FLB_PACK_JSON_FORMAT_NONE) {
