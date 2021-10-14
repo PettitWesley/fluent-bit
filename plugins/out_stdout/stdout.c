@@ -292,7 +292,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
-    const void *final_data = data;
+    void *final_data = data;
     size_t final_bytes = bytes;
     int ret;
 
