@@ -171,6 +171,7 @@ int flb_aws_multiline_parse(struct flb_aws_multiline *ctx,
     size_t tmp_size;
 
     /* reset mspgack size content */
+    flb_info("ctx=%p, ctx->mp_sbuf=%p", ctx, ctx->mp_sbuf);
     ctx->mp_sbuf.size = 0;
 
     /* process records */
