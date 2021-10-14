@@ -250,7 +250,6 @@ static int cb_kinesis_init(struct flb_output_instance *ins,
     ctx->kinesis_client->has_auth = FLB_TRUE;
     ctx->kinesis_client->provider = ctx->aws_provider;
     ctx->kinesis_client->region = (char *) ctx->region;
-    ctx->kinesis_client->retry_requests = ctx->retry_requests;
     ctx->kinesis_client->service = "kinesis";
     ctx->kinesis_client->port = 443;
     ctx->kinesis_client->flags = 0;
@@ -270,6 +269,19 @@ static int cb_kinesis_init(struct flb_output_instance *ins,
     flb_output_upstream_set(upstream, ctx->ins);
 
     ctx->kinesis_client->host = ctx->endpoint;
+
+    if (ctx->key_content) {
+        flb_plg_info(ctx->ins, "enabling output multiline API");
+        ctx->aws_ml = flb_aws_multiline_create(ctx->ins,
+                                               config,
+                                               ctx->multiline_parsers,
+                                               ctx->key_content);
+
+        if (!ctx->aws_ml) {
+            flb_errno();
+            goto error;
+        }
+    }
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -327,6 +339,8 @@ static void cb_kinesis_flush(const void *data, size_t bytes,
     struct flush *buf;
     (void) i_ins;
     (void) config;
+    void *final_data = (void *) data;
+    size_t final_bytes = bytes;
 
     buf = new_flush_buffer(tag, tag_len);
     if (!buf) {
@@ -334,7 +348,16 @@ static void cb_kinesis_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    ret = process_and_send_to_kinesis(ctx, buf, data, bytes);
+    if (ctx->key_content) {
+        ret = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
+        if (ret < 0) {
+            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
+        } else {
+            flb_plg_debug(ctx->ins, "multiline parsing succeeded for tag %s", tag);
+        }
+    }
+
+    ret = process_and_send_to_kinesis(ctx, buf, final_data, final_bytes);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send records to kinesis");
         kinesis_flush_destroy(buf);
@@ -451,14 +474,17 @@ static struct flb_config_map config_map[] = {
      "the log message will be sent to Kinesis."
     },
 
+    /* Multiline Core Engine based API */
     {
-     FLB_CONFIG_MAP_BOOL, "auto_retry_requests", "false",
-     0, FLB_TRUE, offsetof(struct flb_kinesis, retry_requests),
-     "Immediately retry failed requests to AWS services once. This option "
-     "does not affect the normal Fluent Bit retry mechanism with backoff. "
-     "Instead, it enables an immediate retry with no delay for networking "
-     "errors, which may help improve throughput when there are transient/random "
-     "networking issues."
+     FLB_CONFIG_MAP_CLIST, "multiline.parser", NULL,
+     FLB_CONFIG_MAP_MULT, FLB_TRUE, offsetof(struct flb_kinesis, multiline_parsers),
+     "specify one or multiple multiline parsers: docker, cri, go, java, etc."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "multiline.key_content", NULL,
+     0, FLB_TRUE, offsetof(struct flb_kinesis, key_content),
+     "specify the key name that holds the content to process."
     },
 
     /* EOF */
