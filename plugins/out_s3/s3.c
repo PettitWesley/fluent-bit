@@ -888,6 +888,19 @@ static int cb_s3_init(struct flb_output_instance *ins,
     /* this is done last since in the previous block we make calls to AWS */
     ctx->provider->provider_vtable->upstream_set(ctx->provider, ctx->ins);
 
+    if (ctx->key_content) {
+        flb_plg_info(ctx->ins, "enabling output multiline API");
+        ctx->aws_ml = flb_aws_multiline_create(ctx->ins,
+                                            config,
+                                            ctx->multiline_parsers,
+                                            ctx->key_content);
+
+        if (!ctx->aws_ml) {
+            flb_errno();
+            return -1;
+        }
+    }
+
     return 0;
 }
 
@@ -2001,16 +2014,27 @@ static void cb_s3_flush(const void *data, size_t bytes,
     struct s3_file *upload_file = NULL;
     struct flb_s3 *ctx = out_context;
     struct multipart_upload *m_upload_file = NULL;
+    void *final_data = (void *) data;
+    size_t final_bytes = bytes;
 
     /* Cleanup old buffers and initialize upload timer */
     flush_init(ctx);
 
+    if (ctx->key_content) {
+        ret = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
+        if (ret < 0) {
+            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
+        } else {
+            flb_plg_debug(ctx->ins, "multiline parsing succeeded for tag %s", tag);
+        }
+    }
+
     /* Process chunk */
     if (ctx->log_key) {
-        chunk = flb_pack_msgpack_extract_log_key(ctx, data, bytes);
+        chunk = flb_pack_msgpack_extract_log_key(ctx, final_data, final_bytes);
     }
     else {
-        chunk = flb_pack_msgpack_to_json_format(data, bytes,
+        chunk = flb_pack_msgpack_to_json_format(final_data, final_bytes,
                                                FLB_PACK_JSON_FORMAT_LINES,
                                                ctx->json_date_format,
                                                ctx->date_key);
@@ -2309,6 +2333,19 @@ static struct flb_config_map config_map[] = {
      "Normally, when an upload request fails, there is a high chance for the last "
      "received chunk to be swapped with a later chunk, resulting in data shuffling. "
      "This feature prevents this shuffling by using a queue logic for uploads."
+    },
+
+    /* Multiline Core Engine based API */
+    {
+     FLB_CONFIG_MAP_CLIST, "multiline.parser", NULL,
+     FLB_CONFIG_MAP_MULT, FLB_TRUE, offsetof(struct flb_s3, multiline_parsers),
+     "specify one or multiple multiline parsers: docker, cri, go, java, etc."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "multiline.key_content", NULL,
+     0, FLB_TRUE, offsetof(struct flb_s3, key_content),
+     "specify the key name that holds the content to process."
     },
 
     /* EOF */

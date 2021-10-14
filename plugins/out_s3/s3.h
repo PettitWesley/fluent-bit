@@ -165,6 +165,11 @@ struct flb_s3 {
     flb_sds_t metadata_dir;
     flb_sds_t seq_index_file;
 
+    /* multiline */
+    struct flb_aws_multiline *aws_ml;
+    struct mk_list *multiline_parsers;
+    flb_sds_t key_content;
+
     struct flb_output_instance *ins;
 };
 
