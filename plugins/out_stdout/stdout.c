@@ -292,7 +292,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     (void) config;
     struct flb_time tmp;
     msgpack_object *p;
-    void *final_data = data;
+    void *final_data = (void *) data;
     size_t final_bytes = bytes;
     int ret;
 
@@ -306,7 +306,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 #endif
 
-    multiline(ctx, data, bytes, tag, final_data, final_bytes);
+    multiline(ctx, data, bytes, tag, &final_data, &final_bytes);
 
 
     /* Assuming data is a log entry...*/
