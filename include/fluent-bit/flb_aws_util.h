@@ -22,10 +22,37 @@
 #ifndef FLB_AWS_UTIL_H
 
 #include <fluent-bit/flb_output.h>
+#include <fluent-bit/multiline/flb_ml.h>
+#include <fluent-bit/multiline/flb_ml_parser.h>
 
 #define FLB_AWS_UTIL_H
 
 #define FLB_AWS_CREDENTIAL_REFRESH_LIMIT       60
+
+struct flb_aws_multiline {
+    struct flb_output_instance *ins;
+
+    /* Multiline core engine */
+    uint64_t stream_id;
+    struct flb_ml *m;
+    struct mk_list *multiline_parsers;
+    flb_sds_t key_content;
+
+    /* packaging buffers */
+    msgpack_sbuffer mp_sbuf;  /* temporary msgpack buffer */
+    msgpack_packer mp_pck;    /* temporary msgpack packer */
+};
+
+struct flb_aws_multiline *flb_aws_multiline_create(struct flb_output_instance *ins,
+                                                   struct flb_config *config,
+                                                   struct mk_list *multiline_parsers,
+                                                   flb_sds_t key_content);
+
+int flb_aws_multiline_parse(struct flb_aws_multiline *ctx,
+                            const void *data, size_t bytes, const char *tag,
+                            void **out_buf, size_t *out_bytes);
+
+void flb_aws_multiline_destroy(struct flb_aws_multiline *aws_ml);
 
 /*
  * The AWS HTTP Client is a wrapper around the Fluent Bit's http library.
