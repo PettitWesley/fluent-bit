@@ -678,6 +678,7 @@ int flb_ml_append_object(struct flb_ml *ml, uint64_t stream_id,
     int processed = FLB_FALSE;
     struct mk_list *head;
     struct mk_list *head_group = NULL;
+    struct mk_list *tmp;
     struct flb_ml_group *group = NULL;
     struct flb_ml_parser_ins *lru_parser = NULL;
     struct flb_ml_parser_ins *parser_i;
@@ -736,26 +737,28 @@ int flb_ml_append_object(struct flb_ml *ml, uint64_t stream_id,
 
     flb_info("&group->parsers=%p", &group->parsers);
 
-    mk_list_foreach(head_group, &group->parsers) {
-            parser_i = mk_list_entry(head_group, struct flb_ml_parser_ins, _head);
-            if (lru_parser && parser_i == lru_parser) {
-                continue;
-            }
+    if (group) {
+        mk_list_foreach_safe(head_group, tmp, &group->parsers) {
+                parser_i = mk_list_entry(head_group, struct flb_ml_parser_ins, _head);
+                if (lru_parser && parser_i == lru_parser) {
+                    continue;
+                }
 
-            ret = ml_append_try_parser(parser_i, stream_id, type,
-                                       tm, NULL, 0, obj);
-            if (ret == 0) {
-                group->lru_parser = parser_i;
-                group->lru_parser->last_stream_id = stream_id;
-                lru_parser = parser_i;
-                processed = FLB_TRUE;
-                flb_info("another parser worked");
-                break;
-            }
-            else {
-                parser_i = NULL;
-            }
+                ret = ml_append_try_parser(parser_i, stream_id, type,
+                                        tm, NULL, 0, obj);
+                if (ret == 0) {
+                    group->lru_parser = parser_i;
+                    group->lru_parser->last_stream_id = stream_id;
+                    lru_parser = parser_i;
+                    processed = FLB_TRUE;
+                    flb_info("another parser worked");
+                    break;
+                }
+                else {
+                    parser_i = NULL;
+                }
 
+        }
     }
 
     if (!processed) {
