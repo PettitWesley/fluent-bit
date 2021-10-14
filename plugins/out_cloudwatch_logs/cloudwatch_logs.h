@@ -153,6 +153,12 @@ struct flb_cloudwatch {
 
     /* Plugin output instance reference */
     struct flb_output_instance *ins;
+
+    /* multiline */
+    struct flb_aws_multiline *aws_ml;
+    struct mk_list *multiline_parsers;
+    flb_sds_t key_content;
+
 };
 
 void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx);

@@ -363,6 +363,19 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
     ctx->buf = buf;
 
+    if (ctx->key_content) {
+        flb_plg_info(ctx->ins, "enabling output multiline API");
+        ctx->aws_ml = flb_aws_multiline_create(ctx->ins,
+                                            config,
+                                            ctx->multiline_parsers,
+                                            ctx->key_content);
+
+        if (!ctx->aws_ml) {
+            flb_errno();
+            goto error;
+        }
+    }
+
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -388,6 +401,8 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     struct log_stream *stream = NULL;
     (void) i_ins;
     (void) config;
+    void *final_data = (void *) data;
+    size_t final_bytes = bytes;
 
     ctx->buf->put_events_calls = 0;
 
@@ -403,7 +418,17 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    event_count = process_and_send(ctx, i_ins->p->name, ctx->buf, stream, data, bytes);
+    if (ctx->key_content) {
+        ret = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
+        if (ret < 0) {
+            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
+        } else {
+            flb_plg_debug(ctx->ins, "multiline parsing succeeded for tag %s", tag);
+        }
+    }
+
+
+    event_count = process_and_send(ctx, i_ins->p->name, ctx->buf, stream, final_data, final_bytes);
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send events");
         FLB_OUTPUT_RETURN(FLB_RETRY);
@@ -603,6 +628,19 @@ static struct flb_config_map config_map[] = {
      "dimensions, put the values as a comma seperated string. If you want to put "
      "list of lists, use the list as semicolon seperated strings. If your value "
      "is 'd1,d2;d3', we will consider it as [[d1, d2],[d3]]."
+    },
+
+    /* Multiline Core Engine based API */
+    {
+     FLB_CONFIG_MAP_CLIST, "multiline.parser", NULL,
+     FLB_CONFIG_MAP_MULT, FLB_TRUE, offsetof(struct flb_cloudwatch, multiline_parsers),
+     "specify one or multiple multiline parsers: docker, cri, go, java, etc."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "multiline.key_content", NULL,
+     0, FLB_TRUE, offsetof(struct flb_cloudwatch, key_content),
+     "specify the key name that holds the content to process."
     },
 
     /* EOF */
