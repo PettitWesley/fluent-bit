@@ -41,6 +41,8 @@ struct flb_stdout {
     /* packaging buffers */
     msgpack_sbuffer mp_sbuf;  /* temporary msgpack buffer */
     msgpack_packer mp_pck;    /* temporary msgpack packer */
+
+    struct flb_aws_multiline *aws_ml;
 };
 
 #endif

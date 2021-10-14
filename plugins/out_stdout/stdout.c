@@ -242,6 +242,15 @@ static int cb_stdout_init(struct flb_output_instance *ins,
     }
     ctx->stream_id = stream_id;
 
+    ctx->aws_ml = flb_aws_multiline_create(ctx->ins,
+                                           ctx->multiline_parsers,
+                                           ctx->key_content);
+
+    if (!ctx->aws_ml) {
+        flb_errno();
+        return -1; 
+    }
+
     /* Export context */
     flb_output_set_context(ins, ctx);
 
@@ -306,7 +315,7 @@ static void cb_stdout_flush(const void *data, size_t bytes,
     }
 #endif
 
-    multiline(ctx, data, bytes, tag, &final_data, &final_bytes);
+    flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
 
 
     /* Assuming data is a log entry...*/

@@ -48,6 +48,170 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
                                    struct flb_aws_header *dynamic_headers,
                                    size_t dynamic_headers_len);
 
+static int flush_callback(struct flb_ml_parser *parser,
+                          struct flb_ml_stream *mst,
+                          void *data, char *buf_data, size_t buf_size)
+{
+    struct flb_aws_multiline *ctx = data;
+
+    /* Append incoming record to our msgpack context buffer */
+    msgpack_sbuffer_write(&ctx->mp_sbuf, buf_data, buf_size);
+
+    return 0;
+}
+
+static int multiline_load_parsers(struct flb_stdout *ctx)
+{
+    int ret;
+    struct mk_list *head;
+    struct mk_list *head_p;
+    struct flb_config_map_val *mv;
+    struct flb_slist_entry *val = NULL;
+    struct flb_ml_parser_ins *parser_i;
+
+    if (!ctx->multiline_parsers) {
+        return -1;
+    }
+
+    /*
+     * Iterate all 'multiline.parser' entries. Every entry is considered
+     * a group which can have multiple multiline parser instances.
+     */
+    flb_config_map_foreach(head, mv, ctx->multiline_parsers) {
+        mk_list_foreach(head_p, mv->val.list) {
+            val = mk_list_entry(head_p, struct flb_slist_entry, _head);
+
+            /* Create an instance of the defined parser */
+            parser_i = flb_ml_parser_instance_create(ctx->m, val->str);
+            if (!parser_i) {
+                return -1;
+            }
+
+            /* Always override parent parser values */
+            if (ctx->key_content) {
+                ret = flb_ml_parser_instance_set(parser_i,
+                                                 "key_content",
+                                                 ctx->key_content);
+                if (ret == -1) {
+                    flb_plg_error(ctx->ins, "could not override 'key_content'");
+                    return -1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+struct flb_aws_multiline *flb_aws_multiline_create(struct flb_output_instance *ins,
+                                                   struct mk_list *multiline_parsers,
+                                                   flb_sds_t key_content)
+{
+    struct flb_aws_multiline *ctx;
+
+    ctx = flb_calloc(1, sizeof(struct flb_aws_multiline));
+    if (!ctx) {
+        flb_errno();
+        return NULL;
+    }
+
+    ctx->multiline_parsers = multiline_parsers;
+    ctx->key_content = key_content;
+    ctx->ins = ins;
+
+    /* Init buffers */
+    msgpack_sbuffer_init(&ctx->mp_sbuf);
+    msgpack_packer_init(&ctx->mp_pck, &ctx->mp_sbuf, msgpack_sbuffer_write);
+
+    /* Create multiline context */
+    ctx->m = flb_ml_create(config, ctx->ins->name);
+    if (!ctx->m) {
+        flb_free(ctx);
+        return NULL;
+    }
+
+    /* Load the parsers/config */
+    ret = multiline_load_parsers(ctx);
+    if (ret == -1) {
+        flb_aws_multiline_destroy(ctx);
+        return NULL;
+    }
+
+    /* Create a stream for this file */
+    len = strlen(ins->name);
+    ret = flb_ml_stream_create(ctx->m,
+                               ins->name, len,
+                               flush_callback, ctx,
+                               &stream_id);
+    if (ret != 0) {
+        flb_plg_error(ctx->ins, "could not create multiline stream");
+        flb_aws_multiline_destroy(ctx);
+        return NULL;
+    }
+    ctx->stream_id = stream_id;
+
+    return ctx;
+}
+
+int flb_aws_multiline_parse(struct flb_aws_multiline *ctx
+                            const void *data, size_t bytes, const char *tag,
+                            void **out_buf, size_t *out_bytes)
+{
+    int ret;
+    int ok = MSGPACK_UNPACK_SUCCESS;
+    size_t off = 0;
+    msgpack_unpacked result;
+    msgpack_object *obj;
+    struct flb_time tm;
+    char *tmp_buf;
+    size_t tmp_size;
+
+    /* reset mspgack size content */
+    ctx->mp_sbuf.size = 0;
+
+    /* process records */
+    msgpack_unpacked_init(&result);
+    while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
+        flb_time_pop_from_msgpack(&tm, &result, &obj);
+        ret = flb_ml_append_object(ctx->m, ctx->stream_id, &tm, obj);
+        if (ret != 0) {
+            flb_plg_warn(ctx->ins,
+                          "could not ingest record from tag into multiline parser: %s", tag);
+        }
+    }
+    msgpack_unpacked_destroy(&result);
+
+    /* flush all pending buffered data */
+    flb_ml_flush_pending_now(ctx->m);
+
+    if (ctx->mp_sbuf.size > 0) {
+        /*
+         * If multiline will report a new set of records because the
+         * original data was modified, we make a copy to a new memory
+         * area, to make it safe for multiple co-routines to use this object.
+         */
+
+        tmp_buf = flb_malloc(ctx->mp_sbuf.size);
+        if (!tmp_buf) {
+            flb_errno();
+            return -1;
+        }
+        tmp_size = ctx->mp_sbuf.size;
+        memcpy(tmp_buf, ctx->mp_sbuf.data, tmp_size);
+        *out_buf = tmp_buf;
+        *out_bytes = tmp_size;
+        ctx->mp_sbuf.size = 0;
+
+        return 0;
+    }
+
+    /* multiline failed to parse any records */
+    return -1;
+}
+
+void flb_aws_multiline_destroy(struct flb_aws_multiline *ctx);
+
+
 /*
  * https://service.region.amazonaws.com(.cn)
  */
