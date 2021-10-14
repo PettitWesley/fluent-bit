@@ -369,19 +369,19 @@ static struct flb_config_map config_map[] = {
         /* Multiline Core Engine based API */
     {
      FLB_CONFIG_MAP_BOOL, "debug_flush", "false",
-     0, FLB_TRUE, offsetof(struct ml_ctx, debug_flush),
+     0, FLB_TRUE, offsetof(struct flb_stdout, debug_flush),
      "enable debugging for concatenation flush to stdout"
     },
 
     {
      FLB_CONFIG_MAP_CLIST, "multiline.parser", NULL,
-     FLB_CONFIG_MAP_MULT, FLB_TRUE, offsetof(struct ml_ctx, multiline_parsers),
+     FLB_CONFIG_MAP_MULT, FLB_TRUE, offsetof(struct flb_stdout, multiline_parsers),
      "specify one or multiple multiline parsers: docker, cri, go, java, etc."
     },
 
     {
      FLB_CONFIG_MAP_STR, "multiline.key_content", NULL,
-     0, FLB_TRUE, offsetof(struct ml_ctx, key_content),
+     0, FLB_TRUE, offsetof(struct flb_stdout, key_content),
      "specify the key name that holds the content to process."
     },
 
