@@ -332,6 +332,7 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     (void) config;
     void *final_data = (void *) data;
     size_t final_bytes = bytes;
+    int multiline_succeeded;
 
     buf = new_flush_buffer();
     if (!buf) {
@@ -340,15 +341,18 @@ static void cb_firehose_flush(const void *data, size_t bytes,
     }
 
     if (ctx->key_content) {
-        ret = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
-        if (ret < 0) {
-            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
-        } else {
+        multiline_succeeded = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
+        if (multiline_succeeded == FLB_TRUE) {
             flb_plg_debug(ctx->ins, "multiline parsing succeeded for tag %s", tag);
+        } else {
+            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
         }
     }
 
     ret = process_and_send_records(ctx, buf, final_data, final_bytes);
+    if (multiline_succeeded == FLB_TRUE) {
+        flb_free(final_data);
+    }
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send records");
         flush_destroy(buf);

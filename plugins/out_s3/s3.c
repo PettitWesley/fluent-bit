@@ -2016,16 +2016,17 @@ static void cb_s3_flush(const void *data, size_t bytes,
     struct multipart_upload *m_upload_file = NULL;
     void *final_data = (void *) data;
     size_t final_bytes = bytes;
+    int multiline_succeeded;
 
     /* Cleanup old buffers and initialize upload timer */
     flush_init(ctx);
 
     if (ctx->key_content) {
-        ret = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
-        if (ret < 0) {
-            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
-        } else {
+        multiline_succeeded = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
+        if (multiline_succeeded == FLB_TRUE) {
             flb_plg_debug(ctx->ins, "multiline parsing succeeded for tag %s", tag);
+        } else {
+            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
         }
     }
 
@@ -2038,6 +2039,9 @@ static void cb_s3_flush(const void *data, size_t bytes,
                                                FLB_PACK_JSON_FORMAT_LINES,
                                                ctx->json_date_format,
                                                ctx->date_key);
+    }
+    if (multiline_succeeded == FLB_TRUE) {
+        flb_free(final_data);
     }
     if (chunk == NULL) {
         flb_plg_error(ctx->ins, "Could not marshal msgpack to output string");
