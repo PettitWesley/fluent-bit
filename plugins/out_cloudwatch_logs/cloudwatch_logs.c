@@ -403,6 +403,7 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     (void) config;
     void *final_data = (void *) data;
     size_t final_bytes = bytes;
+    int multiline_succeeded;
 
     ctx->buf->put_events_calls = 0;
 
@@ -419,16 +420,24 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     }
 
     if (ctx->key_content) {
-        ret = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
-        if (ret < 0) {
-            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
-        } else {
+        multiline_succeeded = flb_aws_multiline_parse(ctx->aws_ml, data, bytes, tag, &final_data, &final_bytes);
+        if (multiline_succeeded == FLB_TRUE) {
             flb_plg_debug(ctx->ins, "multiline parsing succeeded for tag %s", tag);
+        } else {
+            flb_plg_debug(ctx->ins, "multiline parsing failed for tag %s", tag);
         }
     }
 
 
     event_count = process_and_send(ctx, i_ins->p->name, ctx->buf, stream, final_data, final_bytes);
+    if (multiline_succeeded == FLB_TRUE) {
+        /* 
+         * Need to free the extra buffer created for the parsed logs. 
+         * Technically final_data is in this case a msgpack_sbuffer.data,
+         * but msgpack_sbuffer_free is just a wrapper around free() 
+         */
+        flb_free(final_data);
+    }
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send events");
         FLB_OUTPUT_RETURN(FLB_RETRY);

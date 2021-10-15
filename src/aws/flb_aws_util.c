@@ -200,7 +200,7 @@ int flb_aws_multiline_parse(struct flb_aws_multiline *ctx,
         tmp_buf = flb_malloc(ctx->mp_sbuf.size);
         if (!tmp_buf) {
             flb_errno();
-            return -1;
+            return FLB_FALSE;
         }
         tmp_size = ctx->mp_sbuf.size;
         memcpy(tmp_buf, ctx->mp_sbuf.data, tmp_size);
@@ -208,11 +208,11 @@ int flb_aws_multiline_parse(struct flb_aws_multiline *ctx,
         *out_bytes = tmp_size;
         ctx->mp_sbuf.size = 0;
 
-        return 0;
+        return FLB_TRUE;
     }
 
     /* multiline failed to parse any records */
-    return -1;
+    return FLB_FALSE;
 }
 
 void flb_aws_multiline_destroy(struct flb_aws_multiline *ctx)
