@@ -191,8 +191,8 @@ static int cb_ml_filter(const void *data, size_t bytes,
     msgpack_unpacked_destroy(&result);
 
     /* flush all pending buffered data (there is no auto-flush in filters) */
-    flb_info("multiline:force_flush()");
-    flb_ml_flush_pending_now(ctx->m);
+    // flb_info("multiline:force_flush()");
+    // flb_ml_flush_pending_now(ctx->m);
 
     if (ctx->mp_sbuf.size > 0) {
         /*
