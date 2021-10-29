@@ -27,6 +27,8 @@ struct ml_ctx {
     int debug_flush;
     flb_sds_t key_content;
 
+    int flushed;
+
     /* packaging buffers */
     msgpack_sbuffer mp_sbuf;  /* temporary msgpack buffer */
     msgpack_packer mp_pck;    /* temporary msgpack packer */

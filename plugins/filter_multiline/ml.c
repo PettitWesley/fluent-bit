@@ -77,6 +77,7 @@ static int flush_callback(struct flb_ml_parser *parser,
     struct ml_ctx *ctx = data;
 
     flb_info("multiline:cb_flush()");
+    ctx->flushed = FLB_TRUE;
 
     if (ctx->debug_flush) {
         flb_ml_flush_stdout(parser, mst, data, buf_data, buf_size);
@@ -175,7 +176,9 @@ static int cb_ml_filter(const void *data, size_t bytes,
     struct flb_time tm;
 
     /* reset mspgack size content */
-    ctx->mp_sbuf.size = 0;
+    // ctx->mp_sbuf.size = 0;
+    ctx->flushed = FLB_FALSE;
+
 
     /* process records */
     msgpack_unpacked_init(&result);
@@ -194,7 +197,7 @@ static int cb_ml_filter(const void *data, size_t bytes,
     // flb_info("multiline:force_flush()");
     // flb_ml_flush_pending_now(ctx->m);
 
-    if (ctx->mp_sbuf.size > 0) {
+    if (ctx->mp_sbuf.size > 0 && ctx->flushed == FLB_TRUE) {
         /*
          * If the filter will report a new set of records because the
          * original data was modified, we make a copy to a new memory
