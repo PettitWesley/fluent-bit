@@ -205,6 +205,8 @@ static int cb_ml_filter(const void *data, size_t bytes,
          * chain.
          */
 
+        flb_info("returning something");
+
         tmp_buf = flb_malloc(ctx->mp_sbuf.size);
         if (!tmp_buf) {
             flb_errno();
