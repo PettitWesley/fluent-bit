@@ -222,7 +222,7 @@ static int cb_ml_filter(const void *data, size_t bytes,
     }
 
     /* unlikely to happen.. but just in case */
-    return FLB_FILTER_NOTOUCH;
+    return FLB_FILTER_MODIFIED;
 }
 
 static int cb_ml_exit(void *data, struct flb_config *config)
