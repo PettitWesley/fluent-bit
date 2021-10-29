@@ -57,7 +57,6 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
     const char *tmp;
     char *session_name = NULL;
     struct flb_cloudwatch *ctx = NULL;
-    struct cw_flush *buf = NULL;
     int ret;
     (void) config;
     (void) data;
@@ -162,6 +161,12 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         ctx->create_group = FLB_TRUE;
     }
 
+    ctx->disable_sequence_token = FLB_FALSE;
+    tmp = flb_output_get_property("disable_sequence_token", ins);
+    if (tmp && (strcasecmp(tmp, "On") == 0 || strcasecmp(tmp, "true") == 0)) {
+        ctx->disable_sequence_token = FLB_TRUE;
+    }
+
     ctx->log_retention_days = 0;
     tmp = flb_output_get_property("log_retention_days", ins);
     if (tmp) {
@@ -187,6 +192,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
             flb_errno();
             goto error;
         }
+        ctx->stream.sequence_token = "somerandomsequencetoken23498234";
         ctx->stream_created = FLB_FALSE;
     }
 
@@ -311,50 +317,20 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
         goto error;
     }
 
-    /*
-     * Remove async flag from upstream
-     * CW output runs in sync mode; because the CW API currently requires
-     * PutLogEvents requests to a log stream to be made serially
-     */
-    upstream->flags &= ~(FLB_IO_ASYNC);
+    if (ctx->disable_sequence_token == FLB_TRUE) {
+        flb_plg_warn(ctx->ins, "Enabling full concurrency...");
+    } else {
+        /*
+          * Remove async flag from upstream
+          * CW output runs in sync mode; because the CW API currently requires
+          * PutLogEvents requests to a log stream to be made serially
+          */
+        upstream->flags &= ~(FLB_IO_ASYNC);
+    }
 
     ctx->cw_client->upstream = upstream;
     flb_output_upstream_set(upstream, ctx->ins);
     ctx->cw_client->host = ctx->endpoint;
-
-    /* alloc the payload/processing buffer */
-    buf = flb_calloc(1, sizeof(struct cw_flush));
-    if (!buf) {
-        flb_errno();
-        goto error;
-    }
-
-    buf->out_buf = flb_malloc(PUT_LOG_EVENTS_PAYLOAD_SIZE);
-    if (!buf->out_buf) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        goto error;
-    }
-    buf->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
-
-    buf->tmp_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
-    if (!buf->tmp_buf) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        goto error;
-    }
-    buf->tmp_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
-
-    buf->events = flb_malloc(sizeof(struct cw_event) * MAX_EVENTS_PER_PUT);
-    if (!buf->events) {
-        flb_errno();
-        cw_flush_destroy(buf);
-        goto error;
-    }
-    buf->events_capacity = MAX_EVENTS_PER_PUT;
-
-    ctx->buf = buf;
-
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -366,6 +342,43 @@ error:
     flb_plg_error(ctx->ins, "Initialization failed");
     flb_cloudwatch_ctx_destroy(ctx);
     return -1;
+}
+
+struct cw_flush *new_buffer()
+{
+    struct cw_flush *buf;
+
+    buf = flb_calloc(1, sizeof(struct cw_flush));
+    if (!buf) {
+        flb_errno();
+        return NULL;
+    }
+
+    buf->out_buf = flb_malloc(PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    if (!buf->out_buf) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        return NULL;
+    }
+    buf->out_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
+
+    buf->tmp_buf = flb_malloc(sizeof(char) * PUT_LOG_EVENTS_PAYLOAD_SIZE);
+    if (!buf->tmp_buf) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        return NULL;
+    }
+    buf->tmp_buf_size = PUT_LOG_EVENTS_PAYLOAD_SIZE;
+
+    buf->events = flb_malloc(sizeof(struct cw_event) * MAX_EVENTS_PER_PUT);
+    if (!buf->events) {
+        flb_errno();
+        cw_flush_destroy(buf);
+        return NULL;
+    }
+    buf->events_capacity = MAX_EVENTS_PER_PUT;
+
+    return buf;
 }
 
 static void cb_cloudwatch_flush(const void *data, size_t bytes,
@@ -381,11 +394,19 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     (void) i_ins;
     (void) config;
 
-    ctx->buf->put_events_calls = 0;
+    struct cw_flush *buf;
+
+    buf = new_buffer();
+    if (!buf) {
+        FLB_OUTPUT_RETURN(FLB_RETRY);
+    }
+
+    buf->put_events_calls = 0;
 
     if (ctx->create_group == FLB_TRUE && ctx->group_created == FLB_FALSE) {
         ret = create_log_group(ctx);
         if (ret < 0) {
+            cw_flush_destroy(buf);
             FLB_OUTPUT_RETURN(FLB_RETRY);
         }
     }
@@ -393,15 +414,18 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
     stream = get_log_stream(ctx, tag, tag_len);
     if (!stream) {
         FLB_OUTPUT_RETURN(FLB_RETRY);
+        cw_flush_destroy(buf);
     }
 
-    event_count = process_and_send(ctx, i_ins->p->name, ctx->buf, stream, data, bytes);
+    event_count = process_and_send(ctx, i_ins->p->name, buf, stream, data, bytes);
     if (event_count < 0) {
         flb_plg_error(ctx->ins, "Failed to send events");
+        cw_flush_destroy(buf);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
     flb_plg_debug(ctx->ins, "Sent %d events to CloudWatch", event_count);
+    cw_flush_destroy(buf);
 
     FLB_OUTPUT_RETURN(FLB_OK);
 }
@@ -415,10 +439,6 @@ void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx)
     if (ctx != NULL) {
         if (ctx->base_aws_provider) {
             flb_aws_provider_destroy(ctx->base_aws_provider);
-        }
-
-        if (ctx->buf) {
-            cw_flush_destroy(ctx->buf);
         }
 
         if (ctx->aws_provider) {
@@ -479,6 +499,7 @@ void log_stream_destroy(struct log_stream *stream)
         }
         if (stream->sequence_token) {
             flb_sds_destroy(stream->sequence_token);
+            
         }
         flb_free(stream);
     }
@@ -549,6 +570,12 @@ static struct flb_config_map config_map[] = {
      0, FLB_FALSE, 0,
      "Automatically create the log group (log streams will always automatically"
      " be created)"
+    },
+
+    {
+     FLB_CONFIG_MAP_BOOL, "disable_sequence_token", "false",
+     0, FLB_FALSE, 0,
+     "Disable use of sequence tokens in PutLogEvents requests"
     },
 
     {
