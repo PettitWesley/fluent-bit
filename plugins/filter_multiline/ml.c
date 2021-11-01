@@ -231,7 +231,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
 
     /* Create an flb_ml_stream for this stream */
     flb_info("DEBUG: created new stream for %s", stream_name);
-    len = flb_sds_len(stream_name)
+    len = flb_sds_len(stream_name);
     ret = flb_ml_stream_create(ctx->m,
                                stream_name, len,
                                flush_callback, ctx,
@@ -239,7 +239,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
     if (ret != 0) {
         flb_plg_error(ctx->ins, "could not create multiline stream for %s",
                       stream_name);
-        return -1;
+        return NULL;
     }
     stream->stream_id = stream_id;
     mk_list_add(&stream->_head, ctx->ml_streams);
