@@ -243,7 +243,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
     }
     stream->stream_id = stream_id;
     mk_list_add(&stream->_head, ctx->ml_streams);
-    flb_plg_debug(ctx->ins, "Created new ML stream for %s", stream_name)
+    flb_plg_debug(ctx->ins, "Created new ML stream for %s", stream_name);
 
     /* stream_name does not need to be freed, it will become part of the flb_ml_stream */
     return stream;
