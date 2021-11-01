@@ -139,18 +139,117 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     }
 
     /* Create a stream for this file */
-    len = strlen(ins->name);
+    // len = strlen(ins->name);
+    // ret = flb_ml_stream_create(ctx->m,
+    //                            ins->name, len,
+    //                            flush_callback, ctx,
+    //                            &stream_id);
+    // if (ret != 0) {
+    //     flb_plg_error(ctx->ins, "could not create multiline stream");
+    //     return -1;
+    // }
+    // ctx->stream_id = stream_id;
+
+    return 0;
+}
+
+void ml_stream_destroy(struct ml_stream *stream)
+{
+    if (!stream) {
+        return;
+    }
+
+    if (stream->input_name) {
+        flb_sds_destroy(stream->input_name);
+    }
+    if (stream->tag) {
+        flb_sds_destroy(stream->tag);
+    }
+    flb_free(stream);
+    return;
+}
+
+static struct ml_stream get_or_create_stream(struct ml_ctx *ctx,
+                                             struct flb_input_instance *i_ins, 
+                                             const char *tag, int tag_len)
+{
+    uint64_t stream_id;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct ml_stream *stream;
+    flb_sds_t stream_name;
+    flb_sds_t tmp;
+    int name_check;
+    int tag_check;
+    int len;
+    int ret;
+
+    mk_list_foreach_safe(head, tmp, ctx->ml_streams) {
+        stream = mk_list_entry(head, struct ml_stream, _head);
+        name_check = strcmp(stream->input_name, i_ins->name);
+        tag_check = strcmp(stream->tag, tag);
+        if (tag_check == 0 && name_check == 0) {
+            flb_info("debug: using stream %s_%s", stream->input_name, stream->tag);
+            return stream;
+        }
+    }
+
+    /* create a new stream */
+
+    stream_name = flb_sds_create_size(64);
+
+    tmp = flb_sds_printf(&stream_name, "%s_%s", i_ins->name, tag);
+    if (!tmp) {
+        flb_errno();
+        flb_sds_destroy(stream_name);
+        return NULL;
+    }
+    stream_name = tmp;
+
+    stream = flb_calloc(1, sizeof(struct ml_stream));
+    if (!stream) {
+        flb_errno();
+        flb_sds_destroy(stream_name);
+        return NULL;
+    }
+
+    tmp = flb_sds_create(tag);
+    if (!tmp) {
+        flb_errno();
+        flb_sds_destroy(stream_name);
+        ml_stream_destroy(stream);
+        return NULL;
+    }
+    stream->tag = tmp;
+
+    tmp = flb_sds_create(i_ins->name);
+    if (!tmp) {
+        flb_errno();
+        flb_sds_destroy(stream_name);
+        ml_stream_destroy(stream);
+        return NULL;
+    }
+    stream->input_name = tmp;
+
+    /* Create an flb_ml_stream for this stream */
+    flb_info("DEBUG: created new stream for %s", stream_name);
+    len = flb_sds_len(stream_name)
     ret = flb_ml_stream_create(ctx->m,
-                               ins->name, len,
+                               stream_name, len,
                                flush_callback, ctx,
                                &stream_id);
     if (ret != 0) {
-        flb_plg_error(ctx->ins, "could not create multiline stream");
+        flb_plg_error(ctx->ins, "could not create multiline stream for %s",
+                      stream_name);
         return -1;
     }
-    ctx->stream_id = stream_id;
+    stream->stream_id = stream_id;
+    mk_list_add(&stream->_head, ctx->ml_streams);
+    flb_plg_debug(ctx->ins, "Created new ML stream for %s", stream_name)
 
-    return 0;
+    /* stream_name does not need to be freed, it will become part of the flb_ml_stream */
+    return stream;
+
 }
 
 static int cb_ml_filter(const void *data, size_t bytes,
@@ -174,18 +273,25 @@ static int cb_ml_filter(const void *data, size_t bytes,
     size_t tmp_size;
     struct ml_ctx *ctx = filter_context;
     struct flb_time tm;
+    struct ml_stream *stream;
 
     /* reset mspgack size content */
     // ctx->mp_sbuf.size = 0;
     ctx->flushed = FLB_FALSE;
+    
+    stream = get_or_create_stream(ctx, i_ins, tag, tag_len);
 
+    if (!stream) {
+        flb_plg_error(ctx->ins, "Could not find or create ML stream for %s", tag);
+        return FLB_FILTER_NOTOUCH;
+    }
 
     /* process records */
     msgpack_unpacked_init(&result);
     while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
         flb_time_pop_from_msgpack(&tm, &result, &obj);
         flb_info("multiline:append()");
-        ret = flb_ml_append_object(ctx->m, ctx->stream_id, &tm, obj);
+        ret = flb_ml_append_object(ctx->m, stream->stream_id, &tm, obj);
         if (ret != 0) {
             flb_plg_debug(ctx->ins,
                           "could not append object from tag: %s", tag);
@@ -221,7 +327,6 @@ static int cb_ml_filter(const void *data, size_t bytes,
         return FLB_FILTER_MODIFIED;
     }
 
-    /* unlikely to happen.. but just in case */
     return FLB_FILTER_MODIFIED;
 }
 

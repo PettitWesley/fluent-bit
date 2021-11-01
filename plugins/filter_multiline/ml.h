@@ -23,6 +23,19 @@
 
 #include <fluent-bit/flb_filter_plugin.h>
 
+/* 
+ * input instance + tag is the unique identifier
+ * for a multiline stream
+ * TODO: implement clean up of streams that haven't been used recently
+ */
+struct ml_stream {
+    flb_sds_t tag;
+    flb_sds_t input_name;
+    uint64_t stream_id;
+
+    struct mk_list _head;
+};
+
 struct ml_ctx {
     int debug_flush;
     flb_sds_t key_content;
@@ -37,6 +50,7 @@ struct ml_ctx {
     uint64_t stream_id;
     struct flb_ml *m;
     struct mk_list *multiline_parsers;
+    struct mk_list *ml_streams;
 
     struct flb_filter_instance *ins;
 };
