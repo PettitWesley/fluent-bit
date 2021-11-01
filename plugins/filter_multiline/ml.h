@@ -50,7 +50,8 @@ struct ml_ctx {
     uint64_t stream_id;
     struct flb_ml *m;
     struct mk_list *multiline_parsers;
-    struct mk_list *ml_streams;
+
+    struct mk_list ml_streams;
 
     struct flb_filter_instance *ins;
 };

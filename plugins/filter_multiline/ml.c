@@ -136,7 +136,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
         return -1;
     }
 
-    mk_list_init(ctx->ml_streams);
+    mk_list_init(&ctx->ml_streams);
 
     /* Create a stream for this file */
     // len = strlen(ins->name);
@@ -184,7 +184,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
     int len;
     int ret;
 
-    mk_list_foreach_safe(head, tmp, ctx->ml_streams) {
+    mk_list_foreach_safe(head, tmp, &ctx->ml_streams) {
         stream = mk_list_entry(head, struct ml_stream, _head);
         name_check = strcmp(stream->input_name, i_ins->name);
         tag_check = strcmp(stream->tag, tag);
@@ -244,7 +244,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
         return NULL;
     }
     stream->stream_id = stream_id;
-    mk_list_add(&stream->_head, ctx->ml_streams);
+    mk_list_add(&stream->_head, &ctx->ml_streams);
     flb_plg_debug(ctx->ins, "Created new ML stream for %s", stream_name);
 
     /* stream_name does not need to be freed, it will become part of the flb_ml_stream */
