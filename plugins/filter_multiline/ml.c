@@ -94,8 +94,6 @@ static int cb_ml_init(struct flb_filter_instance *ins,
                       void *data)
 {
     int ret;
-    int len;
-    uint64_t stream_id;
     struct ml_ctx *ctx;
     (void) config;
     (void) data;
@@ -169,16 +167,16 @@ void ml_stream_destroy(struct ml_stream *stream)
     return;
 }
 
-static struct ml_stream get_or_create_stream(struct ml_ctx *ctx,
-                                             struct flb_input_instance *i_ins, 
-                                             const char *tag, int tag_len)
+static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
+                                              struct flb_input_instance *i_ins, 
+                                              const char *tag, int tag_len)
 {
     uint64_t stream_id;
     struct mk_list *tmp;
     struct mk_list *head;
     struct ml_stream *stream;
     flb_sds_t stream_name;
-    flb_sds_t tmp;
+    flb_sds_t tmp_sds;
     int name_check;
     int tag_check;
     int len;
@@ -198,13 +196,13 @@ static struct ml_stream get_or_create_stream(struct ml_ctx *ctx,
 
     stream_name = flb_sds_create_size(64);
 
-    tmp = flb_sds_printf(&stream_name, "%s_%s", i_ins->name, tag);
-    if (!tmp) {
+    tmp_sds = flb_sds_printf(&stream_name, "%s_%s", i_ins->name, tag);
+    if (!tmp_sds) {
         flb_errno();
         flb_sds_destroy(stream_name);
         return NULL;
     }
-    stream_name = tmp;
+    stream_name = tmp_sds;
 
     stream = flb_calloc(1, sizeof(struct ml_stream));
     if (!stream) {
@@ -213,23 +211,23 @@ static struct ml_stream get_or_create_stream(struct ml_ctx *ctx,
         return NULL;
     }
 
-    tmp = flb_sds_create(tag);
+    tmp_sds = flb_sds_create(tag);
     if (!tmp) {
         flb_errno();
         flb_sds_destroy(stream_name);
         ml_stream_destroy(stream);
         return NULL;
     }
-    stream->tag = tmp;
+    stream->tag = tmp_sds;
 
-    tmp = flb_sds_create(i_ins->name);
-    if (!tmp) {
+    tmp_sds = flb_sds_create(i_ins->name);
+    if (!tmp_sds) {
         flb_errno();
         flb_sds_destroy(stream_name);
         ml_stream_destroy(stream);
         return NULL;
     }
-    stream->input_name = tmp;
+    stream->input_name = tmp_sds;
 
     /* Create an flb_ml_stream for this stream */
     flb_info("DEBUG: created new stream for %s", stream_name);
