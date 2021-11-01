@@ -136,6 +136,8 @@ static int cb_ml_init(struct flb_filter_instance *ins,
         return -1;
     }
 
+    mk_list_init(ctx->ml_streams);
+
     /* Create a stream for this file */
     // len = strlen(ins->name);
     // ret = flb_ml_stream_create(ctx->m,
