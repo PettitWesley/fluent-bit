@@ -158,7 +158,7 @@ static int flush_callback(struct flb_ml_parser *parser,
     struct ml_ctx *ctx = data;
     struct ml_stream *stream;
 
-    flb_info("multiline:cb_flush()");
+    flb_debug("multiline:cb_flush()");
     ctx->flushed = FLB_TRUE;
 
     if (ctx->debug_flush) {
@@ -345,7 +345,7 @@ static struct ml_stream *get_by_id(struct ml_ctx *ctx, uint64_t stream_id)
     mk_list_foreach_safe(head, tmp, &ctx->ml_streams) {
         stream = mk_list_entry(head, struct ml_stream, _head);
         if (stream->stream_id == stream_id) {
-            flb_info("debug: emitting to %s_%s", stream->input_name, stream->tag);
+            flb_debug("emitting to %s_%s", stream->input_name, stream->tag);
             return stream;
         }
     }
@@ -373,7 +373,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
         name_check = strcmp(stream->input_name, i_ins->name);
         tag_check = strcmp(stream->tag, tag);
         if (tag_check == 0 && name_check == 0) {
-            flb_info("debug: using stream %s_%s", stream->input_name, stream->tag);
+            flb_debug("debug: using stream %s_%s", stream->input_name, stream->tag);
             return stream;
         }
     }
@@ -416,7 +416,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
     stream->input_name = tmp_sds;
 
     /* Create an flb_ml_stream for this stream */
-    flb_info("DEBUG: created new stream for %s", stream_name);
+    flb_info("created new stream for %s", stream_name);
     len = flb_sds_len(stream_name);
     ret = flb_ml_stream_create(ctx->m,
                                stream_name, len,
@@ -464,7 +464,7 @@ static int cb_ml_filter(const void *data, size_t bytes,
     // ctx->flushed = FLB_FALSE;
 
     if (i_ins == ctx->ins_emitter) {
-        flb_plg_info(ctx->ins, "DEBUG: not processing record from the emitter");
+        flb_plg_debug(ctx->ins, "not processing record from the emitter");
         return FLB_FILTER_NOTOUCH;
     }
     
