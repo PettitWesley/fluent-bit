@@ -416,7 +416,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
     stream->input_name = tmp_sds;
 
     /* Create an flb_ml_stream for this stream */
-    flb_info("created new stream for %s", stream_name);
+    flb_plg_error(ctx->ins, "created new multiline stream for %s", stream_name);
     len = flb_sds_len(stream_name);
     ret = flb_ml_stream_create(ctx->m,
                                stream_name, len,
