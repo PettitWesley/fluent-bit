@@ -453,7 +453,12 @@ static int cb_ml_filter(const void *data, size_t bytes,
 
     /* reset mspgack size content */
     // ctx->mp_sbuf.size = 0;
-    ctx->flushed = FLB_FALSE;
+    // ctx->flushed = FLB_FALSE;
+
+    if (i_ins == ctx->ins_emitter) {
+        flb_plg_info(ctx->ins, "DEBUG: not processing record from the emitter");
+        return FLB_FILTER_NOTOUCH;
+    }
     
     stream = get_or_create_stream(ctx, i_ins, tag, tag_len);
 
