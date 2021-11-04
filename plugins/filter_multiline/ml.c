@@ -29,6 +29,8 @@
 
 #include "ml.h"
 
+static struct ml_stream *get_by_id(struct ml_ctx *ctx, uint64_t stream_id);
+
 /* Create an emitter input instance */
 static int emitter_create(struct ml_ctx *ctx)
 {
