@@ -27,6 +27,84 @@
 
 #include "ml.h"
 
+#define TAG "test"
+
+/* Create an emitter input instance */
+static int emitter_create(struct ml_ctx *ctx)
+{
+    int ret;
+    int coll_fd;
+    struct flb_input_instance *ins;
+
+    ret = flb_input_name_exists(ctx->emitter_name, ctx->config);
+    if (ret == FLB_TRUE) {
+        flb_plg_error(ctx->ins, "emitter_name '%s' already exists",
+                      ctx->emitter_name);
+        return -1;
+    }
+
+    ins = flb_input_new(ctx->config, "emitter", NULL, FLB_FALSE);
+    if (!ins) {
+        flb_plg_error(ctx->ins, "cannot create emitter instance");
+        return -1;
+    }
+
+    /* Set the alias name */
+    ret = flb_input_set_property(ins, "alias", ctx->emitter_name);
+    if (ret == -1) {
+        flb_plg_warn(ctx->ins,
+                     "cannot set emitter_name, using fallback name '%s'",
+                     ins->name);
+    }
+
+    /* Set the emitter_mem_buf_limit */
+    if(ctx->emitter_mem_buf_limit > 0) {
+        ins->mem_buf_limit = ctx->emitter_mem_buf_limit;
+    }
+
+    /* Set the storage type */
+    ret = flb_input_set_property(ins, "storage.type",
+                                 ctx->emitter_storage_type);
+    if (ret == -1) {
+        flb_plg_error(ctx->ins, "cannot set storage.type");
+    }
+
+    /* Initialize emitter plugin */
+    ret = flb_input_instance_init(ins, ctx->config);
+    if (ret == -1) {
+        flb_plg_error(ctx->ins, "cannot initialize emitter instance '%s'",
+                      ins->name);
+        flb_input_instance_exit(ins, ctx->config);
+        flb_input_instance_destroy(ins);
+        return -1;
+    }
+
+    /* Retrieve the collector id registered on the in_emitter initialization */
+    coll_fd = in_emitter_get_collector_id(ins);
+
+    /* Initialize plugin collector (event callback) */
+    flb_input_collector_start(coll_fd, ins);
+
+#ifdef FLB_HAVE_METRICS
+    /* Override Metrics title */
+    ret = flb_metrics_title(ctx->emitter_name, ins->metrics);
+    if (ret == -1) {
+        flb_plg_warn(ctx->ins, "cannot set metrics title, using fallback name %s",
+                     ins->name);
+    }
+#endif
+
+    /* Storage context */
+    ret = flb_storage_input_create(ctx->config->cio, ins);
+    if (ret == -1) {
+        flb_plg_error(ctx->ins, "cannot initialize storage for stream '%s'",
+                      ctx->emitter_name);
+        return -1;
+    }
+    ctx->ins_emitter = ins;
+    return 0;
+}
+
 static int multiline_load_parsers(struct ml_ctx *ctx)
 {
     int ret;
@@ -83,8 +161,12 @@ static int flush_callback(struct flb_ml_parser *parser,
         flb_ml_flush_stdout(parser, mst, data, buf_data, buf_size);
     }
 
-    /* Append incoming record to our msgpack context buffer */
-    msgpack_sbuffer_write(&ctx->mp_sbuf, buf_data, buf_size);
+    // /* Append incoming record to our msgpack context buffer */
+    // msgpack_sbuffer_write(&ctx->mp_sbuf, buf_data, buf_size);
+
+    /* Emit record with new tag */
+    ret = in_emitter_add_record(TAG, 4, buf_data, buf_size,
+                                ctx->ins_emitter);
 
     return 0;
 }
@@ -95,6 +177,8 @@ static int cb_ml_init(struct flb_filter_instance *ins,
 {
     int ret;
     struct ml_ctx *ctx;
+    flb_sds_t tmp;
+    flb_sds_t emitter_name = NULL;
     (void) config;
     (void) data;
 
@@ -110,6 +194,38 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     msgpack_sbuffer_init(&ctx->mp_sbuf);
     msgpack_packer_init(&ctx->mp_pck, &ctx->mp_sbuf, msgpack_sbuffer_write);
 
+    /*
+     * Emitter name: every multiline instance needs an emitter input plugin,
+     * with that one is able to emit records. We use a unique instance so we
+     * can use the metrics interface.
+     *
+     * If not set, we define an emitter name
+     *
+     * Validate if the emitter_name has been set before to check with the
+     * config map. If is not set, do a manual set of the property, so we let the
+     * config map handle the memory allocation.
+     */
+    tmp = (char *) flb_filter_get_property("emitter_name", ins);
+    if (!tmp) {
+        emitter_name = flb_sds_create_size(64);
+        if (!emitter_name) {
+            flb_free(ctx);
+            return -1;
+        }
+
+        tmp = flb_sds_printf(&emitter_name, "emitter_for_%s",
+                             flb_filter_name(ins));
+        if (!tmp) {
+            flb_error("[filter rewrite_tag] cannot compose emitter_name");
+            flb_sds_destroy(emitter_name);
+            flb_free(ctx);
+            return -1;
+        }
+
+        flb_filter_set_property(ins, "emitter_name", emitter_name);
+        flb_sds_destroy(emitter_name);
+    }
+
     /* Load the config map */
     ret = flb_filter_config_map_set(ins, (void *) ctx);
     if (ret == -1) {
@@ -117,8 +233,42 @@ static int cb_ml_init(struct flb_filter_instance *ins,
         return -1;
     }
 
+    /*
+     * Emitter Storage Type: the emitter input plugin to be created by default
+     * uses memory buffer, this option allows to define a filesystem mechanism
+     * for new records created (only if the main service is also filesystem
+     * enabled).
+     *
+     * On this code we just validate the input type: 'memory' or 'filesystem'.
+     */
+    tmp = ctx->emitter_storage_type;
+    if (strcasecmp(tmp, "memory") != 0 && strcasecmp(tmp, "filesystem") != 0) {
+        flb_plg_error(ins, "invalid 'emitter_storage.type' value. Only "
+                      "'memory' or 'filesystem' types are allowed");
+        flb_free(ctx);
+        return -1;
+    }
+
     /* Set plugin context */
     flb_filter_set_context(ins, ctx);
+
+        /* Create the emitter context */
+    ret = emitter_create(ctx);
+    if (ret == -1) {
+        return -1;
+    }
+
+    /* Register a metric to count the number of emitted records */
+#ifdef FLB_HAVE_METRICS
+    ctx->cmt_emitted = cmt_counter_create(ins->cmt,
+                                          "fluentbit", "filter", "emit_records_total",
+                                          "Total number of emitted records",
+                                          1, (char *[]) {"name"});
+
+    /* OLD api */
+    flb_metrics_add(FLB_MULTILINE_METRIC_EMITTED,
+                    "emit_records", ctx->ins->metrics);
+#endif
 
     /* Create multiline context */
     ctx->m = flb_ml_create(config, ctx->ins->name);
@@ -127,6 +277,12 @@ static int cb_ml_init(struct flb_filter_instance *ins,
         * we don't free the context since upon init failure, the exit
          * callback will be triggered with our context set above.
          */
+        return -1;
+    }
+
+    ctx->m->flush_ms = ctx->flush_ms;
+    ret = flb_ml_auto_flush_init(ctx->m);
+    if (ret == -1) {
         return -1;
     }
 
@@ -167,6 +323,23 @@ void ml_stream_destroy(struct ml_stream *stream)
     }
     flb_free(stream);
     return;
+}
+
+static struct ml_stream *get_by_id(struct ml_ctx *ctx, uint64_t stream_id)
+{
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct ml_stream *stream;
+
+    mk_list_foreach_safe(head, tmp, &ctx->ml_streams) {
+        stream = mk_list_entry(head, struct ml_stream, _head);
+        if (stream->stream_id == stream_id) {
+            flb_info("debug: emitting to %s_%s", stream->input_name, stream->tag);
+            return stream;
+        }
+    }
+
+    return NULL;
 }
 
 static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
@@ -290,7 +463,6 @@ static int cb_ml_filter(const void *data, size_t bytes,
     msgpack_unpacked_init(&result);
     while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
         flb_time_pop_from_msgpack(&tm, &result, &obj);
-        flb_info("multiline:append()");
         ret = flb_ml_append_object(ctx->m, stream->stream_id, &tm, obj);
         if (ret != 0) {
             flb_plg_debug(ctx->ins,
@@ -303,30 +475,34 @@ static int cb_ml_filter(const void *data, size_t bytes,
     // flb_info("multiline:force_flush()");
     // flb_ml_flush_pending_now(ctx->m);
 
-    if (ctx->mp_sbuf.size > 0 && ctx->flushed == FLB_TRUE) {
-        /*
-         * If the filter will report a new set of records because the
-         * original data was modified, we make a copy to a new memory
-         * area, since the buffer might be invalidated in the filter
-         * chain.
-         */
+    // if (ctx->mp_sbuf.size > 0 && ctx->flushed == FLB_TRUE) {
+    //     /*
+    //      * If the filter will report a new set of records because the
+    //      * original data was modified, we make a copy to a new memory
+    //      * area, since the buffer might be invalidated in the filter
+    //      * chain.
+    //      */
 
-        flb_info("returning something");
+    //     flb_info("returning something");
 
-        tmp_buf = flb_malloc(ctx->mp_sbuf.size);
-        if (!tmp_buf) {
-            flb_errno();
-            return FLB_FILTER_NOTOUCH;
-        }
-        tmp_size = ctx->mp_sbuf.size;
-        memcpy(tmp_buf, ctx->mp_sbuf.data, tmp_size);
-        *out_buf = tmp_buf;
-        *out_bytes = tmp_size;
-        ctx->mp_sbuf.size = 0;
+    //     tmp_buf = flb_malloc(ctx->mp_sbuf.size);
+    //     if (!tmp_buf) {
+    //         flb_errno();
+    //         return FLB_FILTER_NOTOUCH;
+    //     }
+    //     tmp_size = ctx->mp_sbuf.size;
+    //     memcpy(tmp_buf, ctx->mp_sbuf.data, tmp_size);
+    //     *out_buf = tmp_buf;
+    //     *out_bytes = tmp_size;
+    //     ctx->mp_sbuf.size = 0;
 
-        return FLB_FILTER_MODIFIED;
-    }
+    //     return FLB_FILTER_MODIFIED;
+    // }
 
+    /* 
+     * always returned modified, which will be nothing, since the emitter takes
+     * all records
+     */
     return FLB_FILTER_MODIFIED;
 }
 
@@ -356,6 +532,12 @@ static struct flb_config_map config_map[] = {
      "enable debugging for concatenation flush to stdout"
     },
 
+    {
+     FLB_CONFIG_MAP_INT, "flush_ms", "2000",
+     0, FLB_TRUE, offsetof(struct ml_ctx, flush_ms),
+     "Flush time for pending multiline records"
+    },
+
     /* Multiline Core Engine based API */
     {
      FLB_CONFIG_MAP_CLIST, "multiline.parser", NULL,
@@ -367,6 +549,23 @@ static struct flb_config_map config_map[] = {
      FLB_CONFIG_MAP_STR, "multiline.key_content", NULL,
      0, FLB_TRUE, offsetof(struct ml_ctx, key_content),
      "specify the key name that holds the content to process."
+    },
+
+    /* emitter config */
+    {
+     FLB_CONFIG_MAP_STR, "emitter_name", NULL,
+     FLB_FALSE, FLB_TRUE, offsetof(struct ml_ctx, emitter_name),
+     NULL
+    },
+    {
+     FLB_CONFIG_MAP_STR, "emitter_storage.type", "memory",
+     FLB_FALSE, FLB_TRUE, offsetof(struct ml_ctx, emitter_storage_type),
+     NULL
+    },
+    {
+     FLB_CONFIG_MAP_SIZE, "emitter_mem_buf_limit", FLB_MULTILINE_MEM_BUF_LIMIT_DEFAULT,
+     FLB_FALSE, FLB_TRUE, offsetof(struct ml_ctx, emitter_mem_buf_limit),
+     "set a memory buffer limit to restrict memory usage of emitter"
     },
 
     /* EOF */
