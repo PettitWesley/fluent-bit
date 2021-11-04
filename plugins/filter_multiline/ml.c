@@ -29,8 +29,6 @@
 
 #include "ml.h"
 
-#define TAG "test"
-
 /* Create an emitter input instance */
 static int emitter_create(struct ml_ctx *ctx)
 {
@@ -156,6 +154,7 @@ static int flush_callback(struct flb_ml_parser *parser,
 {
     int ret;
     struct ml_ctx *ctx = data;
+    struct ml_stream *stream;
 
     flb_info("multiline:cb_flush()");
     ctx->flushed = FLB_TRUE;
@@ -167,11 +166,18 @@ static int flush_callback(struct flb_ml_parser *parser,
     // /* Append incoming record to our msgpack context buffer */
     // msgpack_sbuffer_write(&ctx->mp_sbuf, buf_data, buf_size);
 
+    stream = get_by_id(ctx, mst->id);
+    if (!stream) {
+        flb_plg_error(ctx->ins, "Could not find tag to re-emit from stream %s",
+                      mst->name);
+        return -1;
+    }
+
     /* Emit record with new tag */
-    ret = in_emitter_add_record(TAG, 4, buf_data, buf_size,
+    ret = in_emitter_add_record(stream->tag, flb_sds_len(stream->tag), buf_data, buf_size,
                                 ctx->ins_emitter);
 
-    return 0;
+    return ret;
 }
 
 static int cb_ml_init(struct flb_filter_instance *ins,
