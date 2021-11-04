@@ -81,12 +81,6 @@ static int emitter_create(struct ml_ctx *ctx)
         return -1;
     }
 
-    /* Retrieve the collector id registered on the in_emitter initialization */
-    coll_fd = in_emitter_get_collector_id(ins);
-
-    /* Initialize plugin collector (event callback) */
-    flb_input_collector_start(coll_fd, ins);
-
 #ifdef FLB_HAVE_METRICS
     /* Override Metrics title */
     ret = flb_metrics_title(ctx->emitter_name, ins->metrics);
