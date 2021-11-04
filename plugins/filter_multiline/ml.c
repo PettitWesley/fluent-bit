@@ -183,7 +183,6 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     flb_sds_t tmp;
     flb_sds_t emitter_name = NULL;
     (void) config;
-    (void) data;
 
     ctx = flb_calloc(1, sizeof(struct ml_ctx));
     if (!ctx) {
@@ -192,6 +191,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     }
     ctx->ins = ins;
     ctx->debug_flush = FLB_FALSE;
+    ctx->config = config;
 
     /* Init buffers */
     msgpack_sbuffer_init(&ctx->mp_sbuf);
