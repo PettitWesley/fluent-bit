@@ -46,6 +46,7 @@
 #include <fluent-bit/flb_macros.h>
 #include <fluent-bit/flb_upstream.h>
 #include <fluent-bit/flb_scheduler.h>
+#include <fluent-bit/flb_io.h>
 
 #include <monkey/mk_core.h>
 #include <ares.h>
@@ -107,6 +108,7 @@ void flb_net_setup_init(struct flb_net_setup *net)
     net->keepalive_idle_timeout = 30;
     net->keepalive_max_recycle = 0;
     net->connect_timeout = 10;
+    net->io_timeout = FLB_IO_INFTIM;
     net->source_address = NULL;
 }
 

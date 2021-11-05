@@ -42,6 +42,14 @@
 /* Other features */
 #define FLB_IO_IPV6       32  /* network I/O uses IPv6                  */
 
+/* IO Wait */
+#define FLB_IO_WAIT_ERROR      0
+#define FLB_IO_WAIT_TIMEDOUT   1
+#define FLB_IO_WAIT_COMPLETE   2
+typedef int flb_io_wait_ret;
+
+#define FLB_IO_INFTIM         -1
+
 int flb_io_net_connect(struct flb_upstream_conn *u_conn,
                        struct flb_coro *th);
 

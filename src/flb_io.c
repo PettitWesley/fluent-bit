@@ -48,6 +48,12 @@
 #include <limits.h>
 #include <assert.h>
 
+#ifdef FLB_SYSTEM_WINDOWS
+#define poll WSAPoll
+#else
+#include <sys/poll.h>
+#endif
+
 #include <monkey/mk_core.h>
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_config.h>
@@ -116,6 +122,42 @@ int flb_io_net_connect(struct flb_upstream_conn *u_conn,
 
     flb_trace("[io] connection OK");
     return 0;
+}
+
+/*
+ * Perform blocking IO wait
+ * Timeout is provided in milliseconds
+ */
+static flb_io_wait_ret flb_io_wait_sync(struct flb_upstream_conn *u_conn, uint32_t mask,
+                                        int timeout) {
+    struct pollfd pfd;
+    int ret;
+
+    /* To wait, MK_EVENT_READ or MK_EVENT_WRITE must included in event mask */
+    if(!(mask & MK_EVENT_READ) && !(mask & MK_EVENT_WRITE)) {
+        flb_error("[io] mask must include MK_EVENT_READ or MK_EVENT_WRITE");
+        return FLB_IO_WAIT_ERROR;
+    }
+    pfd.events = 0;
+    if (mask & MK_EVENT_READ) {
+        pfd.events |= POLLIN;
+    }
+    if (mask & MK_EVENT_WRITE) {
+        pfd.events |= POLLOUT;
+    }
+
+    pfd.fd = u_conn->fd;
+    ret = poll(&pfd, 1, timeout);
+    if (ret == 0) {
+        /* Timeout */
+        return FLB_IO_WAIT_TIMEDOUT;
+    }
+    else if (ret < 0) {
+        /* Generic poll error */
+        return FLB_IO_WAIT_ERROR;
+    }
+
+    return FLB_IO_WAIT_COMPLETE;
 }
 
 static int net_io_write(struct flb_upstream_conn *u_conn,
@@ -295,12 +337,64 @@ static ssize_t net_io_read(struct flb_upstream_conn *u_conn,
                            void *buf, size_t len)
 {
     int ret;
+    flb_io_wait_ret io_wait_ret;
+
+    /* Set socket to non-blocking mode for timeout */
+    flb_net_socket_nonblocking(u_conn->fd);
 
     ret = recv(u_conn->fd, buf, len, 0);
     if (ret == -1) {
-        return -1;
+        /*
+         * An asynchronous recv can return -1, but what is important is the
+         * socket status, getting a EWOULDBLOCK is expected, but any other case
+         * means a failure.
+         */
+        if (!FLB_WOULDBLOCK()) {
+            /* Generic error */
+            flb_warn("[net] io_read #%i failed from: %s:%i",
+                      u_conn->fd, u_conn->u->tcp_host, u_conn->u->tcp_port);
+            flb_net_socket_blocking(u_conn->fd);
+            return -1;
+        }
+
+        /* The connection is still in progress, implement a socket timeout */
+        flb_trace("[net] io_read #%i in progress from: %s:%i",
+                  u_conn->fd, u_conn->u->tcp_host, u_conn->u->tcp_port);
+
+        /* Blocking synchronous wait */
+        io_wait_ret = flb_io_wait_sync(u_conn, MK_EVENT_READ,
+                                      (u_conn->u->net.io_timeout == FLB_IO_INFTIM) ?
+                                      FLB_IO_INFTIM :
+                                      (u_conn->u->net.io_timeout * 1000));
+
+        if (io_wait_ret == FLB_IO_WAIT_TIMEDOUT) {
+            /* Timeout */
+            flb_warn("[net] io_read #%i timeout after %i seconds from: "
+                      "%s:%i",
+                      u_conn->fd, u_conn->u->net.io_timeout,
+                      u_conn->u->tcp_host, u_conn->u->tcp_port);
+            flb_socket_close(u_conn->fd);
+            flb_net_socket_blocking(u_conn->fd);
+            return -1;
+        }
+        else if (io_wait_ret == FLB_IO_WAIT_ERROR) {
+            /* Generic error */
+            flb_warn("[net] io_read #%i failed from: %s:%i",
+                      u_conn->fd, u_conn->u->tcp_host, u_conn->u->tcp_port);
+            flb_socket_close(u_conn->fd);
+            flb_net_socket_blocking(u_conn->fd);
+            return -1;
+        }
+
+        /* Get data */
+        ret = recv(u_conn->fd, buf, len, 0);
     }
 
+    /*
+     * The read succeeded, return the normal
+     * non-blocking mode to the socket.
+     */
+    flb_net_socket_blocking(u_conn->fd);
     return ret;
 }
 
