@@ -339,6 +339,16 @@ static ssize_t net_io_read(struct flb_upstream_conn *u_conn,
     int ret;
     flb_io_wait_ret io_wait_ret;
 
+    /* Default to original net_io_read if no timeout is used */
+    if (u_conn->u->net.io_timeout == FLB_IO_INFTIM) {
+        ret = recv(u_conn->fd, buf, len, 0);
+        if (ret == -1) {
+            return -1;
+        }
+
+        return ret;
+    }
+
     /* Set socket to non-blocking mode for timeout */
     flb_net_socket_nonblocking(u_conn->fd);
 
