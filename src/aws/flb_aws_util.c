@@ -412,6 +412,8 @@ struct flb_http_client *request_do(struct flb_aws_client *aws_client,
     /* Perform request */
     ret = flb_http_do(c, &b_sent);
 
+    flb_info("final resp buf size=%zu, endpoint=%s", c->resp.data_size, aws_client->host);
+
     if (ret != 0 || c->resp.status != 200) {
         flb_debug("[aws_client] %s: http_do=%i, HTTP Status: %i",
                   aws_client->host, ret, c->resp.status);
