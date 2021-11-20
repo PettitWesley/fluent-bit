@@ -510,9 +510,10 @@ static void flb_signal_exit(int signal)
     case SIGQUIT:
     case SIGHUP:
 #endif
-        flb_stop(ctx);
-        flb_destroy(ctx);
-        _exit(EXIT_SUCCESS);
+        break;
+        // flb_stop(ctx);
+        // flb_destroy(ctx);
+        // _exit(EXIT_SUCCESS);
     default:
         break;
     }
