@@ -510,7 +510,7 @@ static void flb_signal_exit(int signal)
     case SIGQUIT:
     case SIGHUP:
 #endif
-        printf("do nothing plz\n");
+        printf("do nothing plzzzz\n");
         break;
         // flb_stop(ctx);
         // flb_destroy(ctx);
