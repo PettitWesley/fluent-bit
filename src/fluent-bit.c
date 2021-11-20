@@ -575,7 +575,7 @@ static void flb_signal_init()
     signal(SIGHUP,  &flb_signal_handler_break_loop);
     signal(SIGCONT, &flb_signal_handler);
 #endif
-    signal(SIGTERM, &flb_signal_handler_break_loop);
+    //signal(SIGTERM, &flb_signal_handler_break_loop);
     signal(SIGSEGV, &flb_signal_handler);
     signal(SIGFPE,  &flb_signal_handler);
 }
