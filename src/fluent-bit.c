@@ -1286,11 +1286,11 @@ int flb_main(int argc, char **argv)
         return ret;
     }
 
-    while (ctx->status == FLB_LIB_OK && exit_signal == 0) {
+    while (ctx->status == FLB_LIB_OK) {
         sleep(1);
     }
     if (exit_signal) {
-        flb_signal_exit(exit_signal);
+        //flb_signal_exit(exit_signal);
     }
     flb_destroy(ctx);
 
