@@ -510,6 +510,7 @@ static void flb_signal_exit(int signal)
     case SIGQUIT:
     case SIGHUP:
 #endif
+        printf("do nothing plz\n");
         break;
         // flb_stop(ctx);
         // flb_destroy(ctx);
@@ -569,15 +570,15 @@ static void flb_signal_handler(int signal)
 
 static void flb_signal_init()
 {
-//     signal(SIGINT,  &flb_signal_handler_break_loop);
-// #ifndef FLB_SYSTEM_WINDOWS
-//     signal(SIGQUIT, &flb_signal_handler_break_loop);
-//     signal(SIGHUP,  &flb_signal_handler_break_loop);
-//     signal(SIGCONT, &flb_signal_handler);
-// #endif
-//     //signal(SIGTERM, &flb_signal_handler_break_loop);
-//     signal(SIGSEGV, &flb_signal_handler);
-//     signal(SIGFPE,  &flb_signal_handler);
+    signal(SIGINT,  &flb_signal_handler_break_loop);
+#ifndef FLB_SYSTEM_WINDOWS
+    signal(SIGQUIT, &flb_signal_handler_break_loop);
+    signal(SIGHUP,  &flb_signal_handler_break_loop);
+    signal(SIGCONT, &flb_signal_handler);
+#endif
+    signal(SIGTERM, &flb_signal_handler_break_loop);
+    signal(SIGSEGV, &flb_signal_handler);
+    signal(SIGFPE,  &flb_signal_handler);
 }
 
 static int custom_set_property(struct flb_custom_instance *in, char *kv)
