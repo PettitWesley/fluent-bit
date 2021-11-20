@@ -564,6 +564,8 @@ static void flb_signal_handler(int signal)
 #ifndef FLB_SYSTEM_WINDOWS
     case SIGCONT:
         flb_dump(ctx->config);
+    default:
+         break;
 #endif
     }
 }
