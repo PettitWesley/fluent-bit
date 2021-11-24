@@ -606,6 +606,7 @@ static int add_host_and_content_length(struct flb_http_client *c)
     flb_sds_destroy(host);
 
     /* Content-Length */
+/*
     if (c->body_len >= 0) {
         size = 32;
         tmp = flb_malloc(size);
@@ -617,7 +618,7 @@ static int add_host_and_content_length(struct flb_http_client *c)
         flb_http_add_header(c, "Content-Length", 14, tmp, len);
         flb_free(tmp);
     }
-
+*/
     return 0;
 }
 
@@ -1119,7 +1120,24 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     size_t bytes_header = 0;
     size_t bytes_body = 0;
     char *tmp;
+    int len;
+    //flb_sds_t tmp;
+    size_t size;
+    /* Content-Length */
+    
+   if (c->body_len >= 0) {
+        size = 32;
+        tmp = flb_malloc(size);
+        if (!tmp) {
+            flb_errno();
+            return -1;
+        }
+        len = snprintf(tmp, size - 1, "%i", c->body_len);
+        flb_http_add_header(c, "Content-Length", 14, tmp, len);
+        flb_free(tmp);
+    }
 
+    //add_host_and_content_length(c);
     /* Append pending headers */
     ret = http_headers_compose(c);
     if (ret == -1) {
@@ -1141,7 +1159,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     /* Append the ending header CRLF */
     c->header_buf[c->header_len++] = '\r';
     c->header_buf[c->header_len++] = '\n';
-
+    flb_info("request headers:\n%s", c->header_buf);
 #ifdef FLB_HAVE_HTTP_CLIENT_DEBUG
     /* debug: request_headers callback */
     flb_http_client_debug_cb(c, "_debug.http.request_headers");

@@ -53,14 +53,14 @@ static flb_sds_t add_aws_auth(struct flb_http_client *c,
     flb_plg_debug(ctx->ins, "Signing request with AWS Sigv4");
 
     /* Amazon OpenSearch Sigv4 does not allow the host header to include the port */
-    ret = flb_http_strip_port_from_host(c);
-    if (ret < 0) {
-        flb_plg_error(ctx->ins, "could not strip port from host for sigv4");
-        return NULL;
-    }
+//    ret = flb_http_strip_port_from_host(c);
+//    if (ret < 0) {
+//        flb_plg_error(ctx->ins, "could not strip port from host for sigv4");
+//        return NULL;
+//    }
 
     /* AWS Fluent Bit user agent */
-    flb_http_add_header(c, "User-Agent", 10, "aws-fluent-bit-plugin", 21);
+    //flb_http_add_header(c, "User-Agent", 10, "aws-fluent-bit-plugin", 21);
 
     signature = flb_signv4_do(c, FLB_TRUE, FLB_TRUE, time(NULL),
                               ctx->aws_region, ctx->aws_service_name,
@@ -789,7 +789,7 @@ static void cb_es_flush(const void *data, size_t bytes,
     flb_http_buffer_size(c, ctx->buffer_size);
 
 #ifndef FLB_HAVE_AWS
-    flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+    //flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
 #endif
 
     if (ctx->http_user && ctx->http_passwd) {
@@ -807,7 +807,7 @@ static void cb_es_flush(const void *data, size_t bytes,
         }
     }
     else {
-        flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+        //flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
     }
 #endif
 
@@ -815,7 +815,8 @@ static void cb_es_flush(const void *data, size_t bytes,
 
     /* Map debug callbacks */
     flb_http_client_debug(c, ctx->ins->callback);
-
+    
+    flb_plg_debug(ctx->ins, "request headers:\n %s", c->header_buf);
     ret = flb_http_do(c, &b_sent);
     if (ret != 0) {
         flb_plg_warn(ctx->ins, "http_do=%i URI=%s", ret, ctx->uri);
@@ -824,6 +825,7 @@ static void cb_es_flush(const void *data, size_t bytes,
     else {
         /* The request was issued successfully, validate the 'error' field */
         flb_plg_debug(ctx->ins, "HTTP Status=%i URI=%s", c->resp.status, ctx->uri);
+        flb_plg_error(ctx->ins, "Headers: \n%s", c->resp.data);
         if (c->resp.status != 200 && c->resp.status != 201) {
             if (c->resp.payload_size > 0) {
                 flb_plg_error(ctx->ins, "HTTP status=%i URI=%s, response:\n%s\n",
