@@ -32,15 +32,14 @@ static int cb_check_result(void *record, size_t size, void *data)
 
     if (!p) {
         flb_error("Expected to find: '%s' in result '%s'",
-                  expected, result);
+                  expected->expected_pattern, result);
     }
     /*
      * If you want to debug your test
      *
      * printf("Expect: '%s' in result '%s'", expected, result);
      */
-    printf("Expect: '%s' in result '%s'", expected->expected_pattern, result);
-    printf("num_expected=%d, num_actual=%d", expected->expected_records, expected->actual_records);
+    printf("Expect: '%s' in result '%s'\n", expected->expected_pattern, result);
 
     flb_free(record);
     return 0;
