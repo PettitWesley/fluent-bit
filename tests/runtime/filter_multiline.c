@@ -105,14 +105,7 @@ static void flb_test_multiline_buffered()
     char *p;
     struct flb_lib_out_cb cb_data;
     struct filter_test *ctx;
-    struct filter_test_result *expected;
-    flb_sds_t expected_pattern;
-
-    expected = flb_calloc(1, sizeof(struct filter_test_result));
-    TEST_CHECK(expected != NULL);
-
-    expected_pattern = flb_sds_create("\"main.main.func1(0xc420024120)\"");
-    TEST_CHECK(expected_pattern != NULL);
+    struct filter_test_result expected = { 0 };
 
     /* Create test context */
     ctx = filter_test_create((void *) &cb_data);
@@ -130,8 +123,8 @@ static void flb_test_multiline_buffered()
     TEST_CHECK(ret == 0);
 
     /* Prepare output callback with expected result */
-    expected->expected_records = 1; /* 1 record with all lines concatenated */
-    expected->expected_pattern = expected_pattern;
+    expected.expected_records = 1; /* 1 record with all lines concatenated */
+    expected.expected_pattern = "main.main.func1(0xc420024120)";
     cb_data.cb = cb_check_result;
     cb_data.data = (void *) expected;
 
@@ -167,7 +160,7 @@ static void flb_test_multiline_buffered()
 
     /* check number of outputted records */
     sleep(2);
-    TEST_CHECK(expected->actual_records == expected->expected_records);
+    TEST_CHECK(expected.actual_records == expected.expected_records);
     filter_test_destroy(ctx);
     flb_free(expected);
 }
