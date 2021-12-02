@@ -281,22 +281,27 @@ static void flb_test_multiline_unbuffered()
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);
+    sleep(1); /* ensure records get sent one by one */
     p = "[0, {\"log\":\"\n\"}]";
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);
+    sleep(1); /* ensure records get sent one by one */
     p = "[0, {\"log\":\"goroutine 4 [running]:\"}]";
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);
+    sleep(1); /* ensure records get sent one by one */
     p = "[0, {\"log\":\"panic(0x45cb40, 0x47ad70)\"}]";
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);
+    sleep(1); /* ensure records get sent one by one */
     p = "[0, {\"log\":\"  /usr/local/go/src/runtime/panic.go:542 +0x46c fp=0xc42003f7b8 sp=0xc42003f710 pc=0x422f7c\"}]";
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);
+    sleep(1); /* ensure records get sent one by one */
     p = "[0, {\"log\":\"main.main.func1(0xc420024120)\"}]";
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
