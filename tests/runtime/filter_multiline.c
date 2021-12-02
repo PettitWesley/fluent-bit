@@ -267,7 +267,7 @@ static void flb_test_multiline_unbuffered()
 
     /* Prepare output callback with expected result */
     expected.expected_records = 6; /* no concatenation */
-    expected.expected_pattern = "panic)";
+    expected.expected_pattern = "panic";
     expected.expected_pattern_index = 0;
     cb_data.cb = cb_check_result;
     cb_data.data = (void *) &expected;
@@ -305,6 +305,7 @@ static void flb_test_multiline_unbuffered()
     /* check number of outputted records */
     sleep(2);
     TEST_CHECK(expected.actual_records == expected.expected_records);
+    printf("expected_records=%d, actual_records=%d", expected.expected_records, expected.actual_records);
     filter_test_destroy(ctx);
 }
 
