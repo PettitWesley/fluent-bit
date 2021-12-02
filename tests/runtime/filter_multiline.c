@@ -147,7 +147,7 @@ created by main.main
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);
-    p = "[0, {\"log\":\"main.main.func1(0xc420024120)"}]";
+    p = "[0, {\"log\":\"main.main.func1(0xc420024120)\"}]";
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);
