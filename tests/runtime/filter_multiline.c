@@ -122,8 +122,32 @@ static void flb_test_multiline_buffered()
     ret = flb_start(ctx->flb);
     TEST_CHECK(ret == 0);
 
+    /*
+goroutine 4 [running]:
+panic(0x45cb40, 0x47ad70)
+  /usr/local/go/src/runtime/panic.go:542 +0x46c fp=0xc42003f7b8 sp=0xc42003f710 pc=0x422f7c
+main.main.func1(0xc420024120)
+  foo.go:6 +0x39 fp=0xc42003f7d8 sp=0xc42003f7b8 pc=0x451339
+runtime.goexit()
+  /usr/local/go/src/runtime/asm_amd64.s:2337 +0x1 fp=0xc42003f7e0 sp=0xc42003f7d8 pc=0x44b4d1
+created by main.main
+  foo.go:5 +0x58
+    */
+
     /* Ingest data samples */
-    p = "[0, {\"k\":\"sample\"}]";
+    p = "[0, {\"log\":\"goroutine 4 [running]:\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"panic(0x45cb40, 0x47ad70)\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"  /usr/local/go/src/runtime/panic.go:542 +0x46c fp=0xc42003f7b8 sp=0xc42003f710 pc=0x422f7c\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"main.main.func1(0xc420024120)"}]";
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);

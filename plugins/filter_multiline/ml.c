@@ -153,6 +153,7 @@ static int flush_callback(struct flb_ml_parser *parser,
 
     if (ctx->debug_flush) {
         flb_ml_flush_stdout(parser, mst, data, buf_data, buf_size);
+        printf("%s", buf_data);
     }
 
     if (ctx->use_buffer == FLB_FALSE) {
