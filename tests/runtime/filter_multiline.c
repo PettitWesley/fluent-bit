@@ -1,6 +1,7 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <fluent-bit.h>
+#include <fluent-bit/flb_sds.h>
 #include "flb_tests_runtime.h"
 
 struct filter_test {
@@ -105,9 +106,13 @@ static void flb_test_multiline_buffered()
     struct flb_lib_out_cb cb_data;
     struct filter_test *ctx;
     struct filter_test_result *expected;
+    flb_sds_t expected_pattern;
 
     expected = flb_calloc(1, sizeof(struct filter_test_result));
     TEST_CHECK(expected != NULL);
+
+    expected_pattern = flb_sds_create("\"main.main.func1(0xc420024120)\"");
+    TEST_CHECK(expected_pattern !+ NULL);
 
     /* Create test context */
     ctx = filter_test_create((void *) &cb_data);
@@ -126,7 +131,7 @@ static void flb_test_multiline_buffered()
 
     /* Prepare output callback with expected result */
     expected->expected_records = 1; /* 1 record with all lines concatenated */
-    expected->expected_pattern = "\"main.main.func1(0xc420024120)\"";
+    expected->expected_pattern = expected_pattern;
     cb_data.cb = cb_check_result;
     cb_data.data = (void *) expected;
 
