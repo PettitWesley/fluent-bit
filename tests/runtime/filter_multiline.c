@@ -240,9 +240,78 @@ static void flb_test_multiline_buffered_one_output_record()
     filter_test_destroy(ctx);
 }
 
+static void flb_test_multiline_unbuffered()
+{
+    int len;
+    int ret;
+    int bytes;
+    char *p;
+    struct flb_lib_out_cb cb_data;
+    struct filter_test *ctx;
+    struct filter_test_result expected = { 0 };
+
+    /* Create test context */
+    ctx = filter_test_create((void *) &cb_data);
+    if (!ctx) {
+        exit(EXIT_FAILURE);
+    }
+
+    /* Configure filter */
+    ret = flb_filter_set(ctx->flb, ctx->f_ffd,
+                         "multiline.key_content", "log",
+                         "multiline.parser", "go",
+                         "buffer", "on",
+                         "debug_flush", "on",
+                         NULL);
+    TEST_CHECK(ret == 0);
+
+    /* Prepare output callback with expected result */
+    expected.expected_records = 6; /* no concatenation */
+    expected.expected_pattern = "panic)";
+    expected.expected_pattern_index = 0;
+    cb_data.cb = cb_check_result;
+    cb_data.data = (void *) &expected;
+
+    /* Start the engine */
+    ret = flb_start(ctx->flb);
+    TEST_CHECK(ret == 0);
+
+    /* Ingest data samples */
+    p = "[0, {\"log\":\"panic: my panic\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"\n\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"goroutine 4 [running]:\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"panic(0x45cb40, 0x47ad70)\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"  /usr/local/go/src/runtime/panic.go:542 +0x46c fp=0xc42003f7b8 sp=0xc42003f710 pc=0x422f7c\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"main.main.func1(0xc420024120)\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+
+    /* check number of outputted records */
+    sleep(2);
+    TEST_CHECK(expected.actual_records == expected.expected_records);
+    filter_test_destroy(ctx);
+}
+
 TEST_LIST = {
     {"multiline_buffered_one_record"            , flb_test_multiline_buffered_one_output_record },
     {"multiline_buffered_two_record"            , flb_test_multiline_buffered_two_output_record },
+    {"flb_test_multiline_unbuffered"            , flb_test_multiline_unbuffered },
 
     {NULL, NULL}
 };
