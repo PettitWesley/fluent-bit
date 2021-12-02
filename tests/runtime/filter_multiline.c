@@ -38,9 +38,8 @@ static int cb_check_result(void *record, size_t size, void *data)
         /*
         * If you want to debug your test
         *
-        * printf("Expect: '%s' in result '%s'", expected, result);
+        * printf("Expect: '%s' in result '%s'\n", expected->expected_pattern, result);
         */
-        printf("Expect: '%s' in result '%s'\n", expected->expected_pattern, result);
     }
 
     expected->actual_records++;
@@ -312,7 +311,6 @@ static void flb_test_multiline_unbuffered()
     /* check number of outputted records */
     sleep(2);
     TEST_CHECK(expected.actual_records == expected.expected_records);
-    printf("expected_records=%d, actual_records=%d", expected.expected_records, expected.actual_records);
     filter_test_destroy(ctx);
 }
 
