@@ -9,17 +9,24 @@ struct filter_test {
     int f_ffd;         /* Filter fd */
 };
 
+struct filter_test_result {
+    char *expected_pattern;  /* string that must occur in output */
+    int expected_records;    /* expected number of outputted records */
+    int actual_records;      /* actual number of outputted records */
+}
+
 /* Callback to check expected results */
 static int cb_check_result(void *record, size_t size, void *data)
 {
     char *p;
-    char *expected;
+    struct filter_test_result *expected;
     char *result;
 
-    expected = (char *) data;
+    expected = (struct filter_test_result *) data;
     result = (char *) record;
 
-    p = strstr(result, expected);
+    expected->actual_records++;
+    p = strstr(result, expected->expected_pattern);
     TEST_CHECK(p != NULL);
 
     if (!p) {
@@ -84,7 +91,6 @@ static struct filter_test *filter_test_create(struct flb_lib_out_cb *data)
 
 static void filter_test_destroy(struct filter_test *ctx)
 {
-    sleep(2);
     flb_stop(ctx->flb);
     flb_destroy(ctx->flb);
     flb_free(ctx);
@@ -98,6 +104,7 @@ static void flb_test_multiline_buffered()
     char *p;
     struct flb_lib_out_cb cb_data;
     struct filter_test *ctx;
+    struct filter_test_result expected = { 0 };
 
     /* Create test context */
     ctx = filter_test_create((void *) &cb_data);
@@ -115,24 +122,14 @@ static void flb_test_multiline_buffered()
     TEST_CHECK(ret == 0);
 
     /* Prepare output callback with expected result */
+    expected.expected_records = 1; /* 1 record with all lines concatenated */
+    expected.expected_pattern = "\"main.main.func1(0xc420024120)\"";
     cb_data.cb = cb_check_result;
-    cb_data.data = "\"test_key\":\"test_value\"";
+    cb_data.data = (void *) &expected;
 
     /* Start the engine */
     ret = flb_start(ctx->flb);
     TEST_CHECK(ret == 0);
-
-    /*
-goroutine 4 [running]:
-panic(0x45cb40, 0x47ad70)
-  /usr/local/go/src/runtime/panic.go:542 +0x46c fp=0xc42003f7b8 sp=0xc42003f710 pc=0x422f7c
-main.main.func1(0xc420024120)
-  foo.go:6 +0x39 fp=0xc42003f7d8 sp=0xc42003f7b8 pc=0x451339
-runtime.goexit()
-  /usr/local/go/src/runtime/asm_amd64.s:2337 +0x1 fp=0xc42003f7e0 sp=0xc42003f7d8 pc=0x44b4d1
-created by main.main
-  foo.go:5 +0x58
-    */
 
     /* Ingest data samples */
     p = "[0, {\"log\":\"panic: my panic\"}]";
@@ -159,6 +156,10 @@ created by main.main
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
     TEST_CHECK(bytes == len);
+
+    /* check number of outputted records */
+    sleep(2);
+    TEST_CHECK(expected.actual_records == expected.expected_records);
 
     filter_test_destroy(ctx);
 }
