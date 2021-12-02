@@ -13,7 +13,7 @@ struct filter_test_result {
     char *expected_pattern;  /* string that must occur in output */
     int expected_records;    /* expected number of outputted records */
     int actual_records;      /* actual number of outputted records */
-}
+};
 
 /* Callback to check expected results */
 static int cb_check_result(void *record, size_t size, void *data)
@@ -38,7 +38,7 @@ static int cb_check_result(void *record, size_t size, void *data)
      *
      * printf("Expect: '%s' in result '%s'", expected, result);
      */
-    printf("Expect: '%s' in result '%s'", expected, result);
+    printf("Expect: '%s' in result '%s'", expected->expected_pattern, result);
 
     flb_free(record);
     return 0;
