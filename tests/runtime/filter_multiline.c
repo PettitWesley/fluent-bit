@@ -11,9 +11,10 @@ struct filter_test {
 };
 
 struct filter_test_result {
-    char *expected_pattern;  /* string that must occur in output */
-    int expected_records;    /* expected number of outputted records */
-    int actual_records;      /* actual number of outputted records */
+    char *expected_pattern;     /* string that must occur in output */
+    int expected_pattern_index; /* which record to check for the pattern */
+    int expected_records;       /* expected number of outputted records */
+    int actual_records;         /* actual number of outputted records */
 };
 
 /* Callback to check expected results */
@@ -26,20 +27,23 @@ static int cb_check_result(void *record, size_t size, void *data)
     expected = (struct filter_test_result *) data;
     result = (char *) record;
 
-    expected->actual_records++;
-    p = strstr(result, expected->expected_pattern);
-    TEST_CHECK(p != NULL);
+    if (expected->expected_pattern_index == expected->actual_records) {
+        p = strstr(result, expected->expected_pattern);
+        TEST_CHECK(p != NULL);
 
-    if (!p) {
-        flb_error("Expected to find: '%s' in result '%s'",
-                  expected->expected_pattern, result);
+        if (!p) {
+            flb_error("Expected to find: '%s' in result '%s'",
+                    expected->expected_pattern, result);
+        }
+        /*
+        * If you want to debug your test
+        *
+        * printf("Expect: '%s' in result '%s'", expected, result);
+        */
+        printf("Expect: '%s' in result '%s'\n", expected->expected_pattern, result);
     }
-    /*
-     * If you want to debug your test
-     *
-     * printf("Expect: '%s' in result '%s'", expected, result);
-     */
-    printf("Expect: '%s' in result '%s'\n", expected->expected_pattern, result);
+
+    expected->actual_records++;
 
     flb_free(record);
     return 0;
@@ -97,7 +101,7 @@ static void filter_test_destroy(struct filter_test *ctx)
     flb_free(ctx);
 }
 
-static void flb_test_multiline_buffered()
+static void flb_test_multiline_buffered_one_output_record()
 {
     int len;
     int ret;
@@ -125,6 +129,7 @@ static void flb_test_multiline_buffered()
     /* Prepare output callback with expected result */
     expected.expected_records = 1; /* 1 record with all lines concatenated */
     expected.expected_pattern = "main.main.func1(0xc420024120)";
+    expected.expected_pattern_index = 0;
     cb_data.cb = cb_check_result;
     cb_data.data = (void *) &expected;
 
@@ -164,7 +169,78 @@ static void flb_test_multiline_buffered()
     filter_test_destroy(ctx);
 }
 
+static void flb_test_multiline_buffered_one_output_record()
+{
+    int len;
+    int ret;
+    int bytes;
+    char *p;
+    struct flb_lib_out_cb cb_data;
+    struct filter_test *ctx;
+    struct filter_test_result expected = { 0 };
+
+    /* Create test context */
+    ctx = filter_test_create((void *) &cb_data);
+    if (!ctx) {
+        exit(EXIT_FAILURE);
+    }
+
+    /* Configure filter */
+    ret = flb_filter_set(ctx->flb, ctx->f_ffd,
+                         "multiline.key_content", "log",
+                         "multiline.parser", "go",
+                         "buffer", "on",
+                         "debug_flush", "on",
+                         NULL);
+    TEST_CHECK(ret == 0);
+
+    /* Prepare output callback with expected result */
+    expected.expected_records = 2; /* 1 record with all lines concatenated */
+    expected.expected_pattern = "main.main.func1(0xc420024120)";
+    cb_data.cb = cb_check_result;
+    cb_data.data = (void *) &expected;
+
+    /* Start the engine */
+    ret = flb_start(ctx->flb);
+    TEST_CHECK(ret == 0);
+
+    /* Ingest data samples */
+    p = "[0, {\"log\":\"panic: my panic\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"\n\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"goroutine 4 [running]:\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"panic(0x45cb40, 0x47ad70)\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"  /usr/local/go/src/runtime/panic.go:542 +0x46c fp=0xc42003f7b8 sp=0xc42003f710 pc=0x422f7c\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"main.main.func1(0xc420024120)\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+    p = "[0, {\"log\":\"one more line, no multiline\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+
+    /* check number of outputted records */
+    sleep(2);
+    TEST_CHECK(expected.actual_records == expected.expected_records);
+    filter_test_destroy(ctx);
+}
+
 TEST_LIST = {
-    {"multiline_buffered"            , flb_test_multiline_buffered },
+    {"multiline_buffered_one_record"            , flb_test_multiline_buffered_one_output_record },
     {NULL, NULL}
 };
