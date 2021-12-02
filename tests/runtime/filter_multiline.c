@@ -162,9 +162,9 @@ static void flb_test_multiline_buffered()
 
     /* check number of outputted records */
     sleep(2);
-    TEST_CHECK(expected.actual_records == expected.expected_records);
-
+    TEST_CHECK(expected->actual_records == expected->expected_records);
     filter_test_destroy(ctx);
+    flb_free(expected);
 }
 
 TEST_LIST = {
