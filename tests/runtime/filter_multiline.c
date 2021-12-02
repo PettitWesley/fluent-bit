@@ -162,7 +162,6 @@ static void flb_test_multiline_buffered()
     sleep(2);
     TEST_CHECK(expected.actual_records == expected.expected_records);
     filter_test_destroy(ctx);
-    flb_free(expected);
 }
 
 TEST_LIST = {
