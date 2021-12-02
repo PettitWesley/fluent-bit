@@ -126,7 +126,7 @@ static void flb_test_multiline_buffered()
     expected.expected_records = 1; /* 1 record with all lines concatenated */
     expected.expected_pattern = "main.main.func1(0xc420024120)";
     cb_data.cb = cb_check_result;
-    cb_data.data = (void *) expected;
+    cb_data.data = (void *) &expected;
 
     /* Start the engine */
     ret = flb_start(ctx->flb);
