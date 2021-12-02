@@ -40,6 +40,7 @@ static int cb_check_result(void *record, size_t size, void *data)
      * printf("Expect: '%s' in result '%s'", expected, result);
      */
     printf("Expect: '%s' in result '%s'", expected->expected_pattern, result);
+    printf("num_expected=%d, num_actual=%d", expected->expected_records, expected->actual_records);
 
     flb_free(record);
     return 0;
@@ -112,7 +113,7 @@ static void flb_test_multiline_buffered()
     TEST_CHECK(expected != NULL);
 
     expected_pattern = flb_sds_create("\"main.main.func1(0xc420024120)\"");
-    TEST_CHECK(expected_pattern !+ NULL);
+    TEST_CHECK(expected_pattern != NULL);
 
     /* Create test context */
     ctx = filter_test_create((void *) &cb_data);
