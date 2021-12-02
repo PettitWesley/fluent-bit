@@ -135,6 +135,10 @@ created by main.main
     */
 
     /* Ingest data samples */
+    p = "[0, {\"log\":\"panic: my panic\n\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
     p = "[0, {\"log\":\"goroutine 4 [running]:\"}]";
     len = strlen(p);
     bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
