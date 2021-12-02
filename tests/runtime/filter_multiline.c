@@ -260,7 +260,7 @@ static void flb_test_multiline_unbuffered()
     ret = flb_filter_set(ctx->flb, ctx->f_ffd,
                          "multiline.key_content", "log",
                          "multiline.parser", "go",
-                         "buffer", "on",
+                         "buffer", "off",
                          "debug_flush", "on",
                          NULL);
     TEST_CHECK(ret == 0);
