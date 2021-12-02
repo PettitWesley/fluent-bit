@@ -101,7 +101,7 @@ static void filter_test_destroy(struct filter_test *ctx)
     flb_free(ctx);
 }
 
-static void flb_test_multiline_buffered_one_output_record()
+static void flb_test_multiline_buffered_two_output_record()
 {
     int len;
     int ret;
@@ -242,5 +242,7 @@ static void flb_test_multiline_buffered_one_output_record()
 
 TEST_LIST = {
     {"multiline_buffered_one_record"            , flb_test_multiline_buffered_one_output_record },
+    {"multiline_buffered_two_record"            , flb_test_multiline_buffered_two_output_record },
+
     {NULL, NULL}
 };
