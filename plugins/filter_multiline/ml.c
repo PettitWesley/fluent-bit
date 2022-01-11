@@ -169,6 +169,7 @@ static int flush_callback(struct flb_ml_parser *parser,
         }
 
         /* Emit record with original tag */
+        flb_plg_debug(ctx->ins, "emitting from %s to %s", stream->input_name, stream->tag);
         ret = in_emitter_add_record(stream->tag, flb_sds_len(stream->tag), buf_data, buf_size,
                                     ctx->ins_emitter);
 
@@ -360,7 +361,6 @@ static struct ml_stream *get_by_id(struct ml_ctx *ctx, uint64_t stream_id)
     mk_list_foreach_safe(head, tmp, &ctx->ml_streams) {
         stream = mk_list_entry(head, struct ml_stream, _head);
         if (stream->stream_id == stream_id) {
-            flb_debug("emitting to %s_%s", stream->input_name, stream->tag);
             return stream;
         }
     }
