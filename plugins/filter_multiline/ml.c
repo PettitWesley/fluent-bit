@@ -169,7 +169,7 @@ static int flush_callback(struct flb_ml_parser *parser,
         }
 
         /* Emit record with original tag */
-        flb_plg_debug(ctx->ins, "emitting from %s to %s", stream->input_name, stream->tag);
+        flb_plg_trace(ctx->ins, "emitting from %s to %s", stream->input_name, stream->tag);
         ret = in_emitter_add_record(stream->tag, flb_sds_len(stream->tag), buf_data, buf_size,
                                     ctx->ins_emitter);
 
@@ -207,7 +207,6 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     if (tmp) {
         ctx->use_buffer = flb_utils_bool(tmp);
     }
-    flb_info("after: %d", ctx->use_buffer);
     if (ctx->use_buffer == FLB_FALSE) {
             /* Init buffers */
             msgpack_sbuffer_init(&ctx->mp_sbuf);
