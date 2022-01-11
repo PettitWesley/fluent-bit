@@ -201,11 +201,14 @@ static int cb_ml_init(struct flb_filter_instance *ins,
      * Config map is not yet set at this point in the code
      * user must explicitly set buffer to false to turn it off 
      */
+    flb_info("before: %d", ctx->use_buffer);
     tmp = (char *) flb_filter_get_property("buffer", ins);
     if (tmp) {
         ctx->use_buffer = flb_utils_bool(tmp);
     }
+    flb_info("after: %d", ctx->use_buffer);
     if (ctx->use_buffer == FLB_FALSE) {
+            flb_info("unbufferd");
             /* Init buffers */
             msgpack_sbuffer_init(&ctx->mp_sbuf);
             msgpack_packer_init(&ctx->mp_pck, &ctx->mp_sbuf, msgpack_sbuffer_write);
@@ -221,6 +224,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
         * config map. If is not set, do a manual set of the property, so we let the
         * config map handle the memory allocation.
         */
+        flb_info("creating emitter name");
         tmp = (char *) flb_filter_get_property("emitter_name", ins);
         if (!tmp) {
             emitter_name = flb_sds_create_size(64);
