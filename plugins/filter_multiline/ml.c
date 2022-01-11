@@ -204,6 +204,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     flb_info("before: %d", ctx->use_buffer);
     tmp = (char *) flb_filter_get_property("buffer", ins);
     if (tmp) {
+        flb_info("tmp: %s", tmp);
         ctx->use_buffer = flb_utils_bool(tmp);
     }
     flb_info("after: %d", ctx->use_buffer);
