@@ -245,7 +245,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
             }
 
             flb_filter_set_property(ins, "emitter_name", emitter_name);
-            flb_plg_info(ins, "created emitter: %s", ins);
+            flb_plg_info(ins, "created emitter: %s", emitter_name);
             flb_sds_destroy(emitter_name);
         }
     }
