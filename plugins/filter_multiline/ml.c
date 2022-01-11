@@ -388,7 +388,7 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
         name_check = strcmp(stream->input_name, i_ins->name);
         tag_check = strcmp(stream->tag, tag);
         if (tag_check == 0 && name_check == 0) {
-            flb_debug("debug: using stream %s_%s", stream->input_name, stream->tag);
+            flb_plg_trace(ctx->ins, "using stream %s_%s", stream->input_name, stream->tag);
             return stream;
         }
     }
@@ -521,7 +521,7 @@ static int cb_ml_filter(const void *data, size_t bytes,
     
     } else { /* buffered mode */
         if (i_ins == ctx->ins_emitter) {
-            flb_plg_debug(ctx->ins, "not processing record from the emitter");
+            flb_plg_trace(ctx->ins, "not processing record from the emitter");
             return FLB_FILTER_NOTOUCH;
         }
         
