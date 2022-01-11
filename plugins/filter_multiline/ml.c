@@ -201,6 +201,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
      * Config map is not yet set at this point in the code
      * user must explicitly set buffer to false to turn it off 
      */
+    ctx->use_buffer = FLB_TRUE;
     flb_info("before: %d", ctx->use_buffer);
     tmp = (char *) flb_filter_get_property("buffer", ins);
     if (tmp) {
