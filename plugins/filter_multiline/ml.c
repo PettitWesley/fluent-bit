@@ -202,7 +202,10 @@ static int cb_ml_init(struct flb_filter_instance *ins,
      * user must explicitly set buffer to false to turn it off 
      */
     tmp = (char *) flb_filter_get_property("buffer", ins);
-    if (tmp && (strcasecmp(tmp, "Off") == 0 || strcasecmp(tmp, "false") == 0)) {
+    if (tmp) {
+        ctx->use_buffer = flb_utils_bool(tmp);
+    }
+    if (ctx->use_buffer == FLB_FALSE) {
             /* Init buffers */
             msgpack_sbuffer_init(&ctx->mp_sbuf);
             msgpack_packer_init(&ctx->mp_pck, &ctx->mp_sbuf, msgpack_sbuffer_write);
@@ -229,13 +232,14 @@ static int cb_ml_init(struct flb_filter_instance *ins,
             tmp = flb_sds_printf(&emitter_name, "emitter_for_%s",
                                 flb_filter_name(ins));
             if (!tmp) {
-                flb_error("[filter multiline] cannot compose emitter_name");
+                flb_plg_error(ins, "cannot compose emitter_name");
                 flb_sds_destroy(emitter_name);
                 flb_free(ctx);
                 return -1;
             }
 
             flb_filter_set_property(ins, "emitter_name", emitter_name);
+            flb_plg_info(ins, "created emitter: %s", ins);
             flb_sds_destroy(emitter_name);
         }
     }
@@ -270,6 +274,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
         /* Create the emitter context */
         ret = emitter_create(ctx);
         if (ret == -1) {
+            flb_free(ctx);
             return -1;
         }
 
