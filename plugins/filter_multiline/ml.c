@@ -151,6 +151,7 @@ static int flush_callback(struct flb_ml_parser *parser,
     struct ml_ctx *ctx = data;
     struct ml_stream *stream;
 
+
     if (ctx->debug_flush) {
         flb_ml_flush_stdout(parser, mst, data, buf_data, buf_size);
     }
@@ -167,6 +168,8 @@ static int flush_callback(struct flb_ml_parser *parser,
                         mst->name);
             return -1;
         }
+
+        flb_plg_info(ctx->ins, "flush_callback(): %s", (stream->tag);
 
         /* Emit record with original tag */
         flb_plg_trace(ctx->ins, "emitting from %s to %s", stream->input_name, stream->tag);
@@ -557,6 +560,8 @@ static int cb_ml_exit(void *data, struct flb_config *config)
     struct mk_list *tmp;
     struct mk_list *head;
     struct ml_stream *stream;
+
+    flb_plg_info(ctx->ins, "cb_ml_exit()");
 
     if (!ctx) {
         return 0;
