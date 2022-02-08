@@ -169,7 +169,7 @@ static int flush_callback(struct flb_ml_parser *parser,
             return -1;
         }
 
-        flb_plg_info(ctx->ins, "flush_callback(): %s", (stream->tag);
+        flb_plg_info(ctx->ins, "flush_callback(): %s", stream->tag);
 
         /* Emit record with original tag */
         flb_plg_trace(ctx->ins, "emitting from %s to %s", stream->input_name, stream->tag);
