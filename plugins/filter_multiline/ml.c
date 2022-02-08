@@ -562,6 +562,8 @@ static int cb_ml_exit(void *data, struct flb_config *config)
     struct ml_stream *stream;
 
     flb_plg_info(ctx->ins, "cb_ml_exit()");
+    /* last ditch effort to flush all pending data */
+    flb_ml_flush_pending_now(ctx->m);
 
     if (!ctx) {
         return 0;
