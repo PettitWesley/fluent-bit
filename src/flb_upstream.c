@@ -29,6 +29,11 @@
 #include <fluent-bit/tls/flb_tls.h>
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_thread_storage.h>
+#include <fluent-bit/flb_stacktrace.h>
+
+#ifdef FLB_HAVE_LIBBACKTRACE
+struct flb_stacktrace flb_st;
+#endif
 
 FLB_TLS_DEFINE(struct mk_list, flb_upstream_list_key);
 
@@ -758,6 +763,10 @@ int flb_upstream_conn_release(struct flb_upstream_conn *conn)
          * the remote endpoint we need to add it again.
          */
         conn->event.handler = cb_upstream_conn_ka_dropped;
+
+        /* To preserve stacktrace */
+        flb_stacktrace_print(&flb_st);
+        flb_warn("flb_upstream.c:769: event=%p", event);
 
         ret = mk_event_add(conn->evl, conn->fd,
                            FLB_ENGINE_EV_CUSTOM,

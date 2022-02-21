@@ -23,10 +23,17 @@
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_engine.h>
 #include <fluent-bit/flb_network.h>
+#include <fluent-bit/flb_stacktrace.h>
+
 
 #include "fw.h"
 #include "fw_prot.h"
 #include "fw_conn.h"
+
+#ifdef FLB_HAVE_LIBBACKTRACE
+struct flb_stacktrace flb_st;
+#endif
+
 
 /* Callback invoked every time an event is triggered for a connection */
 int fw_conn_event(void *data)
@@ -114,6 +121,11 @@ struct fw_conn *fw_conn_add(int fd, struct flb_in_fw_config *ctx)
     event->fd           = fd;
     event->type         = FLB_ENGINE_EV_CUSTOM;
     event->handler      = fw_conn_event;
+
+    /* To preserve stacktrace */
+    flb_stacktrace_print(&flb_st);
+
+    flb_warn("fw_conn.c:128: event=%p", event);
 
     /* Connection info */
     conn->fd      = fd;

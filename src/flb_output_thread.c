@@ -25,6 +25,11 @@
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_output_thread.h>
 #include <fluent-bit/flb_thread_pool.h>
+#include <fluent-bit/flb_stacktrace.h>
+
+#ifdef FLB_HAVE_LIBBACKTRACE
+struct flb_stacktrace flb_st;
+#endif
 
 static pthread_once_t local_thread_instance_init = PTHREAD_ONCE_INIT;
 FLB_TLS_DEFINE(struct flb_out_thread_instance, local_thread_instance);
@@ -297,6 +302,12 @@ static void output_thread(void *data)
                 flb_coro_resume(out_coro->coro);
             }
             else if (event->type == FLB_ENGINE_EV_CUSTOM) {
+                flb_warn("flb_output_thread.c:305: event=%p", event);
+#ifdef FLB_HAVE_LIBBACKTRACE
+                /* To preserve stacktrace */
+                 flb_stacktrace_print(&flb_st);
+#endif
+                flb_warn("flb_output_thread.c:305: event->handler=%p", event->handler);
                 event->handler(event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD) {

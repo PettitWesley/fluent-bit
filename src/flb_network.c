@@ -49,6 +49,11 @@
 
 #include <monkey/mk_core.h>
 #include <ares.h>
+#include <fluent-bit/flb_stacktrace.h>
+
+#ifdef FLB_HAVE_LIBBACKTRACE
+struct flb_stacktrace flb_st;
+#endif
 
 #ifndef SOL_TCP
 #define SOL_TCP IPPROTO_TCP
@@ -824,6 +829,11 @@ static ares_socket_t flb_dns_ares_socket(int af, int type, int protocol, void *u
     if (SOCK_STREAM == type) {
         event_mask |= MK_EVENT_WRITE;
     }
+
+    /* To preserve stacktrace */
+    flb_stacktrace_print(&flb_st);
+
+    flb_warn("flb_network.c:836: event=%p, sockfd=%p, event_mask=%d", &lookup_context->response_event, sockfd, event_mask);
 
     result = mk_event_add(lookup_context->event_loop, sockfd, FLB_ENGINE_EV_CUSTOM,
                           event_mask, &lookup_context->response_event);
