@@ -766,7 +766,7 @@ int flb_upstream_conn_release(struct flb_upstream_conn *conn)
 
         /* To preserve stacktrace */
         flb_stacktrace_print(&flb_st);
-        flb_warn("flb_upstream.c:769: event=%p", event);
+        flb_warn("flb_upstream.c:769: event=%p", &conn->event);
 
         ret = mk_event_add(conn->evl, conn->fd,
                            FLB_ENGINE_EV_CUSTOM,
