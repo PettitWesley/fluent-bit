@@ -831,7 +831,7 @@ static ares_socket_t flb_dns_ares_socket(int af, int type, int protocol, void *u
     }
 
     /* To preserve stacktrace */
-    flb_stacktrace_print(&flb_st);
+   // flb_stacktrace_print(&flb_st);
 
     flb_warn("flb_network.c:836: event=%p, sockfd=%p, event_mask=%d", &lookup_context->response_event, sockfd, event_mask);
 

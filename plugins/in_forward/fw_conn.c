@@ -123,7 +123,7 @@ struct fw_conn *fw_conn_add(int fd, struct flb_in_fw_config *ctx)
     event->handler      = fw_conn_event;
 
     /* To preserve stacktrace */
-    flb_stacktrace_print(&flb_st);
+    //flb_stacktrace_print(&flb_st);
 
     flb_warn("fw_conn.c:128: event=%p", event);
 

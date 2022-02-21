@@ -305,7 +305,7 @@ static void output_thread(void *data)
                 flb_warn("flb_output_thread.c:305: event=%p", event);
 #ifdef FLB_HAVE_LIBBACKTRACE
                 /* To preserve stacktrace */
-                 flb_stacktrace_print(&flb_st);
+                 //flb_stacktrace_print(&flb_st);
 #endif
                 flb_warn("flb_output_thread.c:305: event->handler=%p", event->handler);
                 event->handler(event);
