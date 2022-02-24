@@ -398,6 +398,8 @@ static void cb_cloudwatch_flush(const void *data, size_t bytes,
         }
     }
 
+    flb_info("%s", stream->name);
+
     stream = get_log_stream(ctx, tag, tag_len);
     if (!stream) {
         FLB_OUTPUT_RETURN(FLB_RETRY);
