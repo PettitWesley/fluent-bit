@@ -72,7 +72,9 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
 
     ctx->ins = ins;
 
-    //ctx->last_error = "ashaslkdjalskdjalksdjalksdjalksjdalksdjalksjdalksdjlaksjdalksdjasdkasjdlakjsdlkajsdklasjdlkasjd";
+    memcpy(ctx->last_error, "INIT", 4);
+    ctx->last_error[4] = '\0';
+
 
     /* Populate context with config map defaults and incoming properties */
     ret = flb_output_config_map_set(ins, (void *) ctx);
