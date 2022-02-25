@@ -1403,7 +1403,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
             if (error != NULL) {
                 flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=%s", cw_client->was_retried, ctx->last_error, error);
                 memcpy(ctx->last_error, error, flb_sds_len(error));
-                int error_len = flb_sds_len(error)
+                int error_len = flb_sds_len(error);
                 ctx->last_error[error_len] = '\0';
                 if (strcmp(error, ERR_CODE_INVALID_SEQUENCE_TOKEN) == 0) {
                     /*
