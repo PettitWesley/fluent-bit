@@ -1365,7 +1365,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                     stream->sequence_token = tmp;
 
                     flb_http_client_destroy(c);
-                    flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=SUCCESS", cw_client->was_retried, ctx->last_error);
+                    flb_info("CUSTOM: was_retried=%i last_status=%s, new_status=SUCCESS", cw_client->was_retried, ctx->last_error);
                     memcpy(ctx->last_error, "SUCCESS", 7);
                     ctx->last_error[7] = '\0';
                     return 0;
@@ -1385,12 +1385,12 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                                   "response: response body is empty: full data: `%.*s`", c->resp.data_len, c->resp.data);
                 }
                 flb_http_client_destroy(c);
-                flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=ErrSequenceTokenNotFound", cw_client->was_retried, ctx->last_error);
+                flb_info("CUSTOM: was_retried=%i last_status=%s, new_status=ErrSequenceTokenNotFound", cw_client->was_retried, ctx->last_error);
                 memcpy(ctx->last_error, "ErrSequenceTokenNotFound", 24);
                 ctx->last_error[24] = '\0';
                 return -1;
             }
-            flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=SuccessSequenceTokenNotFound", cw_client->was_retried, ctx->last_error);
+            flb_info("CUSTOM: was_retried=%i last_status=%s, new_status=SuccessSequenceTokenNotFound", cw_client->was_retried, ctx->last_error);
             memcpy(ctx->last_error, "SuccessSequenceTokenNotFound", 28);
             ctx->last_error[28] = '\0';
             flb_http_client_destroy(c);
@@ -1401,7 +1401,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         if (c->resp.payload_size > 0) {
             error = flb_aws_error(c->resp.payload, c->resp.payload_size);
             if (error != NULL) {
-                flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=%s", cw_client->was_retried, ctx->last_error, error);
+                flb_info("CUSTOM: was_retried=%i last_status=%s, new_status=%s", cw_client->was_retried, ctx->last_error, error);
                 memcpy(ctx->last_error, error, flb_sds_len(error));
                 int error_len = flb_sds_len(error);
                 ctx->last_error[error_len] = '\0';
@@ -1449,7 +1449,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     if (c) {
         flb_http_client_destroy(c);
     }
-    flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=UnknownFailure", cw_client->was_retried, ctx->last_error);
+    flb_info("CUSTOM: was_retried=%i last_status=%s, new_status=UnknownFailure", cw_client->was_retried, ctx->last_error);
     memcpy(ctx->last_error, "UnknownFailure", 14);
     ctx->last_error[14] = '\0';
     return -1;
