@@ -63,6 +63,8 @@ struct flb_aws_client_vtable {
 struct flb_aws_client {
     struct flb_aws_client_vtable *client_vtable;
 
+    int was_retried;
+
     /* Name to identify this client: used in log messages and tests */
     char *name;
 

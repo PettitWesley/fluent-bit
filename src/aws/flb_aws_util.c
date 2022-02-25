@@ -163,6 +163,7 @@ struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client
     // Auto retry if request fails
     if (c == NULL && aws_client->retry_requests) {
         flb_debug("[aws_client] auto-retrying");
+        aws_client->was_retried = FLB_TRUE;
         c = request_do(aws_client, method, uri, body, body_len,
                        dynamic_headers, dynamic_headers_len);
     }

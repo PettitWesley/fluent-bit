@@ -51,6 +51,7 @@
 
 #define ERR_CODE_ALREADY_EXISTS         "ResourceAlreadyExistsException"
 #define ERR_CODE_INVALID_SEQUENCE_TOKEN "InvalidSequenceTokenException"
+#define ERR_CODE_DATA_ALREADY_ACCEPTED  "DataAlreadyAcceptedException"
 
 #define AMZN_REQUEST_ID_HEADER          "x-amzn-RequestId"
 
@@ -1313,17 +1314,18 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     flb_sds_t tmp;
     flb_sds_t error;
     int num_headers = 1;
+    ;
 
-    buf->put_events_calls++;
+    // buf->put_events_calls++;
 
-    if (buf->put_events_calls >= 4) {
-        /*
-         * In normal execution, even under high throughput, 4+ calls per flush
-         * should be extremely rare. This is needed for edge cases basically.
-         */
-        flb_plg_debug(ctx->ins, "Too many calls this flush, sleeping for 250 ms");
-        usleep(250000);
-    }
+    // if (buf->put_events_calls >= 4) {
+    //     /*
+    //      * In normal execution, even under high throughput, 4+ calls per flush
+    //      * should be extremely rare. This is needed for edge cases basically.
+    //      */
+    //     flb_plg_debug(ctx->ins, "Too many calls this flush, sleeping for 250 ms");
+    //     usleep(250000);
+    // }
 
     flb_plg_debug(ctx->ins, "Sending log events to log stream %s", stream->name);
 
@@ -1341,6 +1343,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     }
     else {
         cw_client = ctx->cw_client;
+        cw_client->was_retried = FLB_FALSE;
         c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
                                               "/", buf->out_buf, payload_size,
                                               put_log_events_header, num_headers);
@@ -1362,6 +1365,9 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                     stream->sequence_token = tmp;
 
                     flb_http_client_destroy(c);
+                    flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=SUCCESS", cw_client->was_retried, ctx->last_error);
+                    memcpy(ctx->last_error, "SUCCESS", 7);
+                    memcpy(ctx->last_error + 7, '\0', 1);
                     return 0;
                 }
                 else {
@@ -1379,9 +1385,14 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                                   "response: response body is empty: full data: `%.*s`", c->resp.data_len, c->resp.data);
                 }
                 flb_http_client_destroy(c);
+                flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=ErrSequenceTokenNotFound", cw_client->was_retried, ctx->last_error);
+                memcpy(ctx->last_error, "ErrSequenceTokenNotFound", 24);
+                memcpy(ctx->last_error + 24, '\0', 1);
                 return -1;
             }
-            
+            flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=SuccessSequenceTokenNotFound", cw_client->was_retried, ctx->last_error);
+            memcpy(ctx->last_error, "SuccessSequenceTokenNotFound", 28);
+            memcpy(ctx->last_error + 28, '\0', 1);
             flb_http_client_destroy(c);
             return 0;
         }
@@ -1390,6 +1401,10 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
         if (c->resp.payload_size > 0) {
             error = flb_aws_error(c->resp.payload, c->resp.payload_size);
             if (error != NULL) {
+                flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=%s", cw_client->was_retried, ctx->last_error, error);
+                memcpy(ctx->last_error, error, flb_sds_len(error));
+                memcpy(ctx->last_error + flb_sds_len(error), '\0', 1);
+
                 if (strcmp(error, ERR_CODE_INVALID_SEQUENCE_TOKEN) == 0) {
                     /*
                      * This case will happen when we do not know the correct
@@ -1410,6 +1425,13 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                         /* tell the caller to retry */
                         return 1;
                     }
+                } else if (strcmp(error, ERR_CODE_DATA_ALREADY_ACCEPTED) == 0) {
+                    /* not sure what causes this but it counts as success */
+                    flb_plg_info(ctx->ins, "Got %s, a previous retry must have succeeded asychronously", ERR_CODE_DATA_ALREADY_ACCEPTED);
+                    flb_sds_destroy(error);
+                    flb_http_client_destroy(c);
+                    /* success */
+                    return 0;
                 }
                 /* some other error occurred; notify user */
                 flb_aws_print_error(c->resp.payload, c->resp.payload_size,
@@ -1427,6 +1449,9 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     if (c) {
         flb_http_client_destroy(c);
     }
+    flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=UnknownFailure", cw_client->was_retried, ctx->last_error);
+    memcpy(ctx->last_error, "UnknownFailure", 14);
+    memcpy(ctx->last_error + 14, '\0', 1);
     return -1;
 }
 
