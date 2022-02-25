@@ -45,6 +45,8 @@ static int in_tcp_collect(struct flb_input_instance *in,
         return -1;
     }
 
+    flb_plg_info(ctx->ins, "CUSTOM: new connection/client, fd=%i", fd);
+
     flb_plg_trace(ctx->ins, "new TCP connection arrived FD=%i", fd);
     conn = tcp_conn_add(fd, ctx);
     if (!conn) {
