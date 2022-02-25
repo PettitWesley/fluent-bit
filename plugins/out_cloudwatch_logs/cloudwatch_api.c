@@ -1367,7 +1367,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                     flb_http_client_destroy(c);
                     flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=SUCCESS", cw_client->was_retried, ctx->last_error);
                     memcpy(ctx->last_error, "SUCCESS", 7);
-                    memcpy(ctx->last_error + 7, '\0', 1);
+                    ctx->last_error[7] = \0';
                     return 0;
                 }
                 else {
@@ -1387,12 +1387,12 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
                 flb_http_client_destroy(c);
                 flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=ErrSequenceTokenNotFound", cw_client->was_retried, ctx->last_error);
                 memcpy(ctx->last_error, "ErrSequenceTokenNotFound", 24);
-                memcpy(ctx->last_error + 24, '\0', 1);
+                ctx->last_error[24] = \0';
                 return -1;
             }
             flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=SuccessSequenceTokenNotFound", cw_client->was_retried, ctx->last_error);
             memcpy(ctx->last_error, "SuccessSequenceTokenNotFound", 28);
-            memcpy(ctx->last_error + 28, '\0', 1);
+            ctx->last_error[28] = \0';
             flb_http_client_destroy(c);
             return 0;
         }
@@ -1403,8 +1403,8 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
             if (error != NULL) {
                 flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=%s", cw_client->was_retried, ctx->last_error, error);
                 memcpy(ctx->last_error, error, flb_sds_len(error));
-                memcpy(ctx->last_error + flb_sds_len(error), '\0', 1);
-
+                int error_len = flb_sds_len(error)
+                ctx->last_error[error_len] = \0';
                 if (strcmp(error, ERR_CODE_INVALID_SEQUENCE_TOKEN) == 0) {
                     /*
                      * This case will happen when we do not know the correct
@@ -1451,7 +1451,7 @@ int put_log_events(struct flb_cloudwatch *ctx, struct cw_flush *buf,
     }
     flb_info("CUSTOM: was_retried=%s last_status=%s, new_status=UnknownFailure", cw_client->was_retried, ctx->last_error);
     memcpy(ctx->last_error, "UnknownFailure", 14);
-    memcpy(ctx->last_error + 14, '\0', 1);
+    ctx->last_error[14] = '\0';
     return -1;
 }
 
