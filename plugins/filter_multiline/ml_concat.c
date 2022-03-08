@@ -97,7 +97,6 @@ int is_partial(msgpack_object *map)
 int is_partial_last(msgpack_object *map)
 {
     char *val_str = NULL;
-    size_t val_str_size = 0;
     msgpack_object_kv *kv;
     msgpack_object  val;
     
@@ -126,7 +125,6 @@ int is_partial_last(msgpack_object *map)
 char *get_partial_id(msgpack_object *map)
 {
     char *val_str = NULL;
-    size_t val_str_size = 0;
     msgpack_object_kv *kv;
     msgpack_object  val;
     
