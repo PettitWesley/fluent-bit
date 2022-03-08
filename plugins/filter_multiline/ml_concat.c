@@ -61,7 +61,6 @@ msgpack_object_kv *get_key(msgpack_object *map, char *check_for_key)
             if (strncmp(check_for_key, key_str, key_str_size) == 0) {
                 return (kv+i);
             }
-            return NULL;
         }
     }
     return NULL;
