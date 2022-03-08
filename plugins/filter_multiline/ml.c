@@ -310,6 +310,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     }
 
     mk_list_init(&ctx->ml_streams);
+    mk_list_init(&ctx->split_message_packers);
 
     if (ctx->use_buffer == FLB_TRUE) {
 
@@ -451,6 +452,63 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
     return stream;
 }
 
+static int ml_filter_partial(const void *data, size_t bytes,
+                             const char *tag, int tag_len,
+                             void **out_buf, size_t *out_bytes,
+                             struct flb_filter_instance *f_ins,
+                             struct flb_input_instance *i_ins,
+                             void *filter_context,
+                             struct flb_config *config)
+{
+    int ret;
+    int ok = MSGPACK_UNPACK_SUCCESS;
+    size_t off = 0;
+    (void) f_ins;
+    (void) config;
+    msgpack_unpacked result;
+    msgpack_object *obj;
+    char *tmp_buf;
+    size_t tmp_size;
+    struct ml_ctx *ctx = filter_context;
+    struct flb_time tm;
+    msgpack_sbuffer tmp_sbuf;
+    msgpack_packer tmp_pck;
+    int partial_records = 0;
+    int total_records = 0;
+    int is_partial = FLB_FALSE;
+
+    /* 
+     * Create temporary msgpack buffer
+     * for non-partial messages which are passed on as-is
+     */
+    msgpack_sbuffer_init(&tmp_sbuf);
+    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
+
+    msgpack_unpacked_init(&result);
+    while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
+        total_records++;
+        flb_time_pop_from_msgpack(&tm, &result, &obj);
+        
+        is_partial = is_partial(obj);
+        if (is_partial == FLB_TRUE) {
+            partial_records++;
+        } else {
+            /* record passed from filter as-is */
+            msgpack_pack_array(&tmp_pck, 2);
+            flb_time_append_to_msgpack(&tm, &tmp_pck, 0);
+            msgpack_pack_object(&tmp_pck, *obj);
+        }
+
+    }
+    msgpack_unpacked_destroy(&result);
+
+    if ((total_records - partial_records) > 0) {
+        *out_buf  = tmp_sbuf.data;
+        *out_bytes = tmp_sbuf.size;
+    }
+    return FLB_FILTER_MODIFIED;
+}
+
 static int cb_ml_filter(const void *data, size_t bytes,
                         const char *tag, int tag_len,
                         void **out_buf, size_t *out_bytes,
@@ -462,8 +520,6 @@ static int cb_ml_filter(const void *data, size_t bytes,
     int ret;
     int ok = MSGPACK_UNPACK_SUCCESS;
     size_t off = 0;
-    (void) out_buf;
-    (void) out_bytes;
     (void) f_ins;
     (void) config;
     msgpack_unpacked result;
@@ -474,6 +530,12 @@ static int cb_ml_filter(const void *data, size_t bytes,
     struct flb_time tm;
     struct ml_stream *stream;
 
+    /* 'partial_message' mode */
+    if (ctx->partial_mode == FLB_TRUE) {
+        
+    }
+
+    /* 'parser' mode */
     if (ctx->use_buffer == FLB_FALSE) {
         /* reset mspgack size content */
         ctx->mp_sbuf.size = 0;

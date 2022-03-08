@@ -26,10 +26,21 @@
 #define FLB_MULTILINE_MEM_BUF_LIMIT_DEFAULT  "10M"
 #define FLB_MULTILINE_METRIC_EMITTED    200
 
-struct split_message {
+struct split_message_packer {
     flb_sds_t tag;
     flb_sds_t input_name;
     flb_sds_t partial_id;
+
+    /* packaging buffers */
+    msgpack_sbuffer mp_sbuf;  /* temporary msgpack buffer              */
+    msgpack_packer mp_pck;    /* temporary msgpack packer              */
+    //struct flb_time mp_time;  /* multiline time parsed from first line */
+
+    /* Multiline content buffer */
+    flb_sds_t buf;
+
+    /* used to flush buffers that have been pending for more than flush_ms */
+    unsigned long long last_write_time;
 
     struct mk_list _head;
 };

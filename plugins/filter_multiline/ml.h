@@ -22,6 +22,7 @@
 #define FLB_FILTER_MULTILINE_H
 
 #include <fluent-bit/flb_filter_plugin.h>
+#include "ml_concat.h"
 
 #define FLB_MULTILINE_MEM_BUF_LIMIT_DEFAULT  "10M"
 #define FLB_MULTILINE_METRIC_EMITTED    200
@@ -55,6 +56,8 @@ struct ml_ctx {
     int flush_ms;
 
     struct mk_list ml_streams;
+
+    struct mk_list split_message_packers;
 
     struct flb_filter_instance *ins;
 
