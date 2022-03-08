@@ -257,10 +257,11 @@ struct split_message_packer *create_packer(const char *tag, char *input_name, ch
 
     if (!json) {
         flb_info("could not print msgpack");
-    }
+    } else {
     write(STDOUT_FILENO, json, flb_sds_len(json));
     flb_sds_destroy(json);
     flb_info("______");
+    }
     return packer;
 }
 
@@ -309,10 +310,11 @@ int split_message_packer_write(struct split_message_packer *packer,
                                                     "date");
         if (!json) {
         flb_info("could not print msgpack");
-    }
+    } else {
     write(STDOUT_FILENO, json, flb_sds_len(json));
     flb_sds_destroy(json);
     flb_info("______");
+    }
     return 0;
 }
 
