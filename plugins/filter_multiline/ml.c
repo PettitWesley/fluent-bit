@@ -26,9 +26,9 @@
 #include <fluent-bit/flb_storage.h>
 #include <fluent-bit/multiline/flb_ml.h>
 #include <fluent-bit/multiline/flb_ml_parser.h>
-#include "ml_concat.h"
 
 #include "ml.h"
+#include "ml_concat.h"
 
 static struct ml_stream *get_by_id(struct ml_ctx *ctx, uint64_t stream_id);
 
