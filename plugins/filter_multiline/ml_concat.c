@@ -27,6 +27,7 @@
 #include <fluent-bit/multiline/flb_ml.h>
 #include <fluent-bit/multiline/flb_ml_parser.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 #include "ml_concat.h"
 
@@ -247,8 +248,15 @@ struct split_message_packer *create_packer(const char *tag, char *input_name, ch
     msgpack_pack_object(&packer->mp_pck, split_kv->val);
 
     flb_info("printing state and end of create_packer()");
-    flb_pack_print(packer->mp_sbuf.data, packer->mp_sbuf.size);
-
+    // flb_pack_print(packer->mp_sbuf.data, packer->mp_sbuf.size);
+    // msgpack_object_print(stdout, )
+    flb_sds_t json = flb_pack_msgpack_to_json_format(packer->mp_sbuf.data, packer->mp_sbuf.size,
+                                                    1,
+                                                    1,
+                                                    "date");
+    write(STDOUT_FILENO, json, flb_sds_len(json));
+    flb_sds_destroy(json);
+    flb_info("______");
     return packer;
 }
 
@@ -290,7 +298,14 @@ int split_message_packer_write(struct split_message_packer *packer,
     packer->last_write_time = current_timestamp();
 
     flb_info("printing state and end of split_message_packer_write()");
-    flb_pack_print(packer->mp_sbuf.data, packer->mp_sbuf.size);
+    // flb_pack_print(packer->mp_sbuf.data, packer->mp_sbuf.size);
+        flb_sds_t json = flb_pack_msgpack_to_json_format(packer->mp_sbuf.data, packer->mp_sbuf.size,
+                                                    1,
+                                                    1,
+                                                    "date");
+    write(STDOUT_FILENO, json, flb_sds_len(json));
+    flb_sds_destroy(json);
+    flb_info("______");
     return 0;
 }
 
