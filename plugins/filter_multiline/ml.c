@@ -508,9 +508,11 @@ static int ml_filter_partial(const void *data, size_t bytes,
                 partial_records--;
                 goto pack_non_partial;
             }
+            flb_info("partial id = %s", partial_id);
             packer = get_packer(&ctx->split_message_packers, tag, 
                                 i_ins->name, partial_id);
             if (packer == NULL) {
+                flb_info("creating new packer for partial id = %s", partial_id);
                 flb_plg_trace(ctx->ins, "Found new partial record with tag %s", tag);
                 packer = create_packer(tag, i_ins->name, partial_id,
                                        obj, "log", &tm);
@@ -523,6 +525,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
                 mk_list_add(&packer->_head, &ctx->split_message_packers);
             }
             ret = split_message_packer_write(packer, obj, "log");
+            flb_info("wrote to pack for partial id = %s", partial_id);
             if (ret < 0) {
                 flb_plg_warn(ctx->ins, "Could not append content for partial record with tag %s", tag);
                 /* handle this record as non-partial */
@@ -531,6 +534,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
             }
             is_last_partial = is_partial_last(obj);
             if (is_last_partial == FLB_TRUE) {
+                flb_info("is_last_partial=true partial id = %s", partial_id);
                 /* emit the record in this filter invocation */
                 return_records++;
                 msgpack_sbuffer_write(&tmp_sbuf, packer->mp_sbuf.data, packer->mp_sbuf.size);
