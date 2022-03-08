@@ -246,6 +246,9 @@ struct split_message_packer *create_packer(const char *tag, char *input_name, ch
     msgpack_pack_object(&packer->mp_pck, split_kv->key);
     msgpack_pack_object(&packer->mp_pck, split_kv->val);
 
+    flb_info("printing state and end of create_packer()");
+    flb_pack_print(packer->mp_sbuf.data, packer->mp_sbuf.size);
+
     return packer;
 }
 
@@ -285,6 +288,9 @@ int split_message_packer_write(struct split_message_packer *packer,
 
     msgpack_sbuffer_write(&packer->mp_sbuf, val_str, val_str_size);
     packer->last_write_time = current_timestamp();
+
+    flb_info("printing state and end of split_message_packer_write()");
+    flb_pack_print(packer->mp_sbuf.data, packer->mp_sbuf.size);
     return 0;
 }
 
