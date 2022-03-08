@@ -57,7 +57,7 @@ msgpack_object_kv *get_key(msgpack_object *map, char *check_for_key)
         }
 
         if (check_key == FLB_TRUE) {
-            flb_info("key=%s", key_str);
+            flb_info("key=%.*s", key_str_size, key_str);
             if (strncmp(check_for_key, key_str, key_str_size) == 0) {
                 return (kv+i);
             }
