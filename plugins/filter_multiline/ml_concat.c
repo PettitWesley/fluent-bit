@@ -57,6 +57,7 @@ msgpack_object_kv *get_key(msgpack_object *map, char *check_for_key)
         }
 
         if (check_key == FLB_TRUE) {
+            flb_info("key=%s", key_str);
             if (strncmp(check_for_key, key_str, key_str_size) == 0) {
                 return (kv+i);
             }
@@ -76,6 +77,7 @@ int is_partial(msgpack_object *map)
     kv = get_key(map, "partial_message");
 
     if (kv == NULL) {
+        flb_info("didn't find partial_message key");
         return FLB_FALSE;
     }
 
