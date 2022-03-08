@@ -484,6 +484,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
     struct split_message_packer *packer;
     char *partial_id;
 
+    flb_plg_info(ctx->ins, "partial mode...");
     /* 
      * Create temporary msgpack buffer
      * for non-partial messages which are passed on as-is
