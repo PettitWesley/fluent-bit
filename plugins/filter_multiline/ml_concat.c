@@ -230,8 +230,8 @@ struct split_message_packer *create_packer(const char *tag, char *input_name, ch
     flb_time_append_to_msgpack(tm, &packer->mp_pck, 0);
 
     msgpack_pack_map(&packer->mp_pck, map->via.map.size);
-    kv = obj->via.map.ptr;
-    for(i=0; i < obj->via.map.size; i++) {
+    kv = map->via.map.ptr;
+    for(i=0; i < map->via.map.size; i++) {
         if ((kv+i) == split_kv) {
             continue;
         }
