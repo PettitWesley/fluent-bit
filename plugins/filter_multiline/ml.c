@@ -573,9 +573,14 @@ static int cb_ml_filter(const void *data, size_t bytes,
     struct flb_time tm;
     struct ml_stream *stream;
 
+    ctx->partial_mode = FLB_TRUE;
+
     /* 'partial_message' mode */
     if (ctx->partial_mode == FLB_TRUE) {
-        
+        return ml_filter_partial(data, bytes, tag, tag_len,
+                                 out_buf, out_bytes,
+                                 f_ins, i_ins,
+                                 filter_context, config)
     }
 
     /* 'parser' mode */
