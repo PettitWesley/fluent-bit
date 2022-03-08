@@ -581,6 +581,8 @@ static int cb_ml_filter(const void *data, size_t bytes,
 
     ctx->partial_mode = FLB_TRUE;
 
+    flb_info("partial mode=%i", ctx->partial_mode);
+
     /* 'partial_message' mode */
     if (ctx->partial_mode == FLB_TRUE) {
         return ml_filter_partial(data, bytes, tag, tag_len,
