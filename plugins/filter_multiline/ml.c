@@ -294,44 +294,48 @@ static int cb_ml_init(struct flb_filter_instance *ins,
 #endif
     }
 
-    /* Create multiline context */
-    ctx->m = flb_ml_create(config, ctx->ins->name);
-    if (!ctx->m) {
-        /*
-        * we don't free the context since upon init failure, the exit
-         * callback will be triggered with our context set above.
-         */
-        return -1;
-    }
+    ctx->partial_mode = FLB_TRUE;
 
-    /* Load the parsers/config */
-    ret = multiline_load_parsers(ctx);
-    if (ret == -1) {
-        return -1;
-    }
+    if (ctx->partial_mode == FLB_FALSE) {
+        /* Create multiline context */
+        ctx->m = flb_ml_create(config, ctx->ins->name);
+        if (!ctx->m) {
+            /*
+            * we don't free the context since upon init failure, the exit
+            * callback will be triggered with our context set above.
+            */
+            return -1;
+        }
 
-    mk_list_init(&ctx->ml_streams);
-    mk_list_init(&ctx->split_message_packers);
-
-    if (ctx->use_buffer == FLB_TRUE) {
-
-        ctx->m->flush_ms = ctx->flush_ms;
-        ret = flb_ml_auto_flush_init(ctx->m);
+        /* Load the parsers/config */
+        ret = multiline_load_parsers(ctx);
         if (ret == -1) {
             return -1;
         }
-    } else {
-        /* Create a stream for this file */
-        len = strlen(ins->name);
-        ret = flb_ml_stream_create(ctx->m,
-                                ins->name, len,
-                                flush_callback, ctx,
-                                &stream_id);
-        if (ret != 0) {
-            flb_plg_error(ctx->ins, "could not create multiline stream");
-            return -1;
+
+        mk_list_init(&ctx->ml_streams);
+        mk_list_init(&ctx->split_message_packers);
+
+        if (ctx->use_buffer == FLB_TRUE) {
+
+            ctx->m->flush_ms = ctx->flush_ms;
+            ret = flb_ml_auto_flush_init(ctx->m);
+            if (ret == -1) {
+                return -1;
+            }
+        } else {
+            /* Create a stream for this file */
+            len = strlen(ins->name);
+            ret = flb_ml_stream_create(ctx->m,
+                                    ins->name, len,
+                                    flush_callback, ctx,
+                                    &stream_id);
+            if (ret != 0) {
+                flb_plg_error(ctx->ins, "could not create multiline stream");
+                return -1;
+            }
+            ctx->stream_id = stream_id;
         }
-        ctx->stream_id = stream_id;
     }
 
     return 0;
