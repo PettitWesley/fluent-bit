@@ -499,6 +499,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
         
         partial = is_partial(obj);
         if (partial == FLB_TRUE) {
+            flb_info("is_partial=FLB_TRUE");
             partial_records++;
             partial_id = get_partial_id(obj);
             if (partial_id == NULL) {
@@ -539,6 +540,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
         } else {
 
 pack_non_partial:
+            flb_info("is_partial=FLB_FALSE");
             return_records++;
             /* record passed from filter as-is */
             msgpack_pack_array(&tmp_pck, 2);
