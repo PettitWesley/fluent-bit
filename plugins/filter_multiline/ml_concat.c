@@ -39,9 +39,9 @@ msgpack_object_kv *get_key(msgpack_object *map, char *check_for_key)
     msgpack_object  key;
     int check_key = FLB_FALSE;
 
-    kv = map.via.map.ptr;
+    kv = map->via.map.ptr;
 
-    for(i=0; i < map_size; i++) {
+    for(i=0; i < map->via.map.size; i++) {
         check_key = FLB_FALSE;
 
         key = (kv+i)->key;
@@ -69,7 +69,6 @@ msgpack_object_kv *get_key(msgpack_object *map, char *check_for_key)
 int is_partial(msgpack_object *map)
 {
     char *val_str = NULL;
-    size_t val_str_size = 0;
     msgpack_object_kv *kv;
     msgpack_object  val;
     
@@ -149,7 +148,7 @@ char *get_partial_id(msgpack_object *map)
     return val_str;
 }
 
-struct split_message_packer *get_packer(struct mk_list packers, const char *tag, 
+struct split_message_packer *get_packer(struct mk_list *packers, const char *tag, 
                                         char *input_name, char *partial_id)
 {
     struct mk_list *tmp;

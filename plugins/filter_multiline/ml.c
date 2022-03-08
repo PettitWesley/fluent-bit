@@ -502,7 +502,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
                 partial_records--;
                 goto pack_non_partial;
             }
-            packer = get_packer(ctx->split_message_packers, tag, 
+            packer = get_packer(&ctx->split_message_packers, tag, 
                                 i_ins->name, partial_id);
             if (packer == NULL) {
                 flb_plg_trace(ctx->ins, "Found new partial record with tag %s", tag);
