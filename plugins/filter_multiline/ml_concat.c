@@ -291,9 +291,6 @@ void split_message_packer_destroy(struct split_message_packer *packer)
         return;
     }
 
-    if (packer->buf) {
-        flb_sds_destroy(packer->buf);
-    }
     if (packer->tag) {
         flb_sds_destroy(packer->tag);
     }
@@ -303,7 +300,7 @@ void split_message_packer_destroy(struct split_message_packer *packer)
     if (packer->partial_id) {
         flb_sds_destroy(packer->partial_id);
     }
-    if (packer->mp_sbuf) {
+    if (packer->mp_sbuf.data) {
         msgpack_sbuffer_destroy(&packer->mp_sbuf);
     }
 
