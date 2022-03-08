@@ -55,6 +55,8 @@ struct ml_ctx {
     struct mk_list *multiline_parsers;
     int flush_ms;
 
+    int partial_mode;
+
     struct mk_list ml_streams;
 
     struct mk_list split_message_packers;

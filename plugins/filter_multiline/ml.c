@@ -467,8 +467,6 @@ static int ml_filter_partial(const void *data, size_t bytes,
     (void) config;
     msgpack_unpacked result;
     msgpack_object *obj;
-    char *tmp_buf;
-    size_t tmp_size;
     struct ml_ctx *ctx = filter_context;
     struct flb_time tm;
     msgpack_sbuffer tmp_sbuf;
@@ -476,8 +474,8 @@ static int ml_filter_partial(const void *data, size_t bytes,
     int partial_records = 0;
     int total_records = 0;
     int return_records = 0;
-    int is_partial = FLB_FALSE;
-    int is_partial_last = FLB_FALSE;
+    int partial = FLB_FALSE;
+    int is_last_partial = FLB_FALSE;
     struct split_message_packer *packer;
     char *partial_id;
 
@@ -493,8 +491,8 @@ static int ml_filter_partial(const void *data, size_t bytes,
         total_records++;
         flb_time_pop_from_msgpack(&tm, &result, &obj);
         
-        is_partial = is_partial(obj);
-        if (is_partial == FLB_TRUE) {
+        partial = is_partial(obj);
+        if (partial == FLB_TRUE) {
             partial_records++;
             partial_id = get_partial_id(obj);
             if (partial_id == NULL) {
@@ -524,8 +522,8 @@ static int ml_filter_partial(const void *data, size_t bytes,
                 partial_records--;
                 goto pack_non_partial;
             }
-            is_partial_last = is_partial_last(obj);
-            if (is_partial_last == FLB_TRUE) {
+            is_last_partial = is_partial_last(obj);
+            if (is_last_partial == FLB_TRUE) {
                 /* emit the record in this filter invocation */
                 return_records++;
                 msgpack_sbuffer_write(&tmp_sbuf, packer->mp_sbuf.data, packer->mp_sbuf.size);

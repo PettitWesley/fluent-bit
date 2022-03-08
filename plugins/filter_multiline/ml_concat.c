@@ -149,7 +149,7 @@ char *get_partial_id(msgpack_object *map)
     return val_str;
 }
 
-struct split_message_packer *get_packer(struct mk_list packers, char *tag, 
+struct split_message_packer *get_packer(struct mk_list packers, const char *tag, 
                                         char *input_name, char *partial_id)
 {
     struct mk_list *tmp;
@@ -177,7 +177,7 @@ struct split_message_packer *get_packer(struct mk_list packers, char *tag,
     }
 }
 
-struct split_message_packer *create_packer(char *tag, char *input_name, char *partial_id,
+struct split_message_packer *create_packer(const char *tag, char *input_name, char *partial_id,
                                            msgpack_object *map, char *multiline_key_content,
                                            struct flb_time *tm)
 {
