@@ -34,16 +34,25 @@ struct split_message_packer {
     /* packaging buffers */
     msgpack_sbuffer mp_sbuf;  /* temporary msgpack buffer              */
     msgpack_packer mp_pck;    /* temporary msgpack packer              */
-    //struct flb_time mp_time;  /* multiline time parsed from first line */
-
-    /* Multiline content buffer */
-    flb_sds_t buf;
 
     /* used to flush buffers that have been pending for more than flush_ms */
     unsigned long long last_write_time;
 
     struct mk_list _head;
 };
+
+msgpack_object_kv *get_key(msgpack_object *map, char *check_for_key);
+int is_partial(msgpack_object *map);
+int is_partial_last(msgpack_object *map);
+char *get_partial_id(msgpack_object *map);
+struct split_message_packer *get_packer(struct mk_list packers, char *tag, 
+                                        char *input_name, char *partial_id);
+struct split_message_packer *create_packer(char *tag, char *input_name, char *partial_id,
+                                           msgpack_object *map, char *multiline_key_content,
+                                           struct flb_time *tm);
+int split_message_packer_write(struct split_message_packer *packer, 
+                               msgpack_object *map, char *multiline_key_content);
+void split_message_packer_destroy(struct split_message_packer *packer);
 
 
 #endif

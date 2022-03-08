@@ -26,19 +26,17 @@
 #include <fluent-bit/flb_storage.h>
 #include <fluent-bit/multiline/flb_ml.h>
 #include <fluent-bit/multiline/flb_ml_parser.h>
+#include <sys/time.h>
 
 #include "ml_concat.h"
 
-char *get_key(msgpack_object *map, char *check_for_key)
+msgpack_object_kv *get_key(msgpack_object *map, char *check_for_key)
 {
     int i;
     char *key_str = NULL;
     size_t key_str_size = 0;
-    char *val_str = NULL;
-    size_t val_str_size = 0;
     msgpack_object_kv *kv;
     msgpack_object  key;
-    msgpack_object  val;
     int check_key = FLB_FALSE;
 
     kv = map.via.map.ptr;
@@ -60,15 +58,7 @@ char *get_key(msgpack_object *map, char *check_for_key)
 
         if (check_key == FLB_TRUE) {
             if (strncmp(check_for_key, key_str, key_str_size) == 0) {
-                val = (kv+i)->val;
-                if (val.type == MSGPACK_OBJECT_BIN) {
-                    val_str  = (char *) val.via.bin.ptr;
-                    return val_str;
-                }
-                if (val.type == MSGPACK_OBJECT_STR) {
-                    val_str  = (char *) val.via.str.ptr;
-                    return val_str;
-                }
+                return (kv+i);
             }
             return NULL;
         }
@@ -78,13 +68,24 @@ char *get_key(msgpack_object *map, char *check_for_key)
 
 int is_partial(msgpack_object *map)
 {
-    char *partial_key_value;
+    char *val_str = NULL;
+    size_t val_str_size = 0;
+    msgpack_object_kv *kv;
+    msgpack_object  val;
     
     // TODO: config/constant
-    partial_key_value = get_key(map, "partial_message");
+    kv = get_key(map, "partial_message");
 
-    if (partial_key_value == NULL) {
+    if (kv == NULL) {
         return FLB_FALSE;
+    }
+
+    val = kv->val;
+    if (val.type == MSGPACK_OBJECT_BIN) {
+        val_str  = (char *) val.via.bin.ptr;
+    }
+    if (val.type == MSGPACK_OBJECT_STR) {
+        val_str  = (char *) val.via.str.ptr;
     }
 
     // TODO: config/constant
@@ -92,6 +93,60 @@ int is_partial(msgpack_object *map)
         return FLB_TRUE;
     }
     return FLB_FALSE;
+}
+
+int is_partial_last(msgpack_object *map)
+{
+    char *val_str = NULL;
+    size_t val_str_size = 0;
+    msgpack_object_kv *kv;
+    msgpack_object  val;
+    
+    // TODO: config/constant
+    kv = get_key(map, "partial_last");
+
+    if (kv == NULL) {
+        return FLB_FALSE;
+    }
+
+    val = kv->val;
+    if (val.type == MSGPACK_OBJECT_BIN) {
+        val_str  = (char *) val.via.bin.ptr;
+    }
+    if (val.type == MSGPACK_OBJECT_STR) {
+        val_str  = (char *) val.via.str.ptr;
+    }
+
+    // TODO: config/constant
+    if (strncasecmp("true", val_str, 4) == 0) {
+        return FLB_TRUE;
+    }
+    return FLB_FALSE;
+}
+
+char *get_partial_id(msgpack_object *map)
+{
+    char *val_str = NULL;
+    size_t val_str_size = 0;
+    msgpack_object_kv *kv;
+    msgpack_object  val;
+    
+    // TODO: config/constant
+    kv = get_key(map, "partial_id");
+
+    if (kv == NULL) {
+        return NULL;
+    }
+
+    val = kv->val;
+    if (val.type == MSGPACK_OBJECT_BIN) {
+        val_str  = (char *) val.via.bin.ptr;
+    }
+    if (val.type == MSGPACK_OBJECT_STR) {
+        val_str  = (char *) val.via.str.ptr;
+    }
+
+    return val_str;
 }
 
 struct split_message_packer *get_packer(struct mk_list packers, char *tag, 
@@ -124,10 +179,13 @@ struct split_message_packer *get_packer(struct mk_list packers, char *tag,
 
 struct split_message_packer *create_packer(char *tag, char *input_name, char *partial_id,
                                            msgpack_object *map, char *multiline_key_content,
-                                           struct flb_time *tm;)
+                                           struct flb_time *tm)
 {
     struct split_message_packer *packer;
+    msgpack_object_kv *kv;
+    msgpack_object_kv *split_kv;
     flb_sds_t tmp;
+    int i;
 
     packer = flb_calloc(1, sizeof(struct split_message_packer));
     if (!packer) {
@@ -162,7 +220,72 @@ struct split_message_packer *create_packer(char *tag, char *input_name, char *pa
     msgpack_sbuffer_init(&packer->mp_sbuf);
     msgpack_packer_init(&packer->mp_pck, &packer->mp_sbuf, msgpack_sbuffer_write);
 
-    /* write all of the keys except the 
+    /* get the key that is split */
+    split_kv = get_key(map, multiline_key_content);
+    if (split_kv == NULL) {
+        flb_error("[partial message concat] Could not find key %s in record", multiline_key_content);
+        split_message_packer_destroy(packer);
+        return NULL;
+    }
+
+    /* write all of the keys except the split one */
+    msgpack_pack_array(&packer->mp_pck, 2);
+    flb_time_append_to_msgpack(tm, &packer->mp_pck, 0);
+
+    msgpack_pack_map(&packer->mp_pck, map->via.map.size);
+    kv = obj->via.map.ptr;
+    for(i=0; i < obj->via.map.size; i++) {
+        if ((kv+i) == split_kv) {
+            continue;
+        }
+        msgpack_pack_object(&packer->mp_pck, (kv+i)->key);
+        msgpack_pack_object(&packer->mp_pck, (kv+i)->val);
+    }
+
+    /* write split kv last, so we can append to it later as needed */
+    msgpack_pack_object(&packer->mp_pck, split_kv->key);
+    msgpack_pack_object(&packer->mp_pck, split_kv->val);
+
+    return packer;
+}
+
+unsigned long long current_timestamp() {
+    struct timeval te; 
+    unsigned long long milliseconds;
+    gettimeofday(&te, NULL); 
+    milliseconds = te.tv_sec*1000LL + te.tv_usec/1000; 
+    return milliseconds;
+}
+
+int split_message_packer_write(struct split_message_packer *packer, 
+                               msgpack_object *map, char *multiline_key_content)
+{   
+    char *val_str = NULL;
+    size_t val_str_size = 0;
+    msgpack_object_kv *kv;
+    msgpack_object  val;
+    
+    kv = get_key(map, multiline_key_content);
+
+    if (kv == NULL) {
+        flb_error("[partial message concat] Could not find key %s in record", multiline_key_content);
+        return -1;
+    }
+
+    val = kv->val;
+    if (val.type == MSGPACK_OBJECT_BIN) {
+        val_str  = (char *) val.via.bin.ptr;
+        val_str_size = val.via.bin.size;
+    }
+    if (val.type == MSGPACK_OBJECT_STR) {
+        val_str  = (char *) val.via.str.ptr;
+        val_str_size = val.via.str.size;
+    }
+
+
+    msgpack_sbuffer_write(&packer->mp_sbuf, val_str, val_str_size);
+    packer->last_write_time = current_timestamp();
+    return 0;
 }
 
 void split_message_packer_destroy(struct split_message_packer *packer)
