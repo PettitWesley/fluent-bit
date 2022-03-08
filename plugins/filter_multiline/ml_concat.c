@@ -172,6 +172,8 @@ struct split_message_packer *get_packer(struct mk_list *packers, const char *tag
             return packer;
         }
     }
+
+    return NULL;
 }
 
 struct split_message_packer *create_packer(const char *tag, char *input_name, char *partial_id,
