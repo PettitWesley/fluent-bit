@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_storage.h>
 #include <fluent-bit/multiline/flb_ml.h>
 #include <fluent-bit/multiline/flb_ml_parser.h>
+#include "ml_concat.h"
 
 #include "ml.h"
 
