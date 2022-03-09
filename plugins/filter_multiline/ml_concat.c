@@ -299,7 +299,9 @@ int split_message_packer_write(struct split_message_packer *packer,
         val_str_size = val.via.str.size;
     }
 
+    flb_info("before: packer->buf=%s, val_str=%.*s", packer->buf, val_str_size, val_str);
     flb_sds_cat_safe(&packer->buf, val_str, val_str_size);
+    flb_info("after: packer->buf=%s", packer->buf);
     packer->last_write_time = current_timestamp();
 
     return 0;
@@ -308,6 +310,7 @@ int split_message_packer_write(struct split_message_packer *packer,
 void split_message_packer_complete(struct split_message_packer *packer)
 {
     int len;
+    flb_info("before: packer->buf=%s", packer->buf);
     len = flb_sds_len(packer->buf);
     msgpack_pack_str(&packer->mp_pck, len);
     msgpack_pack_str_body(&packer->mp_pck, packer->buf, len);
