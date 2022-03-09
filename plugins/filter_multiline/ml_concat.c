@@ -143,11 +143,11 @@ int get_partial_id(msgpack_object *map,
     val = kv->val;
     if (val.type == MSGPACK_OBJECT_BIN) {
         val_str  = (char *) val.via.bin.ptr;
-        val_str_size  = (char *) val.via.bin.size;
+        val_str_size  = val.via.bin.size;
     }
     if (val.type == MSGPACK_OBJECT_STR) {
         val_str  = (char *) val.via.str.ptr;
-        val_str_size  = (char *) val.via.str.size;
+        val_str_size  = val.via.str.size;
     }
 
     *partial_id_str = val_str;
@@ -158,7 +158,7 @@ int get_partial_id(msgpack_object *map,
 
 struct split_message_packer *get_packer(struct mk_list *packers, const char *tag, 
                                         char *input_name, 
-                                        char *partial_id_str, size_t partial_id_size))
+                                        char *partial_id_str, size_t partial_id_size)
 {
     struct mk_list *tmp;
     struct mk_list *head;
