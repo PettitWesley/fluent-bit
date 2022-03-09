@@ -50,7 +50,8 @@ int get_partial_id(msgpack_object *map,
 struct split_message_packer *get_packer(struct mk_list *packers, const char *tag, 
                                         char *input_name, 
                                         char *partial_id_str, size_t partial_id_size);
-struct split_message_packer *create_packer(const char *tag, char *input_name, char *partial_id,
+struct split_message_packer *create_packer(const char *tag, char *input_name, 
+                                           char *partial_id_str, size_t partial_id_size,
                                            msgpack_object *map, char *multiline_key_content,
                                            struct flb_time *tm);
 int split_message_packer_write(struct split_message_packer *packer, 
