@@ -220,7 +220,7 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
     }
     packer->tag = tmp;
 
-    tmp = flb_sds_create(partial_id_str, partial_id_size);
+    tmp = flb_sds_create_len(partial_id_str, partial_id_size);
     if (!tmp) {
         flb_errno();
         split_message_packer_destroy(packer);
