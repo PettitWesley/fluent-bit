@@ -44,9 +44,12 @@ struct split_message_packer {
 msgpack_object_kv *get_key(msgpack_object *map, char *check_for_key);
 int is_partial(msgpack_object *map);
 int is_partial_last(msgpack_object *map);
-char *get_partial_id(msgpack_object *map);
+int get_partial_id(msgpack_object *map, 
+                   char **partial_id_str,
+                   size_t *partial_id_size);
 struct split_message_packer *get_packer(struct mk_list *packers, const char *tag, 
-                                        char *input_name, char *partial_id);
+                                        char *input_name, 
+                                        char *partial_id_str, size_t partial_id_size);
 struct split_message_packer *create_packer(const char *tag, char *input_name, char *partial_id,
                                            msgpack_object *map, char *multiline_key_content,
                                            struct flb_time *tm);

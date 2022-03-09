@@ -124,9 +124,12 @@ int is_partial_last(msgpack_object *map)
     return FLB_FALSE;
 }
 
-char *get_partial_id(msgpack_object *map)
+int get_partial_id(msgpack_object *map, 
+                     char **partial_id_str,
+                     size_t *partial_id_size)
 {
     char *val_str = NULL;
+    size_t val_str_size = 0;
     msgpack_object_kv *kv;
     msgpack_object  val;
     
@@ -134,22 +137,28 @@ char *get_partial_id(msgpack_object *map)
     kv = get_key(map, "partial_id");
 
     if (kv == NULL) {
-        return NULL;
+        return -1;
     }
 
     val = kv->val;
     if (val.type == MSGPACK_OBJECT_BIN) {
         val_str  = (char *) val.via.bin.ptr;
+        val_str_size  = (char *) val.via.bin.size;
     }
     if (val.type == MSGPACK_OBJECT_STR) {
         val_str  = (char *) val.via.str.ptr;
+        val_str_size  = (char *) val.via.str.size;
     }
 
-    return val_str;
+    *partial_id_str = val_str;
+    *partial_id_size = val_str_size;
+
+    return 0;
 }
 
 struct split_message_packer *get_packer(struct mk_list *packers, const char *tag, 
-                                        char *input_name, char *partial_id)
+                                        char *input_name, 
+                                        char *partial_id_str, size_t partial_id_size))
 {
     struct mk_list *tmp;
     struct mk_list *head;
@@ -161,7 +170,7 @@ struct split_message_packer *get_packer(struct mk_list *packers, const char *tag
 
     mk_list_foreach_safe(head, tmp, packers) {
         packer = mk_list_entry(head, struct split_message_packer, _head);
-        id_check = strcmp(packer->partial_id, partial_id);
+        id_check = strncmp(packer->partial_id, partial_id_str, partial_id_size);
         if (id_check != 0) {
             continue;
         }
@@ -178,7 +187,8 @@ struct split_message_packer *get_packer(struct mk_list *packers, const char *tag
     return NULL;
 }
 
-struct split_message_packer *create_packer(const char *tag, char *input_name, char *partial_id,
+struct split_message_packer *create_packer(const char *tag, char *input_name, 
+                                           char *partial_id_str, size_t partial_id_size,
                                            msgpack_object *map, char *multiline_key_content,
                                            struct flb_time *tm)
 {
@@ -210,7 +220,7 @@ struct split_message_packer *create_packer(const char *tag, char *input_name, ch
     }
     packer->tag = tmp;
 
-    tmp = flb_sds_create(partial_id);
+    tmp = flb_sds_create(partial_id_str, partial_id_size);
     if (!tmp) {
         flb_errno();
         split_message_packer_destroy(packer);
