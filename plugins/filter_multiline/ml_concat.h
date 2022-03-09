@@ -35,6 +35,8 @@ struct split_message_packer {
     msgpack_sbuffer mp_sbuf;  /* temporary msgpack buffer              */
     msgpack_packer mp_pck;    /* temporary msgpack packer              */
 
+    flb_sds_t buf;
+
     /* used to flush buffers that have been pending for more than flush_ms */
     unsigned long long last_write_time;
 
@@ -56,6 +58,7 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
                                            struct flb_time *tm);
 int split_message_packer_write(struct split_message_packer *packer, 
                                msgpack_object *map, char *multiline_key_content);
+void split_message_packer_complete(struct split_message_packer *packer);
 void split_message_packer_destroy(struct split_message_packer *packer);
 
 

@@ -538,6 +538,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
                 flb_info("is_last_partial=true partial id = %.*s", partial_id_size, partial_id_str);
                 /* emit the record in this filter invocation */
                 return_records++;
+                split_message_packer_complete(packer);
                 msgpack_sbuffer_write(&tmp_sbuf, packer->mp_sbuf.data, packer->mp_sbuf.size);
                 mk_list_del(&packer->_head);
                 split_message_packer_destroy(packer);

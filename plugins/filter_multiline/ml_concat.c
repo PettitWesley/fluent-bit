@@ -254,7 +254,6 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
 
     /* write split kv last, so we can append to it later as needed */
     msgpack_pack_object(&packer->mp_pck, split_kv->key);
-    msgpack_pack_object(&packer->mp_pck, split_kv->val);
 
     return packer;
 }
@@ -292,11 +291,18 @@ int split_message_packer_write(struct split_message_packer *packer,
         val_str_size = val.via.str.size;
     }
 
-
-    msgpack_sbuffer_write(&packer->mp_sbuf, val_str, val_str_size);
+    flb_sds_cat_safe(&packer->buf, val_str, val_str_size);
     packer->last_write_time = current_timestamp();
 
     return 0;
+}
+
+void split_message_packer_complete(struct split_message_packer *packer)
+{
+    int len;
+    len = flb_sds_len(packer->buf);
+    msgpack_pack_str(&mp_pck, len);
+    msgpack_pack_str_body(&packer->mp_pck, packer->buf, len);
 }
 
 void split_message_packer_destroy(struct split_message_packer *packer)
@@ -307,6 +313,9 @@ void split_message_packer_destroy(struct split_message_packer *packer)
 
     if (packer->tag) {
         flb_sds_destroy(packer->tag);
+    }
+    if (packer->buf) {
+        flb_sds_destroy(packer->buf);
     }
     if (packer->input_name) {
         flb_sds_destroy(packer->input_name);
