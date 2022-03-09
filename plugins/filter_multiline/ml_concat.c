@@ -310,10 +310,21 @@ int split_message_packer_write(struct split_message_packer *packer,
 void split_message_packer_complete(struct split_message_packer *packer)
 {
     int len;
-    flb_info("before: packer->buf=%s", packer->buf);
     len = flb_sds_len(packer->buf);
+    flb_info("before complete: packer->buf=%s, buf_len=%i, mp_sbuf.size=%zu", 
+             packer->buf, len, packer->mp_sbuf.size);
     msgpack_pack_str(&packer->mp_pck, len);
     msgpack_pack_str_body(&packer->mp_pck, packer->buf, len);
+    flb_info("after complete: mp_sbuf.size=%zu", packer->mp_sbuf.size);
+    msgpack_zone mempool;
+    msgpack_zone_init(&mempool, 2048);
+
+    msgpack_object deserialized;
+    msgpack_unpack(packer->mp_sbuf.data, packer->mp_sbuf.size, NULL, &mempool, &deserialized);
+
+    /* print the deserialized object. */
+    msgpack_object_print(stdout, deserialized);
+    flb_info("\n----");
 }
 
 void split_message_packer_destroy(struct split_message_packer *packer)
