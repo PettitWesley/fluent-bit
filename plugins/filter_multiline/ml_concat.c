@@ -301,7 +301,7 @@ void split_message_packer_complete(struct split_message_packer *packer)
 {
     int len;
     len = flb_sds_len(packer->buf);
-    msgpack_pack_str(&mp_pck, len);
+    msgpack_pack_str(&packer->mp_pck, len);
     msgpack_pack_str_body(&packer->mp_pck, packer->buf, len);
 }
 
