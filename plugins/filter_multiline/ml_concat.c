@@ -228,9 +228,8 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
     packer->partial_id = tmp;
 
     packer->buf = flb_sds_create_size(FLB_MULTILINE_PARTIAL_BUF_SIZE);
-    if (!group->buf) {
+    if (!packer->buf) {
         flb_errno();
-        flb_sds_destroy(group->name);
         split_message_packer_destroy(packer);
         return NULL;
     }
