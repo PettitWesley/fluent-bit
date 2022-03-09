@@ -324,7 +324,8 @@ void split_message_packer_complete(struct split_message_packer *packer)
 
     /* print the deserialized object. */
     msgpack_object_print(stdout, deserialized);
-    flb_info("\n----");
+    printf("\n\n");
+    fflush(stdout);
 }
 
 void split_message_packer_destroy(struct split_message_packer *packer)
