@@ -24,7 +24,9 @@
 #include <fluent-bit/flb_filter_plugin.h>
 
 #define FLB_MULTILINE_MEM_BUF_LIMIT_DEFAULT  "10M"
-#define FLB_MULTILINE_METRIC_EMITTED    200
+#define FLB_MULTILINE_METRIC_EMITTED         200
+/* docker logs are split at 16KB */
+#define FLB_MULTILINE_PARTIAL_BUF_SIZE       24000
 
 struct split_message_packer {
     flb_sds_t tag;

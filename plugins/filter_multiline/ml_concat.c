@@ -227,6 +227,14 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
     }
     packer->partial_id = tmp;
 
+    packer->buf = flb_sds_create_size(FLB_MULTILINE_PARTIAL_BUF_SIZE);
+    if (!group->buf) {
+        flb_errno();
+        flb_sds_destroy(group->name);
+        split_message_packer_destroy(packer);
+        return NULL;
+    }
+
     msgpack_sbuffer_init(&packer->mp_sbuf);
     msgpack_packer_init(&packer->mp_pck, &packer->mp_sbuf, msgpack_sbuffer_write);
 
@@ -254,6 +262,7 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
 
     /* write split kv last, so we can append to it later as needed */
     msgpack_pack_object(&packer->mp_pck, split_kv->key);
+    
 
     return packer;
 }
