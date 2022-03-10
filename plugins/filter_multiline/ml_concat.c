@@ -290,7 +290,8 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
 
     /* write split kv last, so we can append to it later as needed */
     msgpack_pack_object(&packer->mp_pck, split_kv->key);
-    
+    flb_info("create(): mpsbuf=`%.*s`", packer->mp_sbuf.size, packer->mp_sbuf.data);
+
 
     return packer;
 }
@@ -332,6 +333,7 @@ int split_message_packer_write(struct split_message_packer *packer,
     flb_sds_cat_safe(&packer->buf, val_str, val_str_size);
     flb_info("after: packer->buf=%s", packer->buf);
     packer->last_write_time = current_timestamp();
+    flb_info("write(): mpsbuf=`%.*s`", packer->mp_sbuf.size, packer->mp_sbuf.data);
 
     return 0;
 }
@@ -345,6 +347,7 @@ void split_message_packer_complete(struct split_message_packer *packer)
     msgpack_pack_str(&packer->mp_pck, len);
     msgpack_pack_str_body(&packer->mp_pck, packer->buf, len);
     flb_info("after complete: mp_sbuf.size=%zu", packer->mp_sbuf.size);
+    flb_info("complete(): mpsbuf=`%.*s`", packer->mp_sbuf.size, packer->mp_sbuf.data);
     // msgpack_zone mempool;
     // msgpack_zone_init(&mempool, 2048);
 
