@@ -203,6 +203,8 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
     size_t len;
 
     msgpack_object_print(stdout, *map);
+    printf("\n^create_packer(map)\n");
+    fflush(stdout);
 
     packer = flb_calloc(1, sizeof(struct split_message_packer));
     if (!packer) {
@@ -290,6 +292,8 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
         msgpack_pack_object(&packer->mp_pck, (kv+i)->val);
         msgpack_object_print(stdout, (kv+i)->key);
         msgpack_object_print(stdout, (kv+i)->val);
+        printf("\n^create_packer: kv\n");
+        fflush(stdout);
     }
 
     /* write split kv last, so we can append to it later as needed */
@@ -317,6 +321,8 @@ int split_message_packer_write(struct split_message_packer *packer,
     msgpack_object  val;
 
     msgpack_object_print(stdout, *map);
+    printf("\n^split_message_packer_write(map)\n");
+    fflush(stdout);
     
     kv = get_key(map, multiline_key_content);
 
@@ -377,6 +383,8 @@ void append_complete_record(char *data, size_t bytes, msgpack_packer *tmp_pck)
     msgpack_unpacked_init(&result);
     while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
         msgpack_object_print(stdout, result.data);
+        printf("\n^append_complete_record: unpacked\n");
+        fflush(stdout);
         flb_time_pop_from_msgpack(&tm, &result, &obj);
         msgpack_pack_array(tmp_pck, 2);
         flb_time_append_to_msgpack(&tm, tmp_pck, 0);
