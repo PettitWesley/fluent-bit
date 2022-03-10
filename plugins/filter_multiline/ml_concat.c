@@ -196,6 +196,11 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
     msgpack_object_kv *split_kv;
     flb_sds_t tmp;
     int i;
+    char *key_str = NULL;
+    size_t key_str_size = 0;
+    msgpack_object  key;
+    int check_key = FLB_FALSE;
+    size_t len;
 
     packer = flb_calloc(1, sizeof(struct split_message_packer));
     if (!packer) {
@@ -252,8 +257,33 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
     msgpack_pack_map(&packer->mp_pck, map->via.map.size);
     kv = map->via.map.ptr;
     for(i=0; i < map->via.map.size; i++) {
-        if ((kv+i) == split_kv) {
+        key = (kv+i)->key;
+
+        if (key == split_kv) {
             continue;
+        }
+
+        if (key.type == MSGPACK_OBJECT_BIN) {
+            key_str  = (char *) key.via.bin.ptr;
+            key_str_size = key.via.bin.size;
+            check_key = FLB_TRUE;
+        }
+        if (key.type == MSGPACK_OBJECT_STR) {
+            key_str  = (char *) key.via.str.ptr;
+            key_str_size = key.via.str.size;
+            check_key = FLB_TRUE;
+        }
+
+        len = 7;
+        if (key_str_size < len) {
+            len = key_str_size;
+        }
+
+        if (check_key == FLB_TRUE) {
+            if (strncmp("partial", key_str, len) == 0) {
+                /* don't pack the partial keys */
+                continue;
+            }
         }
         msgpack_pack_object(&packer->mp_pck, (kv+i)->key);
         msgpack_pack_object(&packer->mp_pck, (kv+i)->val);
