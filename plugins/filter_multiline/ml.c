@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_storage.h>
 #include <fluent-bit/multiline/flb_ml.h>
 #include <fluent-bit/multiline/flb_ml_parser.h>
+#include <fluent-bit/flb_scheduler.h>
 
 #include "ml.h"
 #include "ml_concat.h"
@@ -198,6 +199,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     ctx->ins = ins;
     ctx->debug_flush = FLB_FALSE;
     ctx->config = config;
+    ctx->timer_created = FLB_FALSE;
 
     /* 
      * Config map is not yet set at this point in the code
@@ -457,6 +459,39 @@ static struct ml_stream *get_or_create_stream(struct ml_ctx *ctx,
     return stream;
 }
 
+static void partial_timer_cb(struct flb_config *config, void *data)
+{
+    struct ml_ctx *ctx = data;
+    (void) config;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct split_message_packer *packer;
+    unsigned long long now;
+    unsigned long long diff;
+
+    now = current_timestamp();
+
+    mk_list_foreach_safe(head, tmp, &ctx->split_message_packers) {
+        packer = mk_list_entry(head, struct split_message_packer, _head);
+        
+        diff = now - packer->last_write_time;
+        if (diff <= ctx->flush_ms) {
+            continue;
+        }
+        
+        mk_list_del(&packer->_head);
+        split_message_packer_complete(packer);
+        flb_info("[partial] emitting %zu bytes to emitter", packer->mp_sbuf.size);
+        /* re-emit record with original tag */
+        flb_plg_trace(ctx->ins, "emitting from %s to %s", packer->input_name, packer->tag);
+        ret = in_emitter_add_record(packer->tag, flb_sds_len(packer->tag), 
+                                    packer->mp_sbuf.data, packer->mp_sbuf.size,
+                                    ctx->ins_emitter);
+        split_message_packer_destroy(packer);
+    }
+
+}
+
 static int ml_filter_partial(const void *data, size_t bytes,
                              const char *tag, int tag_len,
                              void **out_buf, size_t *out_bytes,
@@ -484,6 +519,28 @@ static int ml_filter_partial(const void *data, size_t bytes,
     struct split_message_packer *packer;
     char *partial_id_str = NULL;
     size_t partial_id_size = 0;
+    struct flb_sched *sched;
+
+    /*
+     * create a timer that will run periodically and check if pending buffers
+     * have expired
+     * this is created once on the first flush
+     */
+    if (ctx->timer_created == FLB_FALSE) {
+        flb_plg_debug(ctx->ins,
+                      "Creating flush timer with frequency %dms",
+                      ctx->flush_ms);
+
+        sched = flb_sched_ctx_get();
+
+        ret = flb_sched_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM,
+                                        ctx->flush_ms, partial_timer_cb, ctx, NULL);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Failed to create flush timer");
+        } else {
+            ctx->timer_created = FLB_TRUE;
+        }
+    }
 
     flb_plg_info(ctx->ins, "partial mode...\n___________");
     /* 
@@ -589,7 +646,10 @@ static int cb_ml_filter(const void *data, size_t bytes,
 
     ctx->partial_mode = FLB_TRUE;
 
-    flb_info("partial mode=%i", ctx->partial_mode);
+    if (i_ins == ctx->ins_emitter) {
+        flb_plg_trace(ctx->ins, "not processing records from the emitter");
+        return FLB_FILTER_NOTOUCH;
+    }
 
     /* 'partial_message' mode */
     if (ctx->partial_mode == FLB_TRUE) {
@@ -645,10 +705,6 @@ static int cb_ml_filter(const void *data, size_t bytes,
         return FLB_FILTER_NOTOUCH;
     
     } else { /* buffered mode */
-        if (i_ins == ctx->ins_emitter) {
-            flb_plg_trace(ctx->ins, "not processing record from the emitter");
-            return FLB_FILTER_NOTOUCH;
-        }
         
         stream = get_or_create_stream(ctx, i_ins, tag, tag_len);
 

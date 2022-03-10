@@ -63,6 +63,7 @@ int split_message_packer_write(struct split_message_packer *packer,
 void split_message_packer_complete(struct split_message_packer *packer);
 void split_message_packer_destroy(struct split_message_packer *packer);
 void append_complete_record(char *data, size_t bytes, msgpack_packer *tmp_pck);
+unsigned long long current_timestamp();
 
 
 #endif
