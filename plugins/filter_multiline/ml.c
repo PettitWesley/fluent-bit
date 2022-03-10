@@ -280,14 +280,14 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     flb_filter_set_context(ins, ctx);
 
     if (ctx->key_content == NULL && ctx->partial_mode == FLB_TRUE) {
-        flb_plg_error(ins, "'Mode' %s requires 'multiline.key_content'",
+        flb_plg_error(ins, "'Mode' '%s' requires 'multiline.key_content'",
                       FLB_MULTILINE_MODE_PARTIAL_MESSAGE);
         flb_free(ctx);
         return -1;
     }
 
     if (ctx->partial_mode == FLB_FALSE && mk_list_size(ctx->multiline_parsers) == 0) {
-        flb_plg_error(ins, "The default 'Mode' %s requires at least one 'multiline.parser'",
+        flb_plg_error(ins, "The default 'Mode' '%s' requires at least one 'multiline.parser'",
                       FLB_MULTILINE_MODE_PARSER);
         flb_free(ctx);
         return -1;
