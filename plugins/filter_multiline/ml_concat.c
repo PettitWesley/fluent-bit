@@ -328,6 +328,24 @@ void split_message_packer_complete(struct split_message_packer *packer)
     fflush(stdout);
 }
 
+void append_complete_record(char *data, size_t bytes, msgpack_packer *tmp_pck)
+{
+    int ret;
+    int ok = MSGPACK_UNPACK_SUCCESS;
+    size_t off = 0;
+    msgpack_unpacked result;
+    msgpack_object *obj;
+    struct flb_time tm;
+
+    msgpack_unpacked_init(&result);
+    while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
+        flb_time_pop_from_msgpack(&tm, &result, &obj);
+        msgpack_pack_array(tmp_pck, 2);
+        flb_time_append_to_msgpack(&tm, tmp_pck, 0);
+        msgpack_pack_object(tmp_pck, *obj);
+    }
+}
+
 void split_message_packer_destroy(struct split_message_packer *packer)
 {
     if (!packer) {

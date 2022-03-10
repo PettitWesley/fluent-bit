@@ -539,8 +539,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
                 /* emit the record in this filter invocation */
                 return_records++;
                 split_message_packer_complete(packer);
-                msgpack_pack_array(&tmp_pck, 2);
-                msgpack_sbuffer_write(&tmp_sbuf, packer->mp_sbuf.data, packer->mp_sbuf.size);
+                append_complete_record(packer->mp_sbuf.data, packer->mp_sbuf.size, &tmp_pck)
                 mk_list_del(&packer->_head);
                 split_message_packer_destroy(packer);
             }
