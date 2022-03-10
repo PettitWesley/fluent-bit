@@ -293,6 +293,7 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
 
         map_size++;
     }
+    map_size++; /* +1 for split key added later */
     msgpack_pack_map(&packer->mp_pck, map_size);
 
     for(i=0; i < map->via.map.size; i++) {
