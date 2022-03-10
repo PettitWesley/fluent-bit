@@ -470,8 +470,6 @@ static void partial_timer_cb(struct flb_config *config, void *data)
     unsigned long long diff;
     int ret; 
 
-    flb_info("partial_timer_cb()");
-
     now = current_timestamp();
 
     mk_list_foreach_safe(head, tmp, &ctx->split_message_packers) {
@@ -484,7 +482,6 @@ static void partial_timer_cb(struct flb_config *config, void *data)
         
         mk_list_del(&packer->_head);
         split_message_packer_complete(packer);
-        flb_info("[partial] emitting %zu bytes to emitter", packer->mp_sbuf.size);
         /* re-emit record with original tag */
         flb_plg_trace(ctx->ins, "emitting from %s to %s", packer->input_name, packer->tag);
         ret = in_emitter_add_record(packer->tag, flb_sds_len(packer->tag), 
@@ -538,9 +535,6 @@ static int ml_filter_partial(const void *data, size_t bytes,
         flb_plg_debug(ctx->ins,
                       "Creating flush timer with frequency %dms",
                       ctx->flush_ms);
-        flb_plg_warn(ctx->ins,
-                      "[remove] Creating flush timer with frequency %dms",
-                      ctx->flush_ms);
 
         sched = flb_sched_ctx_get();
 
@@ -553,7 +547,6 @@ static int ml_filter_partial(const void *data, size_t bytes,
         }
     }
 
-    flb_plg_info(ctx->ins, "partial mode...\n___________");
     /* 
      * Create temporary msgpack buffer
      * for non-partial messages which are passed on as-is
@@ -568,7 +561,6 @@ static int ml_filter_partial(const void *data, size_t bytes,
         
         partial = is_partial(obj);
         if (partial == FLB_TRUE) {
-            flb_info("is_partial=FLB_TRUE");
             partial_records++;
             ret = get_partial_id(obj, &partial_id_str, &partial_id_size);
             if (ret == -1) {
@@ -577,11 +569,9 @@ static int ml_filter_partial(const void *data, size_t bytes,
                 partial_records--;
                 goto pack_non_partial;
             }
-            flb_info("partial id = %.*s", partial_id_size, partial_id_str);
             packer = get_packer(&ctx->split_message_packers, tag, 
                                 i_ins->name, partial_id_str, partial_id_size);
             if (packer == NULL) {
-                flb_info("creating new packer for partial id = %.*s", partial_id_size, partial_id_str);
                 flb_plg_trace(ctx->ins, "Found new partial record with tag %s", tag);
                 packer = create_packer(tag, i_ins->name, partial_id_str, partial_id_size,
                                        obj, "log", &tm);
@@ -594,7 +584,6 @@ static int ml_filter_partial(const void *data, size_t bytes,
                 mk_list_add(&packer->_head, &ctx->split_message_packers);
             }
             ret = split_message_packer_write(packer, obj, "log");
-            flb_info("wrote to pack for partial id = %.*s", partial_id_size, partial_id_str);
             if (ret < 0) {
                 flb_plg_warn(ctx->ins, "Could not append content for partial record with tag %s", tag);
                 /* handle this record as non-partial */
@@ -603,7 +592,6 @@ static int ml_filter_partial(const void *data, size_t bytes,
             }
             is_last_partial = is_partial_last(obj);
             if (is_last_partial == FLB_TRUE) {
-                flb_info("is_last_partial=true partial id = %.*s", partial_id_size, partial_id_str);
                 /* emit the record in this filter invocation */
                 return_records++;
                 split_message_packer_complete(packer);
@@ -614,7 +602,6 @@ static int ml_filter_partial(const void *data, size_t bytes,
         } else {
 
 pack_non_partial:
-            flb_info("is_partial=FLB_FALSE");
             return_records++;
             /* record passed from filter as-is */
             msgpack_pack_array(&tmp_pck, 2);

@@ -76,7 +76,6 @@ int is_partial(msgpack_object *map)
     kv = get_key(map, "partial_message");
 
     if (kv == NULL) {
-        flb_info("didn't find partial_message key");
         return FLB_FALSE;
     }
 
@@ -203,10 +202,6 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
     size_t len;
     int map_size = 0;
 
-    msgpack_object_print(stdout, *map);
-    printf("\n^create_packer(map)\n");
-    fflush(stdout);
-
     packer = flb_calloc(1, sizeof(struct split_message_packer));
     if (!packer) {
         flb_errno();
@@ -326,16 +321,10 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
         }
         msgpack_pack_object(&packer->mp_pck, (kv+i)->key);
         msgpack_pack_object(&packer->mp_pck, (kv+i)->val);
-        msgpack_object_print(stdout, (kv+i)->key);
-        msgpack_object_print(stdout, (kv+i)->val);
-        printf("\n^create_packer: kv\n");
-        fflush(stdout);
     }
 
     /* write split kv last, so we can append to it later as needed */
     msgpack_pack_object(&packer->mp_pck, split_kv->key);
-    flb_info("create(): mpsbuf=`%.*s`", packer->mp_sbuf.size, packer->mp_sbuf.data);
-
 
     return packer;
 }
@@ -355,10 +344,6 @@ int split_message_packer_write(struct split_message_packer *packer,
     size_t val_str_size = 0;
     msgpack_object_kv *kv;
     msgpack_object  val;
-
-    msgpack_object_print(stdout, *map);
-    printf("\n^split_message_packer_write(map)\n");
-    fflush(stdout);
     
     kv = get_key(map, multiline_key_content);
 
@@ -377,11 +362,8 @@ int split_message_packer_write(struct split_message_packer *packer,
         val_str_size = val.via.str.size;
     }
 
-    flb_info("before: packer->buf=%s, val_str=%.*s", packer->buf, val_str_size, val_str);
     flb_sds_cat_safe(&packer->buf, val_str, val_str_size);
-    flb_info("after: packer->buf=%s", packer->buf);
     packer->last_write_time = current_timestamp();
-    flb_info("write(): mpsbuf=`%.*s`", packer->mp_sbuf.size, packer->mp_sbuf.data);
 
     return 0;
 }
@@ -390,22 +372,9 @@ void split_message_packer_complete(struct split_message_packer *packer)
 {
     int len;
     len = flb_sds_len(packer->buf);
-    flb_info("before complete: packer->buf=%s, buf_len=%i, mp_sbuf.size=%zu", 
              packer->buf, len, packer->mp_sbuf.size);
     msgpack_pack_str(&packer->mp_pck, len);
     msgpack_pack_str_body(&packer->mp_pck, packer->buf, len);
-    flb_info("after complete: mp_sbuf.size=%zu", packer->mp_sbuf.size);
-    flb_info("complete(): mpsbuf=`%.*s`", packer->mp_sbuf.size, packer->mp_sbuf.data);
-    // msgpack_zone mempool;
-    // msgpack_zone_init(&mempool, 2048);
-
-    // msgpack_object deserialized;
-    // msgpack_unpack(packer->mp_sbuf.data, packer->mp_sbuf.size, NULL, &mempool, &deserialized);
-
-    // /* print the deserialized object. */
-    // msgpack_object_print(stdout, deserialized);
-    // printf("\n\n");
-    // fflush(stdout);
 }
 
 void append_complete_record(char *data, size_t bytes, msgpack_packer *tmp_pck)
@@ -418,9 +387,6 @@ void append_complete_record(char *data, size_t bytes, msgpack_packer *tmp_pck)
 
     msgpack_unpacked_init(&result);
     while (msgpack_unpack_next(&result, data, bytes, &off) == ok) {
-        msgpack_object_print(stdout, result.data);
-        printf("\n^append_complete_record: unpacked\n");
-        fflush(stdout);
         flb_time_pop_from_msgpack(&tm, &result, &obj);
         msgpack_pack_array(tmp_pck, 2);
         flb_time_append_to_msgpack(&tm, tmp_pck, 0);
