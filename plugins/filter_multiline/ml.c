@@ -468,6 +468,7 @@ static void partial_timer_cb(struct flb_config *config, void *data)
     struct split_message_packer *packer;
     unsigned long long now;
     unsigned long long diff;
+    int ret; 
 
     flb_info("partial_timer_cb()");
 
@@ -489,6 +490,11 @@ static void partial_timer_cb(struct flb_config *config, void *data)
         ret = in_emitter_add_record(packer->tag, flb_sds_len(packer->tag), 
                                     packer->mp_sbuf.data, packer->mp_sbuf.size,
                                     ctx->ins_emitter);
+        if (ret < 0) {
+            /* this shouldn't happen in normal execution */
+            flb_plg_warn(ctx->ins, "Couldn't send concatenated record of size %zu bytes to in_emitter %s",
+                         packer->mp_sbuf.size, ctx->ins_emitter->name);
+        }
         split_message_packer_destroy(packer);
     }
 
