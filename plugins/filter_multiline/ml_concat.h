@@ -28,6 +28,17 @@
 /* docker logs are split at 16KB */
 #define FLB_MULTILINE_PARTIAL_BUF_SIZE       24000
 
+/* 
+ * Long term these keys could be made user configurable
+ * But everyone who's asking for this right now wants it for split
+ * Docker logs, which has a set series of keys
+ */
+#define FLB_MULTILINE_PARTIAL_PREFIX       "partial_"
+#define FLB_MULTILINE_PARTIAL_PREFIX_LEN   8
+#define FLB_MULTILINE_PARTIAL_MESSAGE_KEY  "partial_message"
+#define FLB_MULTILINE_PARTIAL_ID_KEY       "partial_id"
+#define FLB_MULTILINE_PARTIAL_LAST_KEY     "partial_last"
+
 struct split_message_packer {
     flb_sds_t tag;
     flb_sds_t input_name;

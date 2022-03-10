@@ -72,8 +72,7 @@ int is_partial(msgpack_object *map)
     msgpack_object_kv *kv;
     msgpack_object  val;
     
-    // TODO: config/constant
-    kv = get_key(map, "partial_message");
+    kv = get_key(map, FLB_MULTILINE_PARTIAL_MESSAGE_KEY);
 
     if (kv == NULL) {
         return FLB_FALSE;
@@ -87,7 +86,6 @@ int is_partial(msgpack_object *map)
         val_str  = (char *) val.via.str.ptr;
     }
 
-    // TODO: config/constant
     if (strncasecmp("true", val_str, 4) == 0) {
         return FLB_TRUE;
     }
@@ -100,8 +98,7 @@ int is_partial_last(msgpack_object *map)
     msgpack_object_kv *kv;
     msgpack_object  val;
     
-    // TODO: config/constant
-    kv = get_key(map, "partial_last");
+    kv = get_key(map, FLB_MULTILINE_PARTIAL_LAST_KEY);
 
     if (kv == NULL) {
         return FLB_FALSE;
@@ -115,7 +112,6 @@ int is_partial_last(msgpack_object *map)
         val_str  = (char *) val.via.str.ptr;
     }
 
-    // TODO: config/constant
     if (strncasecmp("true", val_str, 4) == 0) {
         return FLB_TRUE;
     }
@@ -131,8 +127,7 @@ int get_partial_id(msgpack_object *map,
     msgpack_object_kv *kv;
     msgpack_object  val;
     
-    // TODO: config/constant
-    kv = get_key(map, "partial_id");
+    kv = get_key(map, FLB_MULTILINE_PARTIAL_ID_KEY);
 
     if (kv == NULL) {
         return -1;
@@ -274,13 +269,13 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
             check_key = FLB_TRUE;
         }
 
-        len = 7;
+        len = FLB_MULTILINE_PARTIAL_PREFIX_LEN;
         if (key_str_size < len) {
             len = key_str_size;
         }
 
         if (check_key == FLB_TRUE) {
-            if (strncmp("partial", key_str, len) == 0) {
+            if (strncmp(FLB_MULTILINE_PARTIAL_PREFIX, key_str, len) == 0) {
                 /* don't pack the partial keys */
                 continue;
             }
@@ -308,13 +303,13 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
             check_key = FLB_TRUE;
         }
 
-        len = 7;
+        len = FLB_MULTILINE_PARTIAL_PREFIX_LEN;
         if (key_str_size < len) {
             len = key_str_size;
         }
 
         if (check_key == FLB_TRUE) {
-            if (strncmp("partial", key_str, len) == 0) {
+            if (strncmp(FLB_MULTILINE_PARTIAL_PREFIX, key_str, len) == 0) {
                 /* don't pack the partial keys */
                 continue;
             }

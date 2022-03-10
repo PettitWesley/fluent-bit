@@ -210,6 +210,26 @@ static int cb_ml_init(struct flb_filter_instance *ins,
     if (tmp) {
         ctx->use_buffer = flb_utils_bool(tmp);
     }
+    ctx->partial_mode = FLB_FALSE;
+    tmp = (char *) flb_filter_get_property("buffer", ins);
+    if (tmp != NULL) {
+        if (strcasecmp(tmp, FLB_MULTILINE_MODE_PARTIAL_MESSAGE) == 0) {
+            ctx->partial_mode = FLB_TRUE;
+        } else if (strcasecmp(tmp, FLB_MULTILINE_MODE_PARSER) == 0) {
+            ctx->partial_mode = FLB_FALSE;
+        } else {
+            flb_plg_error(ins, "'Mode' must be '%s' or '%s'", 
+                          FLB_MULTILINE_MODE_PARTIAL_MESSAGE,
+                          FLB_MULTILINE_MODE_PARSER);
+            return -1;
+        }
+    }
+
+    if (ctx->partial_mode == FLB_TRUE && ctx->use_buffer == FLB_FALSE) {
+        flb_plg_error(ins, "'%s' 'Mode' requires 'Buffer' to be 'On'",
+                      FLB_MULTILINE_MODE_PARTIAL_MESSAGE);
+    }
+
     if (ctx->use_buffer == FLB_FALSE) {
             /* Init buffers */
             msgpack_sbuffer_init(&ctx->mp_sbuf);
@@ -256,6 +276,13 @@ static int cb_ml_init(struct flb_filter_instance *ins,
         return -1;
     }
 
+    if (ctx->key_content == NULL && ctx->partial_mode == FLB_TRUE) {
+        flb_plg_error(ins, "'Mode' %s requires 'multiline.key_content'",
+                      FLB_MULTILINE_MODE_PARTIAL_MESSAGE);
+        flb_free(ctx);
+        return -1;
+    }
+
     /* Set plugin context */
     flb_filter_set_context(ins, ctx);
 
@@ -298,8 +325,6 @@ static int cb_ml_init(struct flb_filter_instance *ins,
 
     mk_list_init(&ctx->ml_streams);
     mk_list_init(&ctx->split_message_packers);
-
-    ctx->partial_mode = FLB_TRUE;
 
     if (ctx->partial_mode == FLB_FALSE) {
         /* Create multiline context */
@@ -564,7 +589,7 @@ static int ml_filter_partial(const void *data, size_t bytes,
             partial_records++;
             ret = get_partial_id(obj, &partial_id_str, &partial_id_size);
             if (ret == -1) {
-                flb_plg_warn(ctx->ins, "Could not find partial_id but is_partial key is FLB_TRUE for record with tag %s", tag);
+                flb_plg_warn(ctx->ins, "Could not find partial_id but partial_message key is FLB_TRUE for record with tag %s", tag);
                 /* handle this record as non-partial */
                 partial_records--;
                 goto pack_non_partial;
@@ -641,8 +666,6 @@ static int cb_ml_filter(const void *data, size_t bytes,
     struct ml_ctx *ctx = filter_context;
     struct flb_time tm;
     struct ml_stream *stream;
-
-    ctx->partial_mode = FLB_TRUE;
 
     if (i_ins == ctx->ins_emitter) {
         flb_plg_trace(ctx->ins, "not processing records from the emitter");
@@ -774,6 +797,13 @@ static struct flb_config_map config_map[] = {
      "rather than in chunks, re-emitting them into the beggining of the "
      "pipeline using the in_emitter instance. "
      "With buffer off, this filter will not work with most inputs, except tail."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "mode", "parser",
+     0, FLB_TRUE, offsetof(struct ml_ctx, mode),
+     "Mode can be 'parser' for regex concat, or 'partial_message' to "
+     "concat split docker logs."
     },
 
     {
