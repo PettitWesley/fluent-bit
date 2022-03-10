@@ -211,7 +211,7 @@ static int cb_ml_init(struct flb_filter_instance *ins,
         ctx->use_buffer = flb_utils_bool(tmp);
     }
     ctx->partial_mode = FLB_FALSE;
-    tmp = (char *) flb_filter_get_property("buffer", ins);
+    tmp = (char *) flb_filter_get_property("mode", ins);
     if (tmp != NULL) {
         if (strcasecmp(tmp, FLB_MULTILINE_MODE_PARTIAL_MESSAGE) == 0) {
             ctx->partial_mode = FLB_TRUE;
