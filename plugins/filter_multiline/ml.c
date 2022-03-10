@@ -557,7 +557,7 @@ pack_non_partial:
     }
     msgpack_unpacked_destroy(&result);
 
-    if (partial_records == 0 )) {
+    if (partial_records == 0 ) {
         return FLB_FILTER_NOTOUCH;
     } else if (return_records > 0) {
         *out_buf  = tmp_sbuf.data;
