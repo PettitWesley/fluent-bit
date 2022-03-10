@@ -330,7 +330,6 @@ void split_message_packer_complete(struct split_message_packer *packer)
 
 void append_complete_record(char *data, size_t bytes, msgpack_packer *tmp_pck)
 {
-    int ret;
     int ok = MSGPACK_UNPACK_SUCCESS;
     size_t off = 0;
     msgpack_unpacked result;
