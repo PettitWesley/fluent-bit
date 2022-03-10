@@ -257,12 +257,11 @@ struct split_message_packer *create_packer(const char *tag, char *input_name,
     msgpack_pack_map(&packer->mp_pck, map->via.map.size);
     kv = map->via.map.ptr;
     for(i=0; i < map->via.map.size; i++) {
-        key = (kv+i)->key;
-
-        if (key == split_kv) {
+        if ((kv+i) == split_kv) {
             continue;
         }
 
+        key = (kv+i)->key;
         if (key.type == MSGPACK_OBJECT_BIN) {
             key_str  = (char *) key.via.bin.ptr;
             key_str_size = key.via.bin.size;
