@@ -345,16 +345,16 @@ void split_message_packer_complete(struct split_message_packer *packer)
     msgpack_pack_str(&packer->mp_pck, len);
     msgpack_pack_str_body(&packer->mp_pck, packer->buf, len);
     flb_info("after complete: mp_sbuf.size=%zu", packer->mp_sbuf.size);
-    msgpack_zone mempool;
-    msgpack_zone_init(&mempool, 2048);
+    // msgpack_zone mempool;
+    // msgpack_zone_init(&mempool, 2048);
 
-    msgpack_object deserialized;
-    msgpack_unpack(packer->mp_sbuf.data, packer->mp_sbuf.size, NULL, &mempool, &deserialized);
+    // msgpack_object deserialized;
+    // msgpack_unpack(packer->mp_sbuf.data, packer->mp_sbuf.size, NULL, &mempool, &deserialized);
 
-    /* print the deserialized object. */
-    msgpack_object_print(stdout, deserialized);
-    printf("\n\n");
-    fflush(stdout);
+    // /* print the deserialized object. */
+    // msgpack_object_print(stdout, deserialized);
+    // printf("\n\n");
+    // fflush(stdout);
 }
 
 void append_complete_record(char *data, size_t bytes, msgpack_packer *tmp_pck)
