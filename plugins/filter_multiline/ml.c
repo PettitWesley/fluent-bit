@@ -469,6 +469,8 @@ static void partial_timer_cb(struct flb_config *config, void *data)
     unsigned long long now;
     unsigned long long diff;
 
+    flb_info("partial_timer_cb()");
+
     now = current_timestamp();
 
     mk_list_foreach_safe(head, tmp, &ctx->split_message_packers) {
@@ -529,6 +531,9 @@ static int ml_filter_partial(const void *data, size_t bytes,
     if (ctx->timer_created == FLB_FALSE) {
         flb_plg_debug(ctx->ins,
                       "Creating flush timer with frequency %dms",
+                      ctx->flush_ms);
+        flb_plg_warn(ctx->ins,
+                      "[remove] Creating flush timer with frequency %dms",
                       ctx->flush_ms);
 
         sched = flb_sched_ctx_get();
