@@ -316,7 +316,7 @@ int split_message_packer_write(struct split_message_packer *packer,
     msgpack_object_kv *kv;
     msgpack_object  val;
 
-    msgpack_object_print(stdout, map);
+    msgpack_object_print(stdout, *map);
     
     kv = get_key(map, multiline_key_content);
 
