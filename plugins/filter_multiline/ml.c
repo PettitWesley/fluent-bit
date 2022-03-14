@@ -646,13 +646,17 @@ pack_non_partial:
 
     msgpack_unpacked_destroy(&result);
 
-    if (partial_records == 0 ) {
-        msgpack_unpacked_destroy(&result);
+    if (partial_records == 0) {
+        /* if no records were partial, we didn't modify the chunk */
+        msgpack_sbuffer_destroy(&tmp_sbuf);
         return FLB_FILTER_NOTOUCH;
     } else if (return_records > 0) {
+        /* some new records can be returned now, return a new buffer */
         *out_buf  = tmp_sbuf.data;
         *out_bytes = tmp_sbuf.size;
-        msgpack_unpacked_destroy(&result);
+    } else {
+        /* no records to return right now, free buffer */
+        msgpack_sbuffer_destroy(&tmp_sbuf);
     }
     return FLB_FILTER_MODIFIED;
 }
