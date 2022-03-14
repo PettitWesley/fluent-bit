@@ -393,7 +393,7 @@ static void flb_test_multiline_partial_message_concat_two_ids()
     TEST_CHECK(ret == 0);
 
     /* Prepare output callback with expected result */
-    expected.expected_records = 2; /* 1 record with all lines concatenated */
+    expected.expected_records = 2; /* 2 records, one for each partial_id*/
     expected.expected_pattern = "one..two";
     cb_data.cb = cb_check_result;
     cb_data.data = (void *) &expected;
