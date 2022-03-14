@@ -644,15 +644,15 @@ pack_non_partial:
 
     }
 
+    msgpack_unpacked_destroy(&result);
+
     if (partial_records == 0 ) {
         msgpack_unpacked_destroy(&result);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         return FLB_FILTER_NOTOUCH;
     } else if (return_records > 0) {
         *out_buf  = tmp_sbuf.data;
         *out_bytes = tmp_sbuf.size;
         msgpack_unpacked_destroy(&result);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
     }
     return FLB_FILTER_MODIFIED;
 }
