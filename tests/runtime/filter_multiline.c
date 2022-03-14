@@ -336,7 +336,7 @@ static void flb_test_multiline_partial_message_concat()
                          "mode", "partial_message",
                          "buffer", "on",
                          "debug_flush", "on",
-                         "flush_ms", "666"
+                         "flush_ms", "666",
                          NULL);
     TEST_CHECK(ret == 0);
 
