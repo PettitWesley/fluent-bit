@@ -427,10 +427,11 @@ static void flb_test_multiline_partial_message_concat_two_ids()
 }
 
 TEST_LIST = {
-    {"multiline_buffered_one_record"                , flb_test_multiline_buffered_one_output_record },
-    {"multiline_buffered_two_record"                , flb_test_multiline_buffered_two_output_record },
-    {"flb_test_multiline_unbuffered"                , flb_test_multiline_unbuffered },
+    {"multiline_buffered_one_record"                      , flb_test_multiline_buffered_one_output_record },
+    {"multiline_buffered_two_record"                      , flb_test_multiline_buffered_two_output_record },
+    {"flb_test_multiline_unbuffered"                      , flb_test_multiline_unbuffered },
 
-    {"flb_test_multiline_partial_message_concat"    , flb_test_multiline_partial_message_concat },
+    {"flb_test_multiline_partial_message_concat"          , flb_test_multiline_partial_message_concat },
+    {"flb_test_multiline_partial_message_concat_two_ids"  , flb_test_multiline_partial_message_concat_two_ids },
     {NULL, NULL}
 };
