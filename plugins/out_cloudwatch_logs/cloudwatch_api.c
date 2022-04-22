@@ -545,7 +545,7 @@ retry:
         return -1;
     }
 
-    flb_plg_debug(ctx->ins, "Sending %d events", i);
+    flb_plg_info(ctx->ins, "PutLogEvents: Sending %d events, in batch of %d bytes", i, offset);
     ret = put_log_events(ctx, buf, stream, (size_t) offset);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Failed to send log events");
