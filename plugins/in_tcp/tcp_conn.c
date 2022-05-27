@@ -72,6 +72,7 @@ static inline int process_pack(struct tcp_conn *conn,
 
     msgpack_unpacked_destroy(&result);
 
+    flb_plg_info(conn->ctx->ins, "CUSTOM: TCP input ingesting %zu bytes", mp_sbuf.size);
     flb_input_chunk_append_raw(conn->ins, NULL, 0, mp_sbuf.data, mp_sbuf.size);
     msgpack_sbuffer_destroy(&mp_sbuf);
 
@@ -153,6 +154,7 @@ static ssize_t parse_payload_none(struct tcp_conn *conn)
         }
     }
 
+    flb_plg_info(conn->ctx->ins, "CUSTOM: TCP input ingesting %zu bytes", mp_sbuf.size);
     flb_input_chunk_append_raw(conn->ins, NULL, 0, mp_sbuf.data, mp_sbuf.size);
     msgpack_sbuffer_destroy(&mp_sbuf);
 
