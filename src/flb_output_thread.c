@@ -254,9 +254,10 @@ static void output_thread(void *data)
              * - handle return status by plugin flush callback.
              */
             if (event->type == FLB_ENGINE_EV_CORE) {
-
+                flb_plg_info(ins, "SCHEDULER: FLB_ENGINE_EV_CORE");
             }
             else if (event->type & FLB_ENGINE_EV_SCHED) {
+                flb_plg_info(ins, "SCHEDULER: FLB_ENGINE_EV_SCHED");
                 /*
                  * Note that this scheduler event handler has more features
                  * designed to be used from the parent thread, on this specific
@@ -266,6 +267,7 @@ static void output_thread(void *data)
                 flb_sched_event_handler(sched->config, event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD_OUTPUT) {
+                flb_plg_info(ins, "SCHEDULER: FLB_ENGINE_EV_THREAD_OUTPUT");
                 /* Read the task reference */
                 n = flb_pipe_r(event->fd, &task, sizeof(struct flb_task *));
                 if (n <= 0) {
@@ -295,9 +297,11 @@ static void output_thread(void *data)
                 flb_coro_resume(out_flush->coro);
             }
             else if (event->type == FLB_ENGINE_EV_CUSTOM) {
+                flb_plg_info(ins, "SCHEDULER: FLB_ENGINE_EV_CUSTOM");
                 event->handler(event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD) {
+                flb_plg_info(ins, "SCHEDULER: FLB_ENGINE_EV_THREAD");
                 /*
                  * Check if we have some co-routine associated to this event,
                  * if so, resume the co-routine
@@ -309,6 +313,7 @@ static void output_thread(void *data)
                 }
             }
             else if (event->type == FLB_ENGINE_EV_OUTPUT) {
+                flb_plg_info(ins, "SCHEDULER: FLB_ENGINE_EV_OUTPUT");
                 /*
                  * The flush callback has finished working and delivered it
                  * return status. At this intermediary step we cleanup the
