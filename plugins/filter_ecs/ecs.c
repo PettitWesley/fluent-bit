@@ -52,6 +52,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     struct flb_kv *kv;
     struct flb_split_entry *sentry;
     int list_size;
+    struct flb_ecs_metadata *ecs_meta = NULL;
     (void) data;
 
     /* Create context */
@@ -71,18 +72,66 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
         return -1;
     }
 
+    mk_list_init(&ctx->metadata_keys);
+
     mk_list_foreach(head, &f_ins->properties) {
         kv = mk_list_entry(head, struct flb_kv, _head);
 
-        split = flb_utils_split(kv->val, ' ', 3);
+        split = flb_utils_split(kv->val, ' ', 2);
         list_size = mk_list_size(split);
 
         if (list_size == 0 || list_size > 2) {
             flb_plg_error(ctx->ins, "Invalid config for %s", kv->key);
-            flb_free(ctx);
             flb_utils_split_free(split);
-            return -1;
+            goto error;
+        } else if (strcasecmp(kv->key, "add") == 0) {
+            sentry = mk_list_entry_first(split, struct flb_split_entry, _head);
+
+            ecs_meta = flb_calloc(1, sizeof(struct flb_ecs_metadata));
+            if (!ecs_meta) {
+                flb_errno();
+                flb_utils_split_free(split);
+                goto error;
+            }
+
+            ecs_meta->key = flb_sds_create_len(sentry->value, sentry->len);
+            if (!ecs_meta->key) {
+                flb_errno();
+                flb_utils_split_free(split);
+                goto error;
+            }
+
+            sentry = mk_list_entry_last(split, struct flb_split_entry, _head);
+            ecs_meta->template = flb_sds_create_len(sentry->value, sentry->len);
+            if (!ecs_meta->template) {
+                flb_errno();
+                flb_utils_split_free(split);
+                goto error;
+            }
+
+            ecs_meta->ra = flb_ra_create(ecs_meta->template, FLB_FALSE);
+            if (ecs_meta->ra == NULL) {
+                flb_plg_error(ctx->ins, "Could not parse template for `%s`", ecs_meta->key);
+                flb_utils_split_free(split);
+                goto error;
+            }
+
+            mk_list_add(&ecs_meta->_head, &ctx->metadata_keys);
         }
+    }
+
+    ctx->ecs_upstream = flb_upstream_create(config,
+                                            FLB_FILTER_AWS_IMDS_HOST,
+                                            80,
+                                            FLB_IO_TCP,
+                                            NULL);
+
+    
+
+error:
+    flb_plg_error(ctx->ins, "Initialization failed.");
+    flb_free(ctx);
+    return -1;
 }
 
 static int cb_ecs_filter(const void *data, size_t bytes,
@@ -125,7 +174,8 @@ static struct flb_config_map config_map[] = {
     {
      FLB_CONFIG_MAP_STR, "Add", NULL,
      FLB_CONFIG_MAP_MULT, FLB_FALSE, 0,
-     "Add a metadata key/value pair with the given key and given value from the given template"
+     "Add a metadata key/value pair with the given key and given value from the given template. "
+     "Format is `Add KEY TEMPLATE`."
     },
 
     {0}

@@ -23,13 +23,27 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_filter.h>
 
+#define FLB_ECS_FILTER_HOST                       "127.0.0.1"
+#define FLB_ECS_FILTER_PORT                       "51678"
+#define FLB_ECS_FILTER_PATH                       "/v1/tasks"
+
+struct flb_ecs_metadata {
+    flb_sds_t key;
+    flb_sds_t template;
+    struct flb_record_accessor ra;
+
+    struct mk_list _head;
+};
+
 
 struct flb_filter_ecs {
-    /* upstream connection to ec2 IMDS */
+    /* upstream connection to ECS Agent */
     struct flb_upstream *ecs_upstream;
 
     /* Filter plugin instance reference */
     struct flb_filter_instance *ins;
+
+    struct mk_list metadata_keys;
 };
 
 #endif
