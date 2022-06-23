@@ -117,21 +117,38 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
             }
 
             mk_list_add(&ecs_meta->_head, &ctx->metadata_keys);
+            flb_utils_split_free(split);
         }
     }
 
     ctx->ecs_upstream = flb_upstream_create(config,
-                                            FLB_FILTER_AWS_IMDS_HOST,
-                                            80,
+                                            FLB_ECS_FILTER_HOST,
+                                            FLB_ECS_FILTER_PORT,
                                             FLB_IO_TCP,
                                             NULL);
 
-    
+    if (!ctx->ecs_upstream) {
+        flb_errno();
+        flb_plg_error(ctx->ins, "Could not create upstream connection to ECS Agent");
+    }
+
+    /* 
+     * Remove async flag from upstream 
+     * Filters can not coroutine-yield. 
+     */
+    ctx->ecs_upstream->flags &= ~(FLB_IO_ASYNC);
+
+
 
 error:
     flb_plg_error(ctx->ins, "Initialization failed.");
     flb_free(ctx);
     return -1;
+}
+
+static int get_ecs_metadata(struct flb_filter_ecs *ctx)
+{
+    
 }
 
 static int cb_ecs_filter(const void *data, size_t bytes,
@@ -156,6 +173,8 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     msgpack_unpacked result;
     msgpack_object  *obj;
     msgpack_object_kv *kv;
+
+
 }
 
 static int cb_ecs_exit(void *data, struct flb_config *config)
