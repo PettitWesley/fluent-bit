@@ -73,6 +73,7 @@ struct flb_opensearch {
     /* one for the standard chain provider, one for sts assume role */
     struct flb_tls *aws_sts_tls;
     char *aws_session_name;
+    char *aws_service_name;
 #endif
 
     /* HTTP Client Setup */
