@@ -1288,7 +1288,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t create_time
     size_t final_body_size;
     char final_body_md5[25];
 
-    s3_key = flb_get_s3_key(ctx->s3_key_format, create_time, tag, ctx->tag_delimiters,
+    s3_key = flb_get_s3_key(ctx->ins, ctx->s3_key_format, create_time, tag, ctx->tag_delimiters,
                             ctx->seq_index);
     if (!s3_key) {
         flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);
@@ -1492,7 +1492,7 @@ static struct multipart_upload *create_upload(struct flb_s3 *ctx,
         flb_errno();
         return NULL;
     }
-    s3_key = flb_get_s3_key(ctx->s3_key_format, time(NULL), tag, ctx->tag_delimiters,
+    s3_key = flb_get_s3_key(ctx->ins, ctx->s3_key_format, time(NULL), tag, ctx->tag_delimiters,
                             ctx->seq_index);
     if (!s3_key) {
         flb_plg_error(ctx->ins, "Failed to construct S3 Object Key for %s", tag);

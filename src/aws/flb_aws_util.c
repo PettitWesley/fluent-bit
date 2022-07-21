@@ -650,7 +650,7 @@ static char* replace_uri_tokens(const char* original_string, const char* current
 }
 
 /* Constructs S3 object key as per the format. */
-flb_sds_t flb_get_s3_key(const char *format, time_t time, const char *tag,
+flb_sds_t flb_get_s3_key(struct flb_output_instance *ins, const char *format, time_t time, const char *tag,
                          char *tag_delimiter, uint64_t seq_index)
 {
     int i = 0;
@@ -706,6 +706,7 @@ flb_sds_t flb_get_s3_key(const char *format, time_t time, const char *tag,
 
     /* Split the string on the delimiters */
     tag_token = strtok(tmp_tag, tag_delimiter);
+    flb_plg_warn(ins, "i=%d, s3_key=%s, tag_token=%s", i, s3_key, tag_token);
 
     /* Find all occurences of $TAG[*] and
      * replaces it with the right token from tag.
@@ -738,6 +739,8 @@ flb_sds_t flb_get_s3_key(const char *format, time_t time, const char *tag,
 
         tag_token = strtok(NULL, tag_delimiter);
         i++;
+        flb_plg_warn(ins, "i=%d, s3_key=%s, tag_token=%s", i, s3_key, tag_token);
+
     }
 
     tmp = flb_sds_create_len(TAG_PART_DESCRIPTOR, 5);
