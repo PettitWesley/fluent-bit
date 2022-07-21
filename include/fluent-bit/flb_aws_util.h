@@ -173,7 +173,7 @@ int flb_aws_is_auth_error(char *payload, size_t payload_size);
 int flb_read_file(const char *path, char **out_buf, size_t *out_size);
 
 //* Constructs S3 object key as per the format. */
-flb_sds_t flb_get_s3_key(const char *format, time_t time, const char *tag,
+flb_sds_t flb_get_s3_key(struct flb_output_instance *ins, const char *format, time_t time, const char *tag,
                          char *tag_delimiter, uint64_t seq_index);
 
 #endif
