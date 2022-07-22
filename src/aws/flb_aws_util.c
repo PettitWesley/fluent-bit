@@ -727,20 +727,19 @@ flb_sds_t flb_get_s3_key(struct flb_output_instance *ins, const char *format, ti
             goto error;
         }
 
-        if(strlen(tmp_key) > S3_KEY_SIZE){
+        if(strlen(tmp_key) > S3_KEY_SIZE) {
             flb_warn("[s3_key] Object key length is longer than the 1024 character limit.");
         }
 
-        flb_sds_destroy(tmp);
-        tmp = NULL;
         flb_sds_destroy(s3_key);
         s3_key = tmp_key;
         tmp_key = NULL;
 
         tag_token = strtok(NULL, tag_delimiter);
         i++;
-        flb_plg_warn(ins, "i=%d, s3_key=%s, tag_token=%s", i, s3_key, tag_token);
-
+        flb_plg_warn(ins, "i=%d, s3_key=%s, tag_token=%s, search=%s", i, s3_key, tag_token, tmp);
+        flb_sds_destroy(tmp);
+        tmp = NULL;
     }
 
     tmp = flb_sds_create_len(TAG_PART_DESCRIPTOR, 5);
