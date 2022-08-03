@@ -146,9 +146,67 @@ error:
     return -1;
 }
 
-static int get_ecs_metadata(struct flb_filter_ecs *ctx)
+/*
+ * Get cluster and container instance info, which are static and never change
+ */
+static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
 {
+    struct flb_http_client *c;
+    struct flb_upstream_conn *u_conn;
+    int ret;
+    int root_type;
+    char *buffer;
+    size_t size;
+    size_t b_sent;
+
+    u_conn = flb_upstream_conn_get(ctx->ecs_upstream);
+
+    if (!u_conn) {
+        flb_plg_error(ctx->ins, "ECS agent introspection endpoint connection error");
+        return -1;
+    }
     
+    /* Compose HTTP Client request*/
+    c = flb_http_client(u_conn, FLB_HTTP_GET,
+                        FLB_ECS_FILTER_CLUSTER_PATH,
+                        NULL, 0, 
+                        FLB_ECS_FILTER_HOST, FLB_ECS_FILTER_PORT,
+                        NULL, 0);
+    flb_http_buffer_size(c, ctx->buffer_size);
+
+    flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+
+    ret = flb_http_do(c, &b_sent);
+    flb_plg_debug(ctx->ins, "http_do=%i, "
+                  "HTTP Status: %i",
+                  ret, c->resp.status);
+
+    if (ret != 0 || c->resp.status != 200) {
+        if (c->resp.payload_size > 0) {
+            flb_plg_warn(ctx->ins, "Failed to get metadata from %s, will retry", 
+                         FLB_ECS_FILTER_CLUSTER_PATH);
+            flb_plg_debug(ctx->ins, "HTTP response\n%s",
+                          c->resp.payload);
+        }
+        flb_http_client_destroy(c);
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
+
+    ret = flb_pack_json(c->resp.payload, c->resp.payload_size,
+                        &buffer, &size, &root_type);
+
+    /* release resources */
+    flb_http_client_destroy(c);
+    flb_upstream_conn_release(u_conn);
+
+    if (ret < 0) {
+        flb_plg_warn(ctx->ins, "Could not parse response from %s; response=\n%s", 
+                     FLB_ECS_FILTER_CLUSTER_PATH, c->resp.payload);
+        return -1;
+    }
+
+    return packed;
 }
 
 static int cb_ecs_filter(const void *data, size_t bytes,
