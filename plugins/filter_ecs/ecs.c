@@ -151,7 +151,20 @@ error:
  */
 static flb_sds_t parse_id_from_arn(char *arn)
 {
-    
+    char *last_slash = NULL;
+    flb_sds_t ID = NULL;
+
+    last_slash = strrchr(arn, '/');
+    if (last_slash == NULL || last_slash == '\0') {
+        return NULL;
+    }
+
+    ID = flb_sds_create(last_slash);
+    if (ID == NULL) {
+        flb_errno();
+    }
+
+    return ID;
 }
 
 /*
