@@ -147,6 +147,14 @@ error:
 }
 
 /*
+ * Both container instance and task ARNs have the ID at the end after last '/'
+ */
+static flb_sds_t parse_id_from_arn(char *arn)
+{
+    
+}
+
+/*
  * Get cluster and container instance info, which are static and never change
  */
 static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
@@ -158,7 +166,14 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     char *buffer;
     size_t size;
     size_t b_sent;
+    size_t off = 0;
     struct flb_ecs_metadata_buffer *meta_buf;
+    msgpack_unpacked result;
+    msgpack_object root;
+    msgpack_object key;
+    msgpack_object val;
+    msgpack_sbuffer tmp_sbuf;
+    msgpack_packer tmp_pck;
 
     u_conn = flb_upstream_conn_get(ctx->ecs_upstream);
 
@@ -209,21 +224,132 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
 
     /* parse metadata response */
     msgpack_unpacked_init(&result);
-    ret = msgpack_unpack_next(&result, out_buf, out_size, &off);
+    ret = msgpack_unpack_next(&result, buffer, size, &off);
     if (ret != MSGPACK_UNPACK_SUCCESS) {
-        flb_plg_error(ctx->ins, "Cannot unpack response to find error\n%s",
-                      c->resp.payload);
-        return FLB_TRUE;
+        flb_plg_error(ctx->ins, "Cannot unpack %s response to find metadata\n%s",
+                      FLB_ECS_FILTER_CLUSTER_PATH, c->resp.payload);
+        flb_free(buffer);
+        return -1;
     }
 
     root = result.data;
     if (root.type != MSGPACK_OBJECT_MAP) {
-        flb_plg_error(ctx->ins, "unexpected payload type=%i",
+        flb_plg_error(ctx->ins, "%s response parsing failed, msgpack_type=%i",
+                      FLB_ECS_FILTER_CLUSTER_PATH,
                       root.type);
-        check = FLB_TRUE;
-        goto done;
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
+        return -1;
     }
 
+    /* 
+     * We copy the metadata response to a new buffer
+     * So we can define the metadata key names and parse ARN values
+     */
+    msgpack_sbuffer_init(&tmp_sbuf);
+    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
+
+    /* 
+Response
+{
+    "Cluster": "cluster_name",
+    "ContainerInstanceArn": "arn:aws:ecs:region:aws_account_id:container-instance/cluster_name/container_instance_id",
+    "Version": "Amazon ECS Agent - v1.30.0 (02ff320c)"
+}
+We will create:
+{
+    "ClusterName": "cluster_name",
+    "ContainerInstanceArn": "arn:aws:ecs:region:aws_account_id:container-instance/cluster_name/container_instance_id",
+    "ContainerInstanceID": "container_instance_id"
+    "ECSAgentVersion": "Amazon ECS Agent - v1.30.0 (02ff320c)"
+}
+    */
+
+    for (i = 0; i < root.via.map.size; i++) {
+        key = root.via.map.ptr[i].key;
+        if (key.type != MSGPACK_OBJECT_STR) {
+            flb_plg_error(ctx->ins, "%s response parsing failed, msgpack key type=%i",
+                         FLB_ECS_FILTER_CLUSTER_PATH,
+                         key.type);
+        }
+
+        if (key.via.str.size == 6 && strncmp(key.via.str.ptr, "errors", 6) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_BOOLEAN) {
+                flb_plg_error(ctx->ins, "unexpected 'error' value type=%i",
+                              val.type);
+                check = FLB_TRUE;
+                goto done;
+            }
+
+            /* If error == false, we are OK (no errors = FLB_FALSE) */
+            if (!val.via.boolean) {
+                /* no errors */
+                check = FLB_FALSE;
+                goto done;
+            }
+        }
+        else if (key.via.str.size == 5 && strncmp(key.via.str.ptr, "items", 5) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_ARRAY) {
+                flb_plg_error(ctx->ins, "unexpected 'items' value type=%i",
+                              val.type);
+                check = FLB_TRUE;
+                goto done;
+            }
+
+            for (j = 0; j < val.via.array.size; j++) {
+                item = val.via.array.ptr[j];
+                if (item.type != MSGPACK_OBJECT_MAP) {
+                    flb_plg_error(ctx->ins, "unexpected 'item' outer value type=%i",
+                                  item.type);
+                    check = FLB_TRUE;
+                    goto done;
+                }
+
+                if (item.via.map.size != 1) {
+                    flb_plg_error(ctx->ins, "unexpected 'item' size=%i",
+                                  item.via.map.size);
+                    check = FLB_TRUE;
+                    goto done;
+                }
+
+                item = item.via.map.ptr[0].val;
+                if (item.type != MSGPACK_OBJECT_MAP) {
+                    flb_plg_error(ctx->ins, "unexpected 'item' inner value type=%i",
+                                  item.type);
+                    check = FLB_TRUE;
+                    goto done;
+                }
+
+                for (k = 0; k < item.via.map.size; k++) {
+                    item_key = item.via.map.ptr[k].key;
+                    if (item_key.type != MSGPACK_OBJECT_STR) {
+                        flb_plg_error(ctx->ins, "unexpected key type=%i",
+                                      item_key.type);
+                        check = FLB_TRUE;
+                        goto done;
+                    }
+
+                    if (item_key.via.str.size == 6 && strncmp(item_key.via.str.ptr, "status", 6) == 0) {
+                        item_val = item.via.map.ptr[k].val;
+
+                        if (item_val.type != MSGPACK_OBJECT_POSITIVE_INTEGER) {
+                            flb_plg_error(ctx->ins, "unexpected 'status' value type=%i",
+                                          item_val.type);
+                            check = FLB_TRUE;
+                            goto done;
+                        }
+                        /* Check for errors other than version conflict (document already exists) */
+                        if (item_val.via.i64 != 409) {
+                            check = FLB_TRUE;
+                            goto done;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
     if (!meta_buf) {
