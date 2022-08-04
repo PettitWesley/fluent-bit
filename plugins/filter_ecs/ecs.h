@@ -36,6 +36,14 @@ struct flb_ecs_metadata {
     struct mk_list _head;
 };
 
+struct flb_ecs_metadata_buffer {
+    char *buf;
+    size_t size;
+
+    msgpack_unpacked unpacked;
+    msgpack_object obj;
+};
+
 
 struct flb_filter_ecs {
     /* upstream connection to ECS Agent */
@@ -45,6 +53,9 @@ struct flb_filter_ecs {
     struct flb_filter_instance *ins;
 
     struct mk_list metadata_keys;
+
+    struct flb_ecs_metadata_buffer cluster_metadata;
+    int has_cluster_metadata;
 };
 
 #endif

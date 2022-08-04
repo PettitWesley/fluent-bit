@@ -138,7 +138,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
      */
     ctx->ecs_upstream->flags &= ~(FLB_IO_ASYNC);
 
-
+    ctx->has_cluster_metadata = FLB_FALSE;
 
 error:
     flb_plg_error(ctx->ins, "Initialization failed.");
@@ -158,6 +158,7 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     char *buffer;
     size_t size;
     size_t b_sent;
+    struct flb_ecs_metadata_buffer *meta_buf;
 
     u_conn = flb_upstream_conn_get(ctx->ecs_upstream);
 
@@ -206,7 +207,35 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
         return -1;
     }
 
-    return packed;
+    /* parse metadata response */
+    msgpack_unpacked_init(&result);
+    ret = msgpack_unpack_next(&result, out_buf, out_size, &off);
+    if (ret != MSGPACK_UNPACK_SUCCESS) {
+        flb_plg_error(ctx->ins, "Cannot unpack response to find error\n%s",
+                      c->resp.payload);
+        return FLB_TRUE;
+    }
+
+    root = result.data;
+    if (root.type != MSGPACK_OBJECT_MAP) {
+        flb_plg_error(ctx->ins, "unexpected payload type=%i",
+                      root.type);
+        check = FLB_TRUE;
+        goto done;
+    }
+
+
+    meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
+    if (!meta_buf) {
+        flb_errno();
+        flb_free(buffer);
+        return -1;
+    }
+
+    // meta_buf->buf = buffer;
+    // meta_buf->size = size;
+
+    return 0;
 }
 
 static int cb_ecs_filter(const void *data, size_t bytes,
