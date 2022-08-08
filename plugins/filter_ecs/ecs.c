@@ -139,6 +139,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     ctx->ecs_upstream->flags &= ~(FLB_IO_ASYNC);
     ctx->has_cluster_metadata = FLB_FALSE;
 
+    flb_filter_set_context(f_ins, ctx);
     return 0;
 
 error:
@@ -503,6 +504,8 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     struct mk_list *head;
     struct flb_ecs_metadata_key *metadata_key;
     flb_sds_t val;
+
+    flb_info("ctx=%p, context=%p", ctx, context);
 
     /* First check that the metadata has been retrieved */
     if (ctx->has_cluster_metadata == FLB_FALSE) {
