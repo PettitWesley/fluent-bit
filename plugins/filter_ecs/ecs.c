@@ -76,8 +76,6 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     mk_list_foreach(head, &f_ins->properties) {
         kv = mk_list_entry(head, struct flb_kv, _head);
 
-        flb_info("config: key=%s, val=%s", kv->key, kv->val);
-
         split = flb_utils_split(kv->val, ' ', 2);
         list_size = mk_list_size(split);
 
@@ -87,7 +85,6 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
             goto error;
         } else if (strcasecmp(kv->key, "add") == 0) {
             sentry = mk_list_entry_first(split, struct flb_split_entry, _head);
-            flb_info("list_size=%d, first=%s", list_size, sentry->value);
             ecs_meta = flb_calloc(1, sizeof(struct flb_ecs_metadata_key));
             if (!ecs_meta) {
                 flb_errno();
@@ -103,7 +100,6 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
             }
 
             sentry = mk_list_entry_last(split, struct flb_split_entry, _head);
-            flb_info("list_size=%d, last=%s", list_size, sentry->value);
 
             ecs_meta->template = flb_sds_create_len(sentry->value, sentry->len);
             if (!ecs_meta->template) {
@@ -167,11 +163,11 @@ static flb_sds_t parse_id_from_arn(const char *arn, int len)
         }
     }
 
-    if (last_slash == 0 || last_slash >= len - 1) {
+    if (last_slash == 0 || last_slash >= len - 2) {
         return NULL;
     }
 
-    ID = flb_sds_create_len(arn + last_slash, len - last_slash);
+    ID = flb_sds_create_len(arn + last_slash + 1, len - last_slash);
     if (ID == NULL) {
         flb_errno();
         return NULL;
@@ -282,8 +278,6 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
         flb_upstream_conn_release(u_conn);
         return -1;
     }
-
-    flb_info("resp=%s", c->resp.payload);
 
     ret = flb_pack_json(c->resp.payload, c->resp.payload_size,
                         &buffer, &size, &root_type);
@@ -569,11 +563,6 @@ static int cb_ecs_filter(const void *data, size_t bytes,
         /* append new keys */
         mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
             metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
-            flb_info("template=%s", metadata_key->template);
-            flb_info("msgpack_buf=%s", ctx->cluster_metadata->buf);
-            flb_info("\n");
-            msgpack_object_print(stdout, ctx->cluster_metadata->obj);
-            flb_info("\n");
             val = flb_ra_translate(metadata_key->ra, NULL, 0,
                                    ctx->cluster_metadata->obj, NULL);
             if (!val) {
