@@ -54,7 +54,7 @@ struct flb_filter_ecs {
 
     struct mk_list metadata_keys;
 
-    struct flb_ecs_metadata_buffer cluster_metadata;
+    struct flb_ecs_metadata_buffer *cluster_metadata;
     int has_cluster_metadata;
 };
 
