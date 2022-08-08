@@ -139,6 +139,8 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     ctx->ecs_upstream->flags &= ~(FLB_IO_ASYNC);
     ctx->has_cluster_metadata = FLB_FALSE;
 
+    return 0;
+
 error:
     flb_plg_error(ctx->ins, "Initialization failed.");
     flb_free(ctx);
