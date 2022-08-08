@@ -528,7 +528,7 @@ static int cb_ecs_filter(const void *data, size_t bytes,
 
         if (result.data.type != MSGPACK_OBJECT_ARRAY) {
             flb_plg_error(ctx->ins, "cb_filter buffer wrong type, msgpack_type=%i",
-                          root.type);
+                          result.data.type);
             continue;
         }
 
@@ -538,7 +538,7 @@ static int cb_ecs_filter(const void *data, size_t bytes,
         /* obj should now be the record map */
         if (obj->type != MSGPACK_OBJECT_MAP) {
             flb_plg_error(ctx->ins, "Record wrong type, msgpack_type=%i",
-                          root.type);
+                          obj->type);
             continue;
         }
 
@@ -588,6 +588,12 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     *out_buf  = tmp_sbuf.data;
     *out_size = tmp_sbuf.size;
     return FLB_FILTER_MODIFIED;
+}
+
+static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
+{
+    //TODO:
+    flb_free(ctx);
 }
 
 static int cb_ecs_exit(void *data, struct flb_config *config)
