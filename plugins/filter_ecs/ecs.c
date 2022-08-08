@@ -43,7 +43,6 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
                        struct flb_config *config,
                        void *data)
 {
-    int use_v2;
     int ret;
     struct flb_filter_ecs *ctx = NULL;
     const char *tmp = NULL;
@@ -180,11 +179,13 @@ static flb_sds_t parse_id_from_arn(char *arn, int len)
  * This deserializes the msgpack metadata buf to msgpack_object
  * which can be used with flb_ra_translate in the main filter callback
  */
-static int flb_ecs_metadata_buffer_init(struct flb_ecs_metadata_buffer *meta)
+static int flb_ecs_metadata_buffer_init(struct flb_filter_ecs *ctx,
+                                        struct flb_ecs_metadata_buffer *meta)
 {
     msgpack_unpacked result;
     msgpack_object root;
     size_t off = 0;
+    int ret;
 
     msgpack_unpacked_init(&result);
     ret = msgpack_unpack_next(&result, meta->buf, meta->size, &off);
@@ -255,7 +256,7 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
                         NULL, 0, 
                         FLB_ECS_FILTER_HOST, FLB_ECS_FILTER_PORT,
                         NULL, 0);
-    flb_http_buffer_size(c, ctx->buffer_size);
+    flb_http_buffer_size(c, 0); /* 0 means unlimited */
 
     flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
 
@@ -460,7 +461,7 @@ We will create:
     meta_buf->buf = tmp_sbuf.data;
     meta_buf->size = tmp_sbuf.size;
 
-    ret = flb_ecs_metadata_buffer_init(meta_buf);
+    ret = flb_ecs_metadata_buffer_init(ctx, meta_buf);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);

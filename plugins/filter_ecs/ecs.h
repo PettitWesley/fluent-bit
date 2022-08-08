@@ -22,9 +22,12 @@
 
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_filter.h>
+#include <fluent-bit/flb_record_accessor.h>
+#include <fluent-bit/flb_ra_key.h>
+#include <fluent-bit/record_accessor/flb_ra_parser.h>
 
 #define FLB_ECS_FILTER_HOST                       "127.0.0.1"
-#define FLB_ECS_FILTER_PORT                       "51678"
+#define FLB_ECS_FILTER_PORT                       51678
 #define FLB_ECS_FILTER_CLUSTER_PATH               "/v1/metadata"
 #define FLB_ECS_FILTER_TASKS_PATH                 "/v1/tasks"
 
