@@ -34,7 +34,7 @@
 struct flb_ecs_metadata_key {
     flb_sds_t key;
     flb_sds_t template;
-    struct flb_record_accessor ra;
+    struct flb_record_accessor *ra;
 
     struct mk_list _head;
 };

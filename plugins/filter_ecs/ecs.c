@@ -45,7 +45,6 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
 {
     int ret;
     struct flb_filter_ecs *ctx = NULL;
-    const char *tmp = NULL;
     struct mk_list *head;
     struct mk_list *split;
     struct flb_kv *kv;
@@ -149,14 +148,13 @@ error:
 /*
  * Both container instance and task ARNs have the ID at the end after last '/'
  */
-static flb_sds_t parse_id_from_arn(char *arn, int len)
+static flb_sds_t parse_id_from_arn(const char *arn, int len)
 {
-    char *c = NULL;
     int i;
     flb_sds_t ID = NULL;
     int last_slash = 0;
 
-    for (int i = 0; i < len; i++) {
+    for (i = 0; i < len; i++) {
         if (arn[i] == '/') {
             last_slash = i;
         }
@@ -166,7 +164,7 @@ static flb_sds_t parse_id_from_arn(char *arn, int len)
         return NULL;
     }
 
-    ID = flb_sds_create(arn + last_slash, len - last_slash);
+    ID = flb_sds_create_len(arn + last_slash, len - last_slash);
     if (ID == NULL) {
         flb_errno();
         return NULL;
@@ -230,6 +228,7 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     int found_cluster = FLB_FALSE;
     int found_version = FLB_FALSE;
     int found_instance = FLB_FALSE;
+    int i;
     char *buffer;
     size_t size;
     size_t b_sent;
@@ -432,19 +431,19 @@ We will create:
     flb_free(buffer);
     msgpack_unpacked_destroy(&result);
 
-    if (found_cluster == FLB_FALSE {
+    if (found_cluster == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Cluster' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
         msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
-    if (found_instance == FLB_FALSE {
+    if (found_instance == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'ContainerInstanceArn' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
         msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
-    if (found_version == FLB_FALSE {
+    if (found_version == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Version' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
         msgpack_sbuffer_destroy(&tmp_sbuf);
