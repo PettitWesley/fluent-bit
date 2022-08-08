@@ -156,6 +156,7 @@ static flb_sds_t parse_id_from_arn(const char *arn, int len)
     int i;
     flb_sds_t ID = NULL;
     int last_slash = 0;
+    int id_start = 0;
 
     for (i = 0; i < len; i++) {
         if (arn[i] == '/') {
@@ -166,8 +167,9 @@ static flb_sds_t parse_id_from_arn(const char *arn, int len)
     if (last_slash == 0 || last_slash >= len - 2) {
         return NULL;
     }
+    id_start = last_slash + 1;
 
-    ID = flb_sds_create_len(arn + last_slash + 1, len - last_slash);
+    ID = flb_sds_create_len(arn + last_slash, len - last_slash);
     if (ID == NULL) {
         flb_errno();
         return NULL;
