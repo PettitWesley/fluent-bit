@@ -505,7 +505,7 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     flb_sds_t val;
 
     /* First check that the metadata has been retrieved */
-    if (!ctx->has_cluster_metadata) {
+    if (ctx->has_cluster_metadata == FLB_FALSE) {
         ret = get_ecs_cluster_metadata(ctx);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not retrieve cluster metadata "
