@@ -76,6 +76,8 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     mk_list_foreach(head, &f_ins->properties) {
         kv = mk_list_entry(head, struct flb_kv, _head);
 
+        flb_info("config: key=%s, val=%s", kv->key, kv->val);
+
         split = flb_utils_split(kv->val, ' ', 2);
         list_size = mk_list_size(split);
 
@@ -85,7 +87,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
             goto error;
         } else if (strcasecmp(kv->key, "add") == 0) {
             sentry = mk_list_entry_first(split, struct flb_split_entry, _head);
-
+            flb_info("list_size=%d, first=%s", list_size, sentry->value);
             ecs_meta = flb_calloc(1, sizeof(struct flb_ecs_metadata_key));
             if (!ecs_meta) {
                 flb_errno();
@@ -101,6 +103,8 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
             }
 
             sentry = mk_list_entry_last(split, struct flb_split_entry, _head);
+            flb_info("list_size=%d, last=%s", list_size, sentry->value);
+
             ecs_meta->template = flb_sds_create_len(sentry->value, sentry->len);
             if (!ecs_meta->template) {
                 flb_errno();
