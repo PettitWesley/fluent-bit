@@ -279,6 +279,8 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
         return -1;
     }
 
+    flb_info("resp=%s", c->resp.payload);
+
     ret = flb_pack_json(c->resp.payload, c->resp.payload_size,
                         &buffer, &size, &root_type);
 
@@ -505,8 +507,6 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     struct flb_ecs_metadata_key *metadata_key;
     flb_sds_t val;
 
-    flb_info("ctx=%p, context=%p", ctx, context);
-
     /* First check that the metadata has been retrieved */
     if (ctx->has_cluster_metadata == FLB_FALSE) {
         ret = get_ecs_cluster_metadata(ctx);
@@ -565,6 +565,11 @@ static int cb_ecs_filter(const void *data, size_t bytes,
         /* append new keys */
         mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
             metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
+            flb_info("template=%s", metadata_key->template);
+            flb_info("msgpack_buf=%s", ctx->cluster_metadata->buf);
+            flb_info("\n");
+            msgpack_object_print(stdout, ctx->cluster_metadata->obj);
+            flb_info("\n");
             val = flb_ra_translate(metadata_key->ra, NULL, 0,
                                    ctx->cluster_metadata->obj, NULL);
             if (!val) {
