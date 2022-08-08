@@ -52,7 +52,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     struct flb_kv *kv;
     struct flb_split_entry *sentry;
     int list_size;
-    struct flb_ecs_metadata *ecs_meta = NULL;
+    struct flb_ecs_metadata_key *ecs_meta = NULL;
     (void) data;
 
     /* Create context */
@@ -73,6 +73,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     }
 
     mk_list_init(&ctx->metadata_keys);
+    ctx->metadata_keys_len = 0;
 
     mk_list_foreach(head, &f_ins->properties) {
         kv = mk_list_entry(head, struct flb_kv, _head);
@@ -87,7 +88,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
         } else if (strcasecmp(kv->key, "add") == 0) {
             sentry = mk_list_entry_first(split, struct flb_split_entry, _head);
 
-            ecs_meta = flb_calloc(1, sizeof(struct flb_ecs_metadata));
+            ecs_meta = flb_calloc(1, sizeof(struct flb_ecs_metadata_key));
             if (!ecs_meta) {
                 flb_errno();
                 flb_utils_split_free(split);
@@ -117,6 +118,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
             }
 
             mk_list_add(&ecs_meta->_head, &ctx->metadata_keys);
+            ctx->metadata_keys_len++;
             flb_utils_split_free(split);
         }
     }
@@ -137,7 +139,6 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
      * Filters can not coroutine-yield. 
      */
     ctx->ecs_upstream->flags &= ~(FLB_IO_ASYNC);
-
     ctx->has_cluster_metadata = FLB_FALSE;
 
 error:
@@ -488,6 +489,7 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     size_t off = 0;
     int i = 0;
     int ret;
+    int len;
     struct flb_time tm;
     int total_records;
     msgpack_sbuffer tmp_sbuf;
@@ -495,8 +497,97 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     msgpack_unpacked result;
     msgpack_object  *obj;
     msgpack_object_kv *kv;
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct flb_ecs_metadata_key *metadata_key;
+    flb_sds_t val;
 
+    /* First check that the metadata has been retrieved */
+    if (!ctx->has_cluster_metadata) {
+        ret = get_ecs_cluster_metadata(ctx);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Could not retrieve cluster metadata "
+                          "from ECS Agent");
+            return FLB_FILTER_NOTOUCH;
+        }
+        //TODO: cluster metadata can be exposed in global env ctx
+    }
+    /* Create temporary msgpack buffer */
+    msgpack_sbuffer_init(&tmp_sbuf);
+    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
 
+    /* Iterate over each item */
+    msgpack_unpacked_init(&result);
+    while (msgpack_unpack_next(&result, data, bytes, &off)
+           == MSGPACK_UNPACK_SUCCESS) {
+        /*
+         * Each record is a msgpack array [timestamp, map] of the
+         * timestamp and record map. We 'unpack' each record, and then re-pack
+         * it with the new fields added.
+         */
+
+        if (result.data.type != MSGPACK_OBJECT_ARRAY) {
+            flb_plg_error(ctx->ins, "cb_filter buffer wrong type, msgpack_type=%i",
+                          root.type);
+            continue;
+        }
+
+        /* unpack the array of [timestamp, map] */
+        flb_time_pop_from_msgpack(&tm, &result, &obj);
+
+        /* obj should now be the record map */
+        if (obj->type != MSGPACK_OBJECT_MAP) {
+            flb_plg_error(ctx->ins, "Record wrong type, msgpack_type=%i",
+                          root.type);
+            continue;
+        }
+
+        /* re-pack the array into a new buffer */
+        msgpack_pack_array(&tmp_pck, 2);
+        flb_time_append_to_msgpack(&tm, &tmp_pck, 0);
+
+        /* new record map size is old size + the new keys we will add */
+        total_records = obj->via.map.size + ctx->metadata_keys_len;
+        msgpack_pack_map(&tmp_pck, total_records);
+
+        /* iterate through the old record map and add it to the new buffer */
+        kv = obj->via.map.ptr;
+        for(i=0; i < obj->via.map.size; i++) {
+            msgpack_pack_object(&tmp_pck, (kv+i)->key);
+            msgpack_pack_object(&tmp_pck, (kv+i)->val);
+        }
+
+        /* append new keys */
+        mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
+            metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
+            val = flb_ra_translate(metadata_key->ra, NULL, 0,
+                                   ctx->cluster_metadata->obj, NULL);
+            if (!val) {
+                flb_plg_error(ctx->ins, "Translation failed for %s : %s",
+                              metadata_key->key, metadata_key->template);
+                msgpack_unpacked_destroy(&result);
+                msgpack_sbuffer_destroy(&tmp_sbuf);
+                return FLB_FILTER_NOTOUCH;
+            }
+            len = flb_sds_len(metadata_key->key);
+            msgpack_pack_str(&tmp_pck, len);
+            msgpack_pack_str_body(&tmp_pck,
+                                  metadata_key->key,
+                                  len);
+            len = flb_sds_len(val);
+            msgpack_pack_str(&tmp_pck, len);
+            msgpack_pack_str_body(&tmp_pck,
+                                  val,
+                                  len);
+            flb_sds_destroy(val);
+        }
+    }
+    msgpack_unpacked_destroy(&result);
+
+    /* link new buffers */
+    *out_buf  = tmp_sbuf.data;
+    *out_size = tmp_sbuf.size;
+    return FLB_FILTER_MODIFIED;
 }
 
 static int cb_ecs_exit(void *data, struct flb_config *config)

@@ -28,7 +28,7 @@
 #define FLB_ECS_FILTER_CLUSTER_PATH               "/v1/metadata"
 #define FLB_ECS_FILTER_TASKS_PATH                 "/v1/tasks"
 
-struct flb_ecs_metadata {
+struct flb_ecs_metadata_key {
     flb_sds_t key;
     flb_sds_t template;
     struct flb_record_accessor ra;
@@ -53,6 +53,7 @@ struct flb_filter_ecs {
     struct flb_filter_instance *ins;
 
     struct mk_list metadata_keys;
+    int metadata_keys_len;
 
     struct flb_ecs_metadata_buffer *cluster_metadata;
     int has_cluster_metadata;
