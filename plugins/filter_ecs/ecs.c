@@ -169,7 +169,7 @@ static flb_sds_t parse_id_from_arn(const char *arn, int len)
     }
     id_start = last_slash + 1;
 
-    ID = flb_sds_create_len(arn + last_slash, len - last_slash);
+    ID = flb_sds_create_len(arn + id_start, len - id_start);
     if (ID == NULL) {
         flb_errno();
         return NULL;
