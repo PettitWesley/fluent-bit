@@ -35,8 +35,6 @@ struct flb_ecs_metadata_key {
     flb_sds_t key;
     flb_sds_t template;
     struct flb_record_accessor *ra;
-
-    struct mk_list _head;
 };
 
 struct flb_ecs_metadata_buffer {
@@ -45,6 +43,8 @@ struct flb_ecs_metadata_buffer {
 
     msgpack_unpacked unpacked;
     msgpack_object obj;
+
+    struct mk_list _head;
 };
 
 
@@ -60,6 +60,8 @@ struct flb_filter_ecs {
 
     struct flb_ecs_metadata_buffer *cluster_metadata;
     int has_cluster_metadata;
+
+    
 };
 
 #endif

@@ -479,6 +479,282 @@ We will create:
     return 0;
 }
 
+/*
+ * Gets the container and task metadata for a single container
+ * given its 12 char short ID. This can be used with the ECS Agent
+ * Introspection API: http://localhost:51678/v1/tasks?dockerid={shortID}
+ */
+static int get_metadata_for_container(struct flb_filter_ecs *ctx, char* shortID)
+{
+    struct flb_http_client *c;
+    struct flb_upstream_conn *u_conn;
+    int ret;
+    int root_type;
+    int found_cluster = FLB_FALSE;
+    int found_version = FLB_FALSE;
+    int found_instance = FLB_FALSE;
+    int i;
+    char *buffer;
+    size_t size;
+    size_t b_sent;
+    size_t off = 0;
+    struct flb_ecs_metadata_buffer *meta_buf;
+    msgpack_unpacked result;
+    msgpack_object root;
+    msgpack_object key;
+    msgpack_object val;
+    msgpack_sbuffer tmp_sbuf;
+    msgpack_packer tmp_pck;
+    flb_sds_t container_instance_id = NULL;
+
+    u_conn = flb_upstream_conn_get(ctx->ecs_upstream);
+
+    if (!u_conn) {
+        flb_plg_error(ctx->ins, "ECS agent introspection endpoint connection error");
+        return -1;
+    }
+    
+    /* Compose HTTP Client request*/
+    c = flb_http_client(u_conn, FLB_HTTP_GET,
+                        FLB_ECS_FILTER_TASKS_PATH,
+                        NULL, 0, 
+                        FLB_ECS_FILTER_HOST, FLB_ECS_FILTER_PORT,
+                        NULL, 0);
+    flb_http_buffer_size(c, 0); /* 0 means unlimited */
+
+    flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+
+    ret = flb_http_do(c, &b_sent);
+    flb_plg_debug(ctx->ins, "http_do=%i, "
+                  "HTTP Status: %i",
+                  ret, c->resp.status);
+
+    if (ret != 0 || c->resp.status != 200) {
+        if (c->resp.payload_size > 0) {
+            flb_plg_warn(ctx->ins, "Failed to get metadata from %s, will retry", 
+                         FLB_ECS_FILTER_TASKS_PATH);
+            flb_plg_debug(ctx->ins, "HTTP response\n%s",
+                          c->resp.payload);
+        }
+        flb_http_client_destroy(c);
+        flb_upstream_conn_release(u_conn);
+        return -1;
+    }
+
+    ret = flb_pack_json(c->resp.payload, c->resp.payload_size,
+                        &buffer, &size, &root_type);
+
+    if (ret < 0) {
+        flb_plg_warn(ctx->ins, "Could not parse response from %s; response=\n%s", 
+                     FLB_ECS_FILTER_TASKS_PATH, c->resp.payload);
+        return -1;
+    }
+
+     /* release resources */
+    flb_http_client_destroy(c);
+    flb_upstream_conn_release(u_conn);
+
+    /* parse metadata response */
+    msgpack_unpacked_init(&result);
+    ret = msgpack_unpack_next(&result, buffer, size, &off);
+    if (ret != MSGPACK_UNPACK_SUCCESS) {
+        flb_plg_error(ctx->ins, "Cannot unpack %s response to find metadata\n%s",
+                      FLB_ECS_FILTER_TASKS_PATH, c->resp.payload);
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
+        return -1;
+    }
+
+    root = result.data;
+    if (root.type != MSGPACK_OBJECT_MAP) {
+        flb_plg_error(ctx->ins, "%s response parsing failed, msgpack_type=%i",
+                      FLB_ECS_FILTER_TASKS_PATH,
+                      root.type);
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
+        return -1;
+    }
+
+    /* 
+     * We copy the metadata response to a new buffer
+     * So we can define the metadata key names and parse ARN values
+     */
+    msgpack_sbuffer_init(&tmp_sbuf);
+    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
+
+    /*
+Metadata Response:
+{
+    "Arn": "arn:aws:ecs:us-west-2:012345678910:task/default/e01d58a8-151b-40e8-bc01-22647b9ecfec",
+    "Containers": [
+        {
+            "DockerId": "79c796ed2a7f864f485c76f83f3165488097279d296a7c05bd5201a1c69b2920",
+            "DockerName": "ecs-nginx-efs-2-nginx-9ac0808dd0afa495f001",
+            "Name": "nginx"
+        }
+    ],
+    "DesiredStatus": "RUNNING",
+    "Family": "nginx-efs",
+    "KnownStatus": "RUNNING",
+    "Version": "2"
+}
+We will create two types of metadata objects:
+1. Task:
+{
+    "TaskARN": "arn:aws:ecs:us-west-2:012345678910:task/default/example5-58ff-46c9-ae05-543f8example",
+    "TaskID: "example5-58ff-46c9-ae05-543f8example",
+    "TaskDefFamily": "hello_world",
+    "TaskDefVersion": "8",
+}
+2. Container:
+{
+    "ContainerID": "9581a69a761a557fbfce1d0f6745e4af5b9dbfb86b6b2c5c4df156f1a5932ff1",
+    "DockerContainerName": "ecs-hello_world-8-mysql-fcae8ac8f9f1d89d8301",
+    "ContainerName": "mysql"
+}
+    */
+
+    msgpack_pack_map(&tmp_pck, 4);
+
+    for (i = 0; i < root.via.map.size; i++) {
+        key = root.via.map.ptr[i].key;
+        if (key.type != MSGPACK_OBJECT_STR) {
+            flb_plg_error(ctx->ins, "%s response parsing failed, msgpack key type=%i",
+                         FLB_ECS_FILTER_TASKS_PATH,
+                         key.type);
+        }
+
+        if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Cluster", 7) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_STR) {
+                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Cluster' value type=%i",
+                              val.type);
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                msgpack_sbuffer_destroy(&tmp_sbuf);
+                return -1;
+            }
+
+            found_cluster = FLB_TRUE;
+            msgpack_pack_str(&tmp_pck, 11);
+            msgpack_pack_str_body(&tmp_pck,
+                                  "ClusterName",
+                                  11);
+            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
+            msgpack_pack_str_body(&tmp_pck,
+                                  val.via.str.ptr,
+                                  (int) val.via.str.size);
+        }
+        else if (key.via.str.size == 20 && strncmp(key.via.str.ptr, "ContainerInstanceArn", 20) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_STR) {
+                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'ContainerInstanceArn' value type=%i",
+                              val.type);
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                msgpack_sbuffer_destroy(&tmp_sbuf);
+                return -1;
+            }
+
+            /* first pack the ARN */
+            found_instance = FLB_TRUE;
+            msgpack_pack_str(&tmp_pck, 20);
+            msgpack_pack_str_body(&tmp_pck,
+                                  "ContainerInstanceArn",
+                                  20);
+            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
+            msgpack_pack_str_body(&tmp_pck,
+                                  val.via.str.ptr,
+                                  (int) val.via.str.size);
+            /* then pack the ID */
+            container_instance_id = parse_id_from_arn(val.via.str.ptr,  (int) val.via.str.size);
+            if (container_instance_id == NULL) {
+                flb_plg_error(ctx->ins, "metadata parsing: failed to get ID from %.*s",
+                              (int) val.via.str.size, val.via.str.ptr);
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                msgpack_sbuffer_destroy(&tmp_sbuf);
+                return -1;
+            }
+            msgpack_pack_str(&tmp_pck, 19);
+            msgpack_pack_str_body(&tmp_pck,
+                                  "ContainerInstanceID",
+                                  19);
+            msgpack_pack_str(&tmp_pck, flb_sds_len(container_instance_id));
+            msgpack_pack_str_body(&tmp_pck,
+                                  container_instance_id,
+                                  flb_sds_len(container_instance_id));
+            flb_sds_destroy(container_instance_id);
+        } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Version", 7) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_STR) {
+                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Version' value type=%i",
+                              val.type);
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                msgpack_sbuffer_destroy(&tmp_sbuf);
+                return -1;
+            }
+
+            found_version = FLB_TRUE;
+            msgpack_pack_str(&tmp_pck, 15);
+            msgpack_pack_str_body(&tmp_pck,
+                                  "ECSAgentVersion",
+                                  15);
+            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
+            msgpack_pack_str_body(&tmp_pck,
+                                  val.via.str.ptr,
+                                  (int) val.via.str.size);
+        }
+
+    }
+
+    flb_free(buffer);
+    msgpack_unpacked_destroy(&result);
+
+    if (found_cluster == FLB_FALSE) {
+        flb_plg_error(ctx->ins, "Could not parse 'Cluster' from %s response",
+                      FLB_ECS_FILTER_TASKS_PATH);
+        msgpack_sbuffer_destroy(&tmp_sbuf);
+        return -1;
+    }
+    if (found_instance == FLB_FALSE) {
+        flb_plg_error(ctx->ins, "Could not parse 'ContainerInstanceArn' from %s response",
+                      FLB_ECS_FILTER_TASKS_PATH);
+        msgpack_sbuffer_destroy(&tmp_sbuf);
+        return -1;
+    }
+    if (found_version == FLB_FALSE) {
+        flb_plg_error(ctx->ins, "Could not parse 'Version' from %s response",
+                      FLB_ECS_FILTER_TASKS_PATH);
+        msgpack_sbuffer_destroy(&tmp_sbuf);
+        return -1;
+    }
+
+    meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
+    if (!meta_buf) {
+        flb_errno();
+        msgpack_sbuffer_destroy(&tmp_sbuf);
+        return -1;
+    }
+
+    meta_buf->buf = tmp_sbuf.data;
+    meta_buf->size = tmp_sbuf.size;
+
+    ret = flb_ecs_metadata_buffer_init(ctx, meta_buf);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
+                      FLB_ECS_FILTER_CLUSTER_PATH);
+        msgpack_sbuffer_destroy(&tmp_sbuf);
+        flb_free(meta_buf);
+        return -1;
+    }
+
+    ctx->cluster_metadata = meta_buf;
+    ctx->has_cluster_metadata = FLB_TRUE;
+    return 0;
+}
+
 static int cb_ecs_filter(const void *data, size_t bytes,
                          const char *tag, int tag_len,
                          void **out_buf, size_t *out_size,
