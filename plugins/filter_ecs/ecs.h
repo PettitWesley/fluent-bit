@@ -29,7 +29,7 @@
 #define FLB_ECS_FILTER_HOST                       "127.0.0.1"
 #define FLB_ECS_FILTER_PORT                       51678
 #define FLB_ECS_FILTER_CLUSTER_PATH               "/v1/metadata"
-#define FLB_ECS_FILTER_TASKS_PATH                 "/v1/tasks"
+#define FLB_ECS_FILTER_TASK_PATH_FORMAT           "/v1/tasks?dockerid=%s"
 
 struct flb_ecs_metadata_key {
     flb_sds_t key;
