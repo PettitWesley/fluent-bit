@@ -73,6 +73,11 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     mk_list_init(&ctx->metadata_keys);
     ctx->metadata_keys_len = 0;
 
+    ctx->hash_table = flb_hash_table_create_with_ttl(ctx->kube_meta_cache_ttl,
+                                                         FLB_HASH_TABLE_EVICT_OLDER,
+                                                         FLB_ECS_FILTER_HASH_TABLE_SIZE,
+                                                         FLB_ECS_FILTER_HASH_TABLE_SIZE);
+
     mk_list_foreach(head, &f_ins->properties) {
         kv = mk_list_entry(head, struct flb_kv, _head);
 

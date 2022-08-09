@@ -31,10 +31,20 @@
 #define FLB_ECS_FILTER_CLUSTER_PATH               "/v1/metadata"
 #define FLB_ECS_FILTER_TASK_PATH_FORMAT           "/v1/tasks?dockerid=%s"
 
+/*
+ * Kubernetes recommends not running more than 110 pods per node
+ * In ECS, the number of tasks per instance will vary considerably
+ * But this should be a very safe starting size for the table
+ * Since we use the TTL hash table there is no max size. 
+ */
+#define FLB_ECS_FILTER_HASH_TABLE_SIZE 100
+
 struct flb_ecs_metadata_key {
     flb_sds_t key;
     flb_sds_t template;
     struct flb_record_accessor *ra;
+
+    struct mk_list _head;
 };
 
 struct flb_ecs_metadata_buffer {
@@ -43,8 +53,6 @@ struct flb_ecs_metadata_buffer {
 
     msgpack_unpacked unpacked;
     msgpack_object obj;
-
-    struct mk_list _head;
 };
 
 
@@ -61,7 +69,17 @@ struct flb_filter_ecs {
     struct flb_ecs_metadata_buffer *cluster_metadata;
     int has_cluster_metadata;
 
-    
+    /* 
+     * Maps 12 char container short ID to container metadata buffer
+     */
+    struct flb_hash_table *container_hash_table;
+
+    /* 
+     * Maps 12 char container short ID to task metadata buffer
+     * This may seem inefficient but in practice most task
+     * only have 1 - 2 containers. 
+     */
+    struct flb_hash_table *task_hash_table;
 };
 
 #endif
