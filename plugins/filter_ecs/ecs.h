@@ -73,16 +73,16 @@ struct flb_filter_ecs {
     /* 
      * Maps 12 char container short ID to container metadata buffer
      */
-    struct flb_hash_table *container_hash_table;
+    struct flb_hash *container_hash_table;
 
     /* 
      * Maps 12 char container short ID to task metadata buffer
      * This may seem inefficient but in practice most tasks
      * only have 1 - 2 containers. 
      */
-    struct flb_hash_table *task_hash_table;
+    struct flb_hash *task_hash_table;
 
-    int hash_table_ttl;
+    int ecs_meta_cache_ttl;
 };
 
 #endif
