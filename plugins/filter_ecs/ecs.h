@@ -39,6 +39,7 @@
  */
 #define FLB_ECS_FILTER_HASH_TABLE_SIZE 100
 
+
 struct flb_ecs_metadata_key {
     flb_sds_t key;
     flb_sds_t template;
@@ -76,10 +77,12 @@ struct flb_filter_ecs {
 
     /* 
      * Maps 12 char container short ID to task metadata buffer
-     * This may seem inefficient but in practice most task
+     * This may seem inefficient but in practice most tasks
      * only have 1 - 2 containers. 
      */
     struct flb_hash_table *task_hash_table;
+
+    int hash_table_ttl;
 };
 
 #endif

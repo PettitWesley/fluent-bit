@@ -73,11 +73,6 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     mk_list_init(&ctx->metadata_keys);
     ctx->metadata_keys_len = 0;
 
-    ctx->hash_table = flb_hash_table_create_with_ttl(ctx->kube_meta_cache_ttl,
-                                                         FLB_HASH_TABLE_EVICT_OLDER,
-                                                         FLB_ECS_FILTER_HASH_TABLE_SIZE,
-                                                         FLB_ECS_FILTER_HASH_TABLE_SIZE);
-
     mk_list_foreach(head, &f_ins->properties) {
         kv = mk_list_entry(head, struct flb_kv, _head);
 
@@ -143,6 +138,28 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
      */
     ctx->ecs_upstream->flags &= ~(FLB_IO_ASYNC);
     ctx->has_cluster_metadata = FLB_FALSE;
+
+    /* entries are only evicted when TTL is reached and a get is issued */
+    ctx->container_hash_table = flb_hash_table_create_with_ttl(ctx->hash_table_ttl,
+                                                               FLB_HASH_TABLE_EVICT_OLDER,
+                                                               FLB_ECS_FILTER_HASH_TABLE_SIZE,
+                                                               FLB_ECS_FILTER_HASH_TABLE_SIZE);
+    if (!ctx->container_hash_table) {
+        flb_plg_error(f_ins, "failed to create container_hash_table");
+        //TODO: destroy method
+        return -1;
+    }
+
+    /* entries are only evicted when TTL is reached and a get is issued */
+    ctx->task_hash_table = flb_hash_table_create_with_ttl(ctx->hash_table_ttl,
+                                                          FLB_HASH_TABLE_EVICT_OLDER,
+                                                          FLB_ECS_FILTER_HASH_TABLE_SIZE,
+                                                          FLB_ECS_FILTER_HASH_TABLE_SIZE);
+    if (!ctx->task_hash_table) {
+        flb_plg_error(f_ins, "failed to create task_hash_table");
+        //TODO: destroy method
+        return -1;
+    }
 
     flb_filter_set_context(f_ins, ctx);
     return 0;
@@ -485,8 +502,8 @@ We will create:
 }
 
 /*
- * Gets the container and task metadata for a single container
- * given its 12 char short ID. This can be used with the ECS Agent
+ * Gets the container and task metadata for a task via a container's
+ * 12 char short ID. This can be used with the ECS Agent
  * Introspection API: http://localhost:51678/v1/tasks?dockerid={shortID}
  * Entries in the hash table will be added for all containers in the task
  */
@@ -500,11 +517,12 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* shortID)
     int found_version = FLB_FALSE;
     int found_family = FLB_FALSE;
     int i;
+    int id;
     char *buffer;
     size_t size;
     size_t b_sent;
     size_t off = 0;
-    struct flb_ecs_metadata_buffer *meta_buf;
+    struct flb_ecs_metadata_buffer *task_meta_buf;
     msgpack_unpacked result;
     msgpack_object root;
     msgpack_object key;
@@ -764,29 +782,32 @@ We will create two types of metadata objects:
     }
     //TODO: containers field
 
-    meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
-    if (!meta_buf) {
+    task_meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
+    if (!task_meta_buf) {
         flb_errno();
         msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(http_path);
         return -1;
     }
 
-    meta_buf->buf = tmp_sbuf.data;
-    meta_buf->size = tmp_sbuf.size;
+    task_meta_buf->buf = tmp_sbuf.data;
+    task_meta_buf->size = tmp_sbuf.size;
 
-    ret = flb_ecs_metadata_buffer_init(ctx, meta_buf);
+    ret = flb_ecs_metadata_buffer_init(ctx, task_meta_buf);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
                       http_path);
         msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_free(meta_buf);
+        flb_free(task_meta_buf);
         flb_sds_destroy(http_path);
         return -1;
     }
 
     flb_sds_destroy(http_path);
-    //TODO: save metadata struct to hash table
+    
+    id = flb_hash_table_add(ctx->task_hash_table,
+                            meta->cache_key, meta->cache_key_len,
+                            tmp_hash_meta_buf, hash_meta_size);
     return 0;
 }
 
