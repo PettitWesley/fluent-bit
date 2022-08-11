@@ -473,17 +473,11 @@ But our metadata keys names are:
 }
 
 /*
- * This is a helper function used by get_task_metadata()
- * It processes a single container metadata object from the response
- * And stores it in our hash table
- * 
- * Given an input like:
-{
-    "DockerId": "79c796ed2a7f864f485c76f83f3165488097279d296a7c05bd5201a1c69b2920",
-    "DockerName": "ecs-nginx-efs-2-nginx-9ac0808dd0afa495f001",
-    "Name": "nginx"
-}
-We will create a new metadata object:
+ * This is the helper function used by get_task_metadata()
+ * that actually creates the final metadata msgpack buffer
+ * with our final key names.
+ * It collects cluster, task, and container metadata into one
+The new metadata msgpack is flat and looks like:
 {
     "ContainerID": "79c796ed2a7f864f485c76f83f3165488097279d296a7c05bd5201a1c69b2920",
     "DockerContainerName": "ecs-nginx-efs-2-nginx-9ac0808dd0afa495f001",
