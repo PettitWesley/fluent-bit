@@ -56,6 +56,13 @@ struct flb_ecs_metadata_buffer {
     msgpack_object obj;
 };
 
+struct flb_ecs_cluster_metadata {
+    flb_sds_t cluster_name;
+    flb_sds_t container_instance_arn;
+    flb_sds_t container_instance_id;
+    flb_sds_t ecs_agent_version;
+};
+
 
 struct flb_filter_ecs {
     /* upstream connection to ECS Agent */
@@ -67,20 +74,13 @@ struct flb_filter_ecs {
     struct mk_list metadata_keys;
     int metadata_keys_len;
 
-    struct flb_ecs_metadata_buffer *cluster_metadata;
+    struct flb_ecs_cluster_metadata cluster_metadata;
     int has_cluster_metadata;
 
     /* 
-     * Maps 12 char container short ID to container metadata buffer
+     * Maps 12 char container short ID to metadata buffer
      */
     struct flb_hash *container_hash_table;
-
-    /* 
-     * Maps 12 char container short ID to task metadata buffer
-     * This may seem inefficient but in practice most tasks
-     * only have 1 - 2 containers. 
-     */
-    struct flb_hash *task_hash_table;
 
     int ecs_meta_cache_ttl;
 };
