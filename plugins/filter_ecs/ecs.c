@@ -377,14 +377,16 @@ But our metadata keys names are:
             }
 
             found_cluster = FLB_TRUE;
-            tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
-            if (!tmp) {
-                flb_errno();
-                flb_free(buffer);
-                msgpack_unpacked_destroy(&result);
-                return -1;
+            if (ctx->cluster_metadata.cluster_name == NULL) {
+                tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
+                if (!tmp) {
+                    flb_errno();
+                    flb_free(buffer);
+                    msgpack_unpacked_destroy(&result);
+                    return -1;
+                }
+                ctx->cluster_metadata.cluster_name = tmp;
             }
-            ctx->cluster_metadata.cluster_name = tmp;
         }
         else if (key.via.str.size == 20 && strncmp(key.via.str.ptr, "ContainerInstanceArn", 20) == 0) {
             val = root.via.map.ptr[i].val;
@@ -398,25 +400,29 @@ But our metadata keys names are:
 
             /* first the ARN */
             found_instance = FLB_TRUE;
-            tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
-            if (!tmp) {
-                flb_errno();
-                flb_free(buffer);
-                msgpack_unpacked_destroy(&result);
-                return -1;
+            if (ctx->cluster_metadata.container_instance_arn == NULL) {
+                tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
+                if (!tmp) {
+                    flb_errno();
+                    flb_free(buffer);
+                    msgpack_unpacked_destroy(&result);
+                    return -1;
+                }
+                ctx->cluster_metadata.container_instance_arn = tmp;
             }
-            ctx->cluster_metadata.container_instance_arn = tmp;
 
             /* then the ID */
-            container_instance_id = parse_id_from_arn(val.via.str.ptr,  (int) val.via.str.size);
-            if (container_instance_id == NULL) {
-                flb_plg_error(ctx->ins, "metadata parsing: failed to get ID from %.*s",
-                              (int) val.via.str.size, val.via.str.ptr);
-                flb_free(buffer);
-                msgpack_unpacked_destroy(&result);
-                return -1;
+            if (ctx->cluster_metadata.container_instance_id == NULL) {
+                container_instance_id = parse_id_from_arn(val.via.str.ptr,  (int) val.via.str.size);
+                if (container_instance_id == NULL) {
+                    flb_plg_error(ctx->ins, "metadata parsing: failed to get ID from %.*s",
+                                (int) val.via.str.size, val.via.str.ptr);
+                    flb_free(buffer);
+                    msgpack_unpacked_destroy(&result);
+                    return -1;
+                }
+                ctx->cluster_metadata.container_instance_id = container_instance_id;
             }
-            ctx->cluster_metadata.container_instance_id = container_instance_id;
         } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Version", 7) == 0) {
             val = root.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_STR) {
@@ -428,14 +434,16 @@ But our metadata keys names are:
             }
 
             found_version = FLB_TRUE;
-            tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
-            if (!tmp) {
-                flb_errno();
-                flb_free(buffer);
-                msgpack_unpacked_destroy(&result);
-                return -1;
+            if (ctx->cluster_metadata.ecs_agent_version == NULL) {
+                tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
+                if (!tmp) {
+                    flb_errno();
+                    flb_free(buffer);
+                    msgpack_unpacked_destroy(&result);
+                    return -1;
+                }
+                ctx->cluster_metadata.ecs_agent_version = tmp;
             }
-            ctx->cluster_metadata.ecs_agent_version = tmp;
         }
 
     }
