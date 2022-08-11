@@ -481,7 +481,17 @@ The new metadata msgpack is flat and looks like:
 {
     "ContainerID": "79c796ed2a7f864f485c76f83f3165488097279d296a7c05bd5201a1c69b2920",
     "DockerContainerName": "ecs-nginx-efs-2-nginx-9ac0808dd0afa495f001",
-    "ContainerName": "nginx"
+    "ContainerName": "nginx",
+
+    "ClusterName": "cluster_name",
+    "ContainerInstanceArn": "arn:aws:ecs:region:aws_account_id:container-instance/cluster_name/container_instance_id",
+    "ContainerInstanceID": "container_instance_id"
+    "ECSAgentVersion": "Amazon ECS Agent - v1.30.0 (02ff320c)"
+
+    "TaskARN": "arn:aws:ecs:us-west-2:012345678910:task/default/example5-58ff-46c9-ae05-543f8example",
+    "TaskID: "example5-58ff-46c9-ae05-543f8example",
+    "TaskDefFamily": "hello_world",
+    "TaskDefVersion": "8",
 }
  */
 static int process_container_response(struct flb_filter_ecs *ctx,
@@ -508,8 +518,10 @@ static int process_container_response(struct flb_filter_ecs *ctx,
     msgpack_sbuffer_init(&tmp_sbuf);
     msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
 
-    msgpack_pack_map(&tmp_pck, 3);
+    /* 3 container metadata keys, 4 for instance/cluster, 4 for the task */
+    msgpack_pack_map(&tmp_pck, 11);
 
+    /* 1st- process/pack the raw container metadata response */
     for (i = 0; i < container.via.map.size; i++) {
         key = container.via.map.ptr[i].key;
         if (key.type != MSGPACK_OBJECT_STR) {
@@ -618,6 +630,10 @@ static int process_container_response(struct flb_filter_ecs *ctx,
         }
         return -1;
     }
+
+    /* 2nd - Add the task fields from the task_meta temp buf we were given */
+
+    /* 3rd - Add the static cluster fields from the plugin context */
 
     cont_meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
     if (!cont_meta_buf) {
