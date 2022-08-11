@@ -249,6 +249,26 @@ static void flb_ecs_metadata_buffer_destroy(struct flb_ecs_metadata_buffer *meta
     }
 }
 
+/* 
+ * If metadata parsing fails half way through, we need to free
+ * any SDS strings that were created and then retry.
+ */
+static void cluster_metadata_destroy(struct flb_filter_ecs *ctx)
+{
+    if (ctx->cluster_metadata.cluster_name) {
+        flb_sds_destroy(ctx->cluster_metadata.cluster_name);
+    }
+    if (ctx->cluster_metadata.container_instance_arn) {
+        flb_sds_destroy(ctx->cluster_metadata.container_instance_arn);
+    }
+    if (ctx->cluster_metadata.container_instance_id) {
+        flb_sds_destroy(ctx->cluster_metadata.container_instance_id);
+    }
+    if (ctx->cluster_metadata.ecs_agent_version) {
+        flb_sds_destroy(ctx->cluster_metadata.ecs_agent_version);
+    }
+}
+
 /*
  * Get cluster and container instance info, which are static and never change
  */
@@ -271,9 +291,8 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     msgpack_object root;
     msgpack_object key;
     msgpack_object val;
-    msgpack_sbuffer tmp_sbuf;
-    msgpack_packer tmp_pck;
     flb_sds_t container_instance_id = NULL;
+    flb_sds_t tmp = NULL;
 
     u_conn = flb_upstream_conn_get(ctx->ecs_upstream);
 
@@ -344,20 +363,13 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     }
 
     /* 
-     * We copy the metadata response to a new buffer
-     * So we can define the metadata key names and parse ARN values
-     */
-    msgpack_sbuffer_init(&tmp_sbuf);
-    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
-
-    /* 
 Metadata Response:
 {
     "Cluster": "cluster_name",
     "ContainerInstanceArn": "arn:aws:ecs:region:aws_account_id:container-instance/cluster_name/container_instance_id",
     "Version": "Amazon ECS Agent - v1.30.0 (02ff320c)"
 }
-We will create:
+But our metadata keys names are:
 {
     "ClusterName": "cluster_name",
     "ContainerInstanceArn": "arn:aws:ecs:region:aws_account_id:container-instance/cluster_name/container_instance_id",
@@ -365,8 +377,6 @@ We will create:
     "ECSAgentVersion": "Amazon ECS Agent - v1.30.0 (02ff320c)"
 }
     */
-
-    msgpack_pack_map(&tmp_pck, 4);
 
     for (i = 0; i < root.via.map.size; i++) {
         key = root.via.map.ptr[i].key;
@@ -383,19 +393,18 @@ We will create:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
             found_cluster = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 11);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "ClusterName",
-                                  11);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
+            tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
+            if (!tmp) {
+                flb_errno();
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                return -1;
+            }
+            ctx->cluster_metadata.cluster_name = tmp;
         }
         else if (key.via.str.size == 20 && strncmp(key.via.str.ptr, "ContainerInstanceArn", 20) == 0) {
             val = root.via.map.ptr[i].val;
@@ -404,39 +413,30 @@ We will create:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
-            /* first pack the ARN */
+            /* first the ARN */
             found_instance = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 20);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "ContainerInstanceArn",
-                                  20);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
-            /* then pack the ID */
+            tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
+            if (!tmp) {
+                flb_errno();
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                return -1;
+            }
+            ctx->cluster_metadata.container_instance_arn = tmp;
+
+            /* then the ID */
             container_instance_id = parse_id_from_arn(val.via.str.ptr,  (int) val.via.str.size);
             if (container_instance_id == NULL) {
                 flb_plg_error(ctx->ins, "metadata parsing: failed to get ID from %.*s",
                               (int) val.via.str.size, val.via.str.ptr);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
-            msgpack_pack_str(&tmp_pck, 19);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "ContainerInstanceID",
-                                  19);
-            msgpack_pack_str(&tmp_pck, flb_sds_len(container_instance_id));
-            msgpack_pack_str_body(&tmp_pck,
-                                  container_instance_id,
-                                  flb_sds_len(container_instance_id));
-            flb_sds_destroy(container_instance_id);
+            ctx->cluster_metadata.container_instance_id = container_instance_id;
         } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Version", 7) == 0) {
             val = root.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_STR) {
@@ -444,19 +444,18 @@ We will create:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
             found_version = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 15);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "ECSAgentVersion",
-                                  15);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
+            tmp = flb_sds_create_len(val.via.str.ptr, (int) val.via.str.size);
+            if (!tmp) {
+                flb_errno();
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                return -1;
+            }
+            ctx->cluster_metadata.ecs_agent_version = tmp;
         }
 
     }
@@ -467,42 +466,19 @@ We will create:
     if (found_cluster == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Cluster' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
     if (found_instance == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'ContainerInstanceArn' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
     if (found_version == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Version' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
 
-    meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
-    if (!meta_buf) {
-        flb_errno();
-        msgpack_sbuffer_destroy(&tmp_sbuf);
-        return -1;
-    }
-
-    meta_buf->buf = tmp_sbuf.data;
-    meta_buf->size = tmp_sbuf.size;
-
-    ret = flb_ecs_metadata_buffer_init(ctx, meta_buf);
-    if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
-                      FLB_ECS_FILTER_CLUSTER_PATH);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_free(meta_buf);
-        return -1;
-    }
-
-    ctx->cluster_metadata = meta_buf;
     ctx->has_cluster_metadata = FLB_TRUE;
     return 0;
 }
