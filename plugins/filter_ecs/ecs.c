@@ -681,6 +681,7 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
     size_t b_sent;
     size_t off = 0;
     msgpack_unpacked result;
+    msgpack_unpacked unpacked;
     msgpack_object root;
     msgpack_object key;
     msgpack_object val;
@@ -870,70 +871,15 @@ Metadata Response:
             }
 
             found_version = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 14);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "TaskDefVersion",
-                                  14);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
-        } else if (key.via.str.size == 10 && strncmp(key.via.str.ptr, "Containers", 10) == 0) {
-            val = root.via.map.ptr[i].val;
-            if (val.type != MSGPACK_OBJECT_ARRAY ) {
-                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Containers' value type=%i",
-                              val.type);
-                flb_free(buffer);
-                msgpack_unpacked_destroy(&result);
-                flb_sds_destroy(http_path);
-                if (task_id) {
-                    flb_sds_destroy(task_id);
-                }
-                return -1;
-            }
-            found_containers = FLB_TRUE;
-
-            /* iterate through list of containers and process them*/
-            for (k = 0; k < val.via.array.size; k++) {
-                container = val.via.array.ptr[k];
-                if (container.type != MSGPACK_OBJECT_MAP) {
-                    flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Containers[%d]' inner value type=%i",
-                                  k,
-                                  container.type);
-                    flb_free(buffer);
-                    msgpack_unpacked_destroy(&result);
-                    flb_sds_destroy(http_path);
-                    if (task_id) {
-                        flb_sds_destroy(task_id);
-                    }
-                    return -1;
-                }
-                ret = process_container_response(ctx, container);
-                if (ret < 0) {
-                    flb_plg_error(ctx->ins, "metadata parsing: failed to parse 'Containers[%d]'",
-                                  k);
-                    flb_free(buffer);
-                    msgpack_unpacked_destroy(&result);
-                    flb_sds_destroy(http_path);
-                    if (task_id) {
-                        flb_sds_destroy(task_id);
-                    }
-                    return -1;
-                }
-            }
+            task_meta.task_def_version = val.via.str.ptr;
+            task_meta.task_def_version = (int) val.via.str.size;
         }
     }
-
-    flb_free(buffer);
-    msgpack_unpacked_destroy(&result);
 
     if (found_task == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse Task 'Arn' from %s response",
                       http_path);
         flb_sds_destroy(http_path);
-        if (task_id) {
-            flb_sds_destroy(task_id);
-        }
         return -1;
     }
     if (found_family == FLB_FALSE) {
@@ -964,6 +910,93 @@ Metadata Response:
         return -1;
     }
 
+    /* 
+     * Parse metadata response a 2nd time to get the Containers list 
+     * This is because we need one complete metadata buf per container
+     * with all task metadata. So we collect task before we process containers.
+     */
+    msgpack_unpacked_init(&unpacked);
+    ret = msgpack_unpack_next(&unpacked, buffer, size, &off);
+    if (ret != MSGPACK_UNPACK_SUCCESS) {
+        flb_plg_error(ctx->ins, "Cannot unpack %s response to find metadata\n%s",
+                      http_path, c->resp.payload);
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
+        msgpack_unpacked_destroy(&unpacked);
+        flb_sds_destroy(http_path);
+        flb_sds_destroy(task_id);
+        return -1;
+    }
+
+    root = result.data;
+    if (root.type != MSGPACK_OBJECT_MAP) {
+        flb_plg_error(ctx->ins, "%s response parsing failed, msgpack_type=%i",
+                      http_path,
+                      root.type);
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
+        msgpack_unpacked_destroy(&unpacked);
+        flb_sds_destroy(http_path);
+        flb_sds_destroy(task_id);
+        return -1;
+    }
+
+    for (i = 0; i < root.via.map.size; i++) {
+        key = root.via.map.ptr[i].key;
+        if (key.type != MSGPACK_OBJECT_STR) {
+            flb_plg_error(ctx->ins, "%s response parsing failed, msgpack key type=%i",
+                         http_path,
+                         key.type);
+            continue;
+        }
+
+        if (key.via.str.size == 10 && strncmp(key.via.str.ptr, "Containers", 10) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_ARRAY ) {
+                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Containers' value type=%i",
+                              val.type);
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                msgpack_unpacked_destroy(&unpacked);
+                flb_sds_destroy(http_path);
+                flb_sds_destroy(task_id);
+                return -1;
+            }
+            found_containers = FLB_TRUE;
+
+            /* iterate through list of containers and process them*/
+            for (k = 0; k < val.via.array.size; k++) {
+                container = val.via.array.ptr[k];
+                if (container.type != MSGPACK_OBJECT_MAP) {
+                    flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Containers[%d]' inner value type=%i",
+                                  k,
+                                  container.type);
+                    flb_free(buffer);
+                    msgpack_unpacked_destroy(&result);
+                    msgpack_unpacked_destroy(&unpacked);
+                    flb_sds_destroy(http_path);
+                    flb_sds_destroy(task_id);
+                    return -1;
+                }
+                ret = process_container_response(ctx, container, task_meta);
+                if (ret < 0) {
+                    flb_plg_error(ctx->ins, "metadata parsing: failed to parse 'Containers[%d]'",
+                                  k);
+                    flb_free(buffer);
+                    msgpack_unpacked_destroy(&result);
+                    msgpack_unpacked_destroy(&unpacked);
+                    flb_sds_destroy(http_path);
+                    flb_sds_destroy(task_id);
+                    return -1;
+                }
+            }
+        }
+    }
+
+    flb_free(buffer);
+    msgpack_unpacked_destroy(&result);
+    msgpack_unpacked_destroy(&unpacked);
+    flb_sds_destroy(task_id);
     flb_sds_destroy(http_path);
     return 0;
 }
