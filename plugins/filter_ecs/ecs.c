@@ -364,6 +364,7 @@ But our metadata keys names are:
             flb_plg_error(ctx->ins, "%s response parsing failed, msgpack key type=%i",
                          FLB_ECS_FILTER_CLUSTER_PATH,
                          key.type);
+            continue;
         }
 
         if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Cluster", 7) == 0) {
@@ -520,6 +521,7 @@ static int process_container_response(struct flb_filter_ecs *ctx,
         if (key.type != MSGPACK_OBJECT_STR) {
             flb_plg_error(ctx->ins, "Container metadata parsing failed, msgpack key type=%i",
                          key.type);
+            continue;
         }
 
         if (key.via.str.size == 8 && strncmp(key.via.str.ptr, "DockerId", 8) == 0) {
@@ -797,13 +799,7 @@ Metadata Response:
             flb_plg_error(ctx->ins, "%s response parsing failed, msgpack key type=%i",
                          http_path,
                          key.type);
-            flb_free(buffer);
-            msgpack_unpacked_destroy(&result);
-            flb_sds_destroy(http_path);
-            if (task_id) {
-                flb_sds_destroy(task_id);
-            }
-            return -1;
+            continue;
         }
 
         if (key.via.str.size == 6 && strncmp(key.via.str.ptr, "Family", 6) == 0) {
@@ -832,6 +828,9 @@ Metadata Response:
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
                 flb_sds_destroy(http_path);
+                if (task_id) {
+                    flb_sds_destroy(task_id);
+                }
                 return -1;
             }
 
@@ -848,6 +847,9 @@ Metadata Response:
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
                 flb_sds_destroy(http_path);
+                if (task_id) {
+                    flb_sds_destroy(task_id);
+                }
                 return -1;
             }
 
@@ -860,7 +862,6 @@ Metadata Response:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 flb_sds_destroy(http_path);
                 if (task_id) {
                     flb_sds_destroy(task_id);
@@ -884,8 +885,10 @@ Metadata Response:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 flb_sds_destroy(http_path);
+                if (task_id) {
+                    flb_sds_destroy(task_id);
+                }
                 return -1;
             }
             found_containers = FLB_TRUE;
@@ -899,8 +902,10 @@ Metadata Response:
                                   container.type);
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
-                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     flb_sds_destroy(http_path);
+                    if (task_id) {
+                        flb_sds_destroy(task_id);
+                    }
                     return -1;
                 }
                 ret = process_container_response(ctx, container);
@@ -909,8 +914,10 @@ Metadata Response:
                                   k);
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
-                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     flb_sds_destroy(http_path);
+                    if (task_id) {
+                        flb_sds_destroy(task_id);
+                    }
                     return -1;
                 }
             }
@@ -923,51 +930,41 @@ Metadata Response:
     if (found_task == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse Task 'Arn' from %s response",
                       http_path);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(http_path);
+        if (task_id) {
+            flb_sds_destroy(task_id);
+        }
         return -1;
     }
     if (found_family == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Family' from %s response",
                       http_path);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(http_path);
+        if (task_id) {
+            flb_sds_destroy(task_id);
+        }
         return -1;
     }
     if (found_version == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Version' from %s response",
                       http_path);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(http_path);
+        if (task_id) {
+            flb_sds_destroy(task_id);
+        }
         return -1;
     }
     if (found_containers == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Containers' from %s response",
                       http_path);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(http_path);
-        return -1;
-    }
-
-    ret = flb_ecs_metadata_buffer_init(ctx, task_meta_buf);
-    if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
-                      http_path);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_free(task_meta_buf);
-        flb_sds_destroy(http_path);
+        if (task_id) {
+            flb_sds_destroy(task_id);
+        }
         return -1;
     }
 
     flb_sds_destroy(http_path);
-    
-    /* 
-     * Size is set to 0 so the table just stores our pointer 
-     * Otherwise it will try to copy the memory to a new buffer
-     */
-    id = flb_hash_add(ctx->task_hash_table,
-                      short_id, strlen(short_id),
-                      task_meta_buf, 0);
     return 0;
 }
 
