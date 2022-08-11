@@ -249,26 +249,6 @@ static void flb_ecs_metadata_buffer_destroy(struct flb_ecs_metadata_buffer *meta
     }
 }
 
-/* 
- * If metadata parsing fails half way through, we need to free
- * any SDS strings that were created and then retry.
- */
-static void cluster_metadata_destroy(struct flb_filter_ecs *ctx)
-{
-    if (ctx->cluster_metadata.cluster_name) {
-        flb_sds_destroy(ctx->cluster_metadata.cluster_name);
-    }
-    if (ctx->cluster_metadata.container_instance_arn) {
-        flb_sds_destroy(ctx->cluster_metadata.container_instance_arn);
-    }
-    if (ctx->cluster_metadata.container_instance_id) {
-        flb_sds_destroy(ctx->cluster_metadata.container_instance_id);
-    }
-    if (ctx->cluster_metadata.ecs_agent_version) {
-        flb_sds_destroy(ctx->cluster_metadata.ecs_agent_version);
-    }
-}
-
 /*
  * Get cluster and container instance info, which are static and never change
  */
