@@ -163,6 +163,10 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
         return -1;
     }
 
+    /* attempt to get metadata in init, can retry in cb_filter */
+    ret = get_ecs_cluster_metadata(ctx);
+    //TODO: cluster metadata can be exposed in global env ctx
+
     flb_filter_set_context(f_ins, ctx);
     return 0;
 
