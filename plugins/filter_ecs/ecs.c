@@ -489,7 +489,9 @@ We will create a new metadata object:
     "ContainerName": "nginx"
 }
  */
-static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object container)
+static int process_container_response(struct flb_filter_ecs *ctx,
+                                      msgpack_object container,
+                                      struct flb_ecs_task_metadata task_meta)
 {
     int ret;
     int found_id = FLB_FALSE;
@@ -676,17 +678,15 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
     size_t size;
     size_t b_sent;
     size_t off = 0;
-    struct flb_ecs_metadata_buffer *task_meta_buf;
     msgpack_unpacked result;
     msgpack_object root;
     msgpack_object key;
     msgpack_object val;
     msgpack_object container;
-    msgpack_sbuffer tmp_sbuf;
-    msgpack_packer tmp_pck;
     flb_sds_t tmp;
     flb_sds_t http_path;
     flb_sds_t task_id = NULL;
+    struct flb_ecs_task_metadata task_meta;
 
     tmp = flb_sds_create_size(64);
     if (!tmp) {
@@ -773,13 +773,6 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
         return -1;
     }
 
-    /* 
-     * We copy the metadata response to a new buffer
-     * So we can define the metadata key names and parse ARN values
-     */
-    msgpack_sbuffer_init(&tmp_sbuf);
-    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
-
     /*
 Metadata Response:
 {
@@ -796,23 +789,7 @@ Metadata Response:
     "KnownStatus": "RUNNING",
     "Version": "2"
 }
-We will create two types of metadata objects:
-1. Task:
-{
-    "TaskARN": "arn:aws:ecs:us-west-2:012345678910:task/default/example5-58ff-46c9-ae05-543f8example",
-    "TaskID: "example5-58ff-46c9-ae05-543f8example",
-    "TaskDefFamily": "hello_world",
-    "TaskDefVersion": "8",
-}
-2. Container: (processed by process_container_response() function)
-{
-    "ContainerID": "79c796ed2a7f864f485c76f83f3165488097279d296a7c05bd5201a1c69b2920",
-    "DockerContainerName": "ecs-nginx-efs-2-nginx-9ac0808dd0afa495f001",
-    "ContainerName": "nginx"
-}
     */
-
-    msgpack_pack_map(&tmp_pck, 4);
 
     for (i = 0; i < root.via.map.size; i++) {
         key = root.via.map.ptr[i].key;
@@ -820,6 +797,13 @@ We will create two types of metadata objects:
             flb_plg_error(ctx->ins, "%s response parsing failed, msgpack key type=%i",
                          http_path,
                          key.type);
+            flb_free(buffer);
+            msgpack_unpacked_destroy(&result);
+            flb_sds_destroy(http_path);
+            if (task_id) {
+                flb_sds_destroy(task_id);
+            }
+            return -1;
         }
 
         if (key.via.str.size == 6 && strncmp(key.via.str.ptr, "Family", 6) == 0) {
@@ -829,20 +813,16 @@ We will create two types of metadata objects:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 flb_sds_destroy(http_path);
+                if (task_id) {
+                    flb_sds_destroy(task_id);
+                }
                 return -1;
             }
 
             found_task = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 13);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "TaskDefFamily",
-                                  13);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
+            task_meta.task_def_family = val.via.str.ptr;
+            task_meta.task_def_family_len = (int) val.via.str.size;
         }
         else if (key.via.str.size == 3 && strncmp(key.via.str.ptr, "Arn", 3) == 0) {
             val = root.via.map.ptr[i].val;
@@ -851,41 +831,28 @@ We will create two types of metadata objects:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 flb_sds_destroy(http_path);
                 return -1;
             }
 
-            /* first pack the ARN */
+            /* first get the ARN */
             found_instance = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 7);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "TaskARN",
-                                  7);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
-            /* then pack the ID */
+            task_meta.task_arn = val.via.str.ptr;
+            task_meta.task_arn_len = (int) val.via.str.size;
+
+            /* then get the ID */
             task_id = parse_id_from_arn(val.via.str.ptr,  (int) val.via.str.size);
             if (task_id == NULL) {
                 flb_plg_error(ctx->ins, "metadata parsing: failed to get ID from %.*s",
                               (int) val.via.str.size, val.via.str.ptr);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 flb_sds_destroy(http_path);
                 return -1;
             }
-            msgpack_pack_str(&tmp_pck, 6);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "TaskID",
-                                  6);
-            msgpack_pack_str(&tmp_pck, flb_sds_len(task_id));
-            msgpack_pack_str_body(&tmp_pck,
-                                  task_id,
-                                  flb_sds_len(task_id));
-            flb_sds_destroy(task_id);
+
+            task_meta.task_id = task_id;
+            task_meta.task_id = flb_sds_len(task_id);
         } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Version", 7) == 0) {
             val = root.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_STR) {
@@ -895,6 +862,9 @@ We will create two types of metadata objects:
                 msgpack_unpacked_destroy(&result);
                 msgpack_sbuffer_destroy(&tmp_sbuf);
                 flb_sds_destroy(http_path);
+                if (task_id) {
+                    flb_sds_destroy(task_id);
+                }
                 return -1;
             }
 
@@ -978,17 +948,6 @@ We will create two types of metadata objects:
         flb_sds_destroy(http_path);
         return -1;
     }
-
-    task_meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
-    if (!task_meta_buf) {
-        flb_errno();
-        msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_sds_destroy(http_path);
-        return -1;
-    }
-
-    task_meta_buf->buf = tmp_sbuf.data;
-    task_meta_buf->size = tmp_sbuf.size;
 
     ret = flb_ecs_metadata_buffer_init(ctx, task_meta_buf);
     if (ret < 0) {
