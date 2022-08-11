@@ -534,7 +534,7 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
     msgpack_object val;
     msgpack_sbuffer tmp_sbuf;
     msgpack_packer tmp_pck;
-    flb_sds_t container_id;
+    flb_sds_t short_id = NULL;
 
     /* 
      * We copy the metadata response to a new buffer
@@ -558,6 +558,17 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
                 flb_plg_error(ctx->ins, "metadata parsing: unexpected 'DockerId' value type=%i",
                               val.type);
                 msgpack_sbuffer_destroy(&tmp_sbuf);
+                if (short_id != NULL) {
+                    flb_sds_destroy(short_id);
+                }
+                return -1;
+            }
+
+            /* save the short ID for hash table key */
+            short_id = flb_sds_create_len(val.via.str.ptr, 12);
+            if (!short_id) {
+                flb_errno();
+                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
@@ -577,6 +588,9 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
                 flb_plg_error(ctx->ins, "metadata parsing: unexpected 'DockerName' value type=%i",
                               val.type);
                 msgpack_sbuffer_destroy(&tmp_sbuf);
+                if (short_id != NULL) {
+                    flb_sds_destroy(short_id);
+                }
                 return -1;
             }
 
@@ -596,6 +610,9 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
                 flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Name' value type=%i",
                               val.type);
                 msgpack_sbuffer_destroy(&tmp_sbuf);
+                if (short_id != NULL) {
+                    flb_sds_destroy(short_id);
+                }
                 return -1;
             }
 
@@ -622,11 +639,17 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
     if (found_family == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'DockerName' from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
+        if (short_id != NULL) {
+            flb_sds_destroy(short_id);
+        }
         return -1;
     }
     if (found_ecs_name == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Name' from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
+        if (short_id != NULL) {
+            flb_sds_destroy(short_id);
+        }
         return -1;
     }
 
@@ -635,6 +658,7 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
         flb_errno();
         msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(http_path);
+        flb_sds_destroy(short_id);
         return -1;
     }
 
@@ -646,6 +670,7 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
         flb_plg_error(ctx->ins, "Could not init metadata buffer from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_free(cont_meta_buf);
+        flb_sds_destroy(short_id);
         return -1;
     }
     
@@ -654,18 +679,19 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
      * Otherwise it will try to copy the memory to a new buffer
      */
     id = flb_hash_add(ctx->task_hash_table,
-                      shortID, strlen(shortID),
+                      short_id, strlen(short_id),
                       task_meta_buf, 0);
+    flb_sds_destroy(short_id);
     return 0;
 }
 
 /*
  * Gets the container and task metadata for a task via a container's
  * 12 char short ID. This can be used with the ECS Agent
- * Introspection API: http://localhost:51678/v1/tasks?dockerid={shortID}
+ * Introspection API: http://localhost:51678/v1/tasks?dockerid={short_id}
  * Entries in the hash table will be added for all containers in the task
  */
-static int get_task_metadata(struct flb_filter_ecs *ctx, char* shortID)
+static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
 {
     struct flb_http_client *c;
     struct flb_upstream_conn *u_conn;
@@ -692,13 +718,13 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* shortID)
     msgpack_packer tmp_pck;
     flb_sds_t tmp;
     flb_sds_t http_path;
-    flb_sds_t task_id;
+    flb_sds_t task_id = NULL;
 
     tmp = flb_sds_create_size(64);
     if (!tmp) {
         return -1;
     }
-    http_path = flb_sds_printf(&tmp, FLB_ECS_FILTER_TASK_PATH_FORMAT, shortID);
+    http_path = flb_sds_printf(&tmp, FLB_ECS_FILTER_TASK_PATH_FORMAT, short_id);
     if (!http_path) {
         flb_sds_destroy(tmp);
         return -1;
@@ -1013,7 +1039,7 @@ We will create two types of metadata objects:
      * Otherwise it will try to copy the memory to a new buffer
      */
     id = flb_hash_add(ctx->task_hash_table,
-                      shortID, strlen(shortID),
+                      short_id, strlen(short_id),
                       task_meta_buf, 0);
     return 0;
 }
