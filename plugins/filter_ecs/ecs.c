@@ -632,6 +632,40 @@ static int process_container_response(struct flb_filter_ecs *ctx,
     }
 
     /* 2nd - Add the task fields from the task_meta temp buf we were given */
+    msgpack_pack_str(&tmp_pck, 13);
+    msgpack_pack_str_body(&tmp_pck,
+                          "TaskDefFamily",
+                          13);
+    msgpack_pack_str(&tmp_pck, task_meta.task_def_family_len);
+    msgpack_pack_str_body(&tmp_pck,
+                          task_meta.task_def_family,
+                          task_meta.task_def_family_len);
+
+    msgpack_pack_str(&tmp_pck, 7);
+    msgpack_pack_str_body(&tmp_pck,
+                          "TaskARN",
+                          7);
+    msgpack_pack_str(&tmp_pck, task_meta.task_arn_len);
+    msgpack_pack_str_body(&tmp_pck,
+                          task_meta.task_arn,
+                          task_meta.task_arn_len);
+    msgpack_pack_str(&tmp_pck, 6);
+    msgpack_pack_str_body(&tmp_pck,
+                          "TaskID",
+                          6);
+    msgpack_pack_str(&tmp_pck, task_meta.task_id_len);
+    msgpack_pack_str_body(&tmp_pck,
+                          task_meta.task_id,
+                          task_meta.task_id_len);
+
+    msgpack_pack_str(&tmp_pck, 14);
+    msgpack_pack_str_body(&tmp_pck,
+                          "TaskDefVersion",
+                          14);
+    msgpack_pack_str(&tmp_pck, task_meta.task_def_version_len);
+    msgpack_pack_str_body(&tmp_pck,
+                          task_meta.task_def_version,
+                          task_meta.task_def_version_len);
 
     /* 3rd - Add the static cluster fields from the plugin context */
 
