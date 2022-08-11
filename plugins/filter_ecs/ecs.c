@@ -534,6 +534,7 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
     msgpack_object val;
     msgpack_sbuffer tmp_sbuf;
     msgpack_packer tmp_pck;
+    flb_sds_t container_id;
 
     /* 
      * We copy the metadata response to a new buffer
@@ -551,75 +552,58 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
                          key.type);
         }
 
-        if (key.via.str.size == 6 && strncmp(key.via.str.ptr, "DockerId", 6) == 0) {
+        if (key.via.str.size == 8 && strncmp(key.via.str.ptr, "DockerId", 8) == 0) {
             val = container.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_STR) {
-                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Family' value type=%i",
+                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'DockerId' value type=%i",
                               val.type);
                 msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
-            found_task = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 13);
+            found_id = FLB_TRUE;
+            msgpack_pack_str(&tmp_pck, 11);
             msgpack_pack_str_body(&tmp_pck,
-                                  "TaskDefFamily",
-                                  13);
+                                  "ContainerID",
+                                  11);
             msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
             msgpack_pack_str_body(&tmp_pck,
                                   val.via.str.ptr,
                                   (int) val.via.str.size);
         }
-        else if (key.via.str.size == 3 && strncmp(key.via.str.ptr, "DockerName", 3) == 0) {
+        else if (key.via.str.size == 10 && strncmp(key.via.str.ptr, "DockerName", 10) == 0) {
             val = container.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_STR) {
-                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Arn' value type=%i",
+                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'DockerName' value type=%i",
                               val.type);
                 msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
             /* first pack the ARN */
-            found_instance = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 7);
+            found_docker_name = FLB_TRUE;
+            msgpack_pack_str(&tmp_pck, 19);
             msgpack_pack_str_body(&tmp_pck,
-                                  "TaskARN",
-                                  7);
+                                  "DockerContainerName",
+                                  19);
             msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
             msgpack_pack_str_body(&tmp_pck,
                                   val.via.str.ptr,
                                   (int) val.via.str.size);
-            /* then pack the ID */
-            task_id = parse_id_from_arn(val.via.str.ptr,  (int) val.via.str.size);
-            if (task_id == NULL) {
-                flb_plg_error(ctx->ins, "metadata parsing: failed to get ID from %.*s",
-                              (int) val.via.str.size, val.via.str.ptr);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
-                return -1;
-            }
-            msgpack_pack_str(&tmp_pck, 6);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "TaskID",
-                                  6);
-            msgpack_pack_str(&tmp_pck, flb_sds_len(task_id));
-            msgpack_pack_str_body(&tmp_pck,
-                                  task_id,
-                                  flb_sds_len(task_id));
-            flb_sds_destroy(task_id);
-        } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Name", 7) == 0) {
+        } else if (key.via.str.size == 4 && strncmp(key.via.str.ptr, "Name", 4) == 0) {
             val = container.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_STR) {
-                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Version' value type=%i",
+                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Name' value type=%i",
                               val.type);
                 msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
-            found_version = FLB_TRUE;
-            msgpack_pack_str(&tmp_pck, 14);
+            found_ecs_name = FLB_TRUE;
+            msgpack_pack_str(&tmp_pck, 13);
             msgpack_pack_str_body(&tmp_pck,
-                                  "TaskDefVersion",
-                                  14);
+                                  "ContainerName",
+                                  13);
             msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
             msgpack_pack_str_body(&tmp_pck,
                                   val.via.str.ptr,
@@ -630,57 +614,40 @@ static int process_container_response(struct flb_filter_ecs *ctx, msgpack_object
     flb_free(buffer);
     msgpack_unpacked_destroy(&result);
 
-    if (found_task == FLB_FALSE) {
-        flb_plg_error(ctx->ins, "Could not parse Task 'Arn' from %s response",
-                      http_path);
+    if (found_id == FLB_FALSE) {
+        flb_plg_error(ctx->ins, "Could not parse Task 'DockerId' from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_sds_destroy(http_path);
         return -1;
     }
     if (found_family == FLB_FALSE) {
-        flb_plg_error(ctx->ins, "Could not parse 'Family' from %s response",
-                      http_path);
+        flb_plg_error(ctx->ins, "Could not parse 'DockerName' from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_sds_destroy(http_path);
         return -1;
     }
-    if (found_version == FLB_FALSE) {
-        flb_plg_error(ctx->ins, "Could not parse 'Version' from %s response",
-                      http_path);
+    if (found_ecs_name == FLB_FALSE) {
+        flb_plg_error(ctx->ins, "Could not parse 'Name' from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_sds_destroy(http_path);
-        return -1;
-    }
-    if (found_containers == FLB_FALSE) {
-        flb_plg_error(ctx->ins, "Could not parse 'Containers' from %s response",
-                      http_path);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_sds_destroy(http_path);
         return -1;
     }
 
-    task_meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
-    if (!task_meta_buf) {
+    cont_meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
+    if (!cont_meta_buf) {
         flb_errno();
         msgpack_sbuffer_destroy(&tmp_sbuf);
         flb_sds_destroy(http_path);
         return -1;
     }
 
-    task_meta_buf->buf = tmp_sbuf.data;
-    task_meta_buf->size = tmp_sbuf.size;
+    cont_meta_buf->buf = tmp_sbuf.data;
+    cont_meta_buf->size = tmp_sbuf.size;
 
-    ret = flb_ecs_metadata_buffer_init(ctx, task_meta_buf);
+    ret = flb_ecs_metadata_buffer_init(ctx, cont_meta_buf);
     if (ret < 0) {
-        flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
-                      http_path);
+        flb_plg_error(ctx->ins, "Could not init metadata buffer from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_free(task_meta_buf);
-        flb_sds_destroy(http_path);
+        flb_free(cont_meta_buf);
         return -1;
     }
-
-    flb_sds_destroy(http_path);
     
     /* 
      * Size is set to 0 so the table just stores our pointer 
