@@ -996,7 +996,7 @@ Metadata Response:
             }
 
             task_meta.task_id = task_id;
-            task_meta.task_id = flb_sds_len(task_id);
+            task_meta.task_id_len = flb_sds_len(task_id);
         } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Version", 7) == 0) {
             val = root.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_STR) {
