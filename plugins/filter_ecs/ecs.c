@@ -447,16 +447,14 @@ But our metadata keys names are:
                 ctx->cluster_metadata.container_instance_id = container_instance_id;
             }
 
-            //TODO: container_instance_id not in scope and must be freed
-
             msgpack_pack_str(&tmp_pck, 19);
             msgpack_pack_str_body(&tmp_pck,
                                   "ContainerInstanceID",
                                   19);
-            msgpack_pack_str(&tmp_pck, flb_sds_len(container_instance_id));
+            msgpack_pack_str(&tmp_pck, flb_sds_len(ctx->cluster_metadata.container_instance_id));
             msgpack_pack_str_body(&tmp_pck,
-                                  container_instance_id,
-                                  flb_sds_len(container_instance_id));
+                                  ctx->cluster_metadata.container_instance_id,
+                                  flb_sds_len(ctx->cluster_metadata.container_instance_id));
 
         } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Version", 7) == 0) {
             val = root.via.map.ptr[i].val;
