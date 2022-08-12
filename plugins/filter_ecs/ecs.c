@@ -373,6 +373,7 @@ But our metadata keys names are:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
+                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
@@ -383,10 +384,20 @@ But our metadata keys names are:
                     flb_errno();
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
+                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     return -1;
                 }
                 ctx->cluster_metadata.cluster_name = tmp;
             }
+
+            msgpack_pack_str(&tmp_pck, 11);
+            msgpack_pack_str_body(&tmp_pck,
+                                  "ClusterName",
+                                  11);
+            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
+            msgpack_pack_str_body(&tmp_pck,
+                                  val.via.str.ptr,
+                                  (int) val.via.str.size);
         }
         else if (key.via.str.size == 20 && strncmp(key.via.str.ptr, "ContainerInstanceArn", 20) == 0) {
             val = root.via.map.ptr[i].val;
@@ -395,6 +406,7 @@ But our metadata keys names are:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
+                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
@@ -406,10 +418,20 @@ But our metadata keys names are:
                     flb_errno();
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
+                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     return -1;
                 }
                 ctx->cluster_metadata.container_instance_arn = tmp;
             }
+
+            msgpack_pack_str(&tmp_pck, 20);
+            msgpack_pack_str_body(&tmp_pck,
+                                  "ContainerInstanceArn",
+                                  20);
+            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
+            msgpack_pack_str_body(&tmp_pck,
+                                  val.via.str.ptr,
+                                  (int) val.via.str.size);
 
             /* then the ID */
             if (ctx->cluster_metadata.container_instance_id == NULL) {
@@ -419,10 +441,23 @@ But our metadata keys names are:
                                 (int) val.via.str.size, val.via.str.ptr);
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
+                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     return -1;
                 }
                 ctx->cluster_metadata.container_instance_id = container_instance_id;
             }
+
+            //TODO: container_instance_id not in scope and must be freed
+
+            msgpack_pack_str(&tmp_pck, 19);
+            msgpack_pack_str_body(&tmp_pck,
+                                  "ContainerInstanceID",
+                                  19);
+            msgpack_pack_str(&tmp_pck, flb_sds_len(container_instance_id));
+            msgpack_pack_str_body(&tmp_pck,
+                                  container_instance_id,
+                                  flb_sds_len(container_instance_id));
+
         } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Version", 7) == 0) {
             val = root.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_STR) {
@@ -430,6 +465,7 @@ But our metadata keys names are:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
+                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
@@ -440,10 +476,20 @@ But our metadata keys names are:
                     flb_errno();
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
+                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     return -1;
                 }
                 ctx->cluster_metadata.ecs_agent_version = tmp;
             }
+
+            msgpack_pack_str(&tmp_pck, 15);
+            msgpack_pack_str_body(&tmp_pck,
+                                  "ECSAgentVersion",
+                                  15);
+            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
+            msgpack_pack_str_body(&tmp_pck,
+                                  val.via.str.ptr,
+                                  (int) val.via.str.size);
         }
 
     }
@@ -454,16 +500,30 @@ But our metadata keys names are:
     if (found_cluster == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Cluster' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
+        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
     if (found_instance == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'ContainerInstanceArn' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
+        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
     if (found_version == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Version' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
+        msgpack_sbuffer_destroy(&tmp_sbuf);
+        return -1;
+    }
+
+    ctx->cluster_meta_buf.buf = tmp_sbuf.data;
+    ctx->cluster_meta_buf.size =  tmp_sbuf.size;
+
+    ret = flb_ecs_metadata_buffer_init(ctx, ctx->cluster_meta_buf);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
+                      FLB_ECS_FILTER_CLUSTER_PATH);
+        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
 
