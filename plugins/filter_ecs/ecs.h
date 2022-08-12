@@ -99,6 +99,8 @@ struct flb_filter_ecs {
     struct flb_hash *container_hash_table;
 
     int ecs_meta_cache_ttl;
+    char *ecs_tag_prefix;
+    int ecs_tag_prefix_len;
 };
 
 #endif

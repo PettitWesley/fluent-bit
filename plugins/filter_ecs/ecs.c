@@ -152,16 +152,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
         return -1;
     }
 
-    /* entries are only evicted when TTL is reached and a get is issued */
-    ctx->task_hash_table = flb_hash_create_with_ttl(ctx->ecs_meta_cache_ttl,
-                                                    FLB_HASH_TABLE_EVICT_OLDER,
-                                                    FLB_ECS_FILTER_HASH_TABLE_SIZE,
-                                                    FLB_ECS_FILTER_HASH_TABLE_SIZE);
-    if (!ctx->task_hash_table) {
-        flb_plg_error(f_ins, "failed to create task_hash_table");
-        //TODO: destroy method
-        return -1;
-    }
+    ctx->ecs_tag_prefix_len = strlen(ctx->ecs_tag_prefix);
 
     /* attempt to get metadata in init, can retry in cb_filter */
     ret = get_ecs_cluster_metadata(ctx);
@@ -734,7 +725,7 @@ static int process_container_response(struct flb_filter_ecs *ctx,
      * Size is set to 0 so the table just stores our pointer 
      * Otherwise it will try to copy the memory to a new buffer
      */
-    id = flb_hash_add(ctx->task_hash_table,
+    id = flb_hash_add(ctx->container_hash_table,
                       short_id, strlen(short_id),
                       task_meta_buf, 0);
     flb_sds_destroy(short_id);
@@ -1085,6 +1076,60 @@ Metadata Response:
     return 0;
 }
 
+static int get_metadata_by_id(struct flb_filter_ecs *ctx, 
+                              const char *tag, int tag_len,
+                              struct flb_ecs_metadata_buffer **metadata_buffer)
+{
+    flb_sds_t container_short_id = NULL;
+    char *tmp;
+    int ret;
+    size_t size;
+
+    if (ctx->ecs_tag_prefix_len + 12 > tag_len) {
+        flb_plg_error(ctx->ins, "Tag '%s' length check failed: tag is expected "
+                      "to be or be prefixed with '{ecs_tag_prefix}{12 character container short ID}'",
+                      tag);
+        return -1;
+    }
+
+    ret = strncmp(ctx->ecs_tag_prefix, tag, ctx->ecs_tag_prefix_len);
+    if (ret != 0) {
+        flb_plg_error(ctx->ins, "Tag '%s' is not prefixed with ecs_tag_prefix '%s'",
+                      tag, ctx->ecs_tag_prefix);
+        return -1;
+    }
+
+    tmp = tag + ctx->ecs_tag_prefix_len;
+    container_short_id = flb_sds_create_len(tmp, 12);
+    if (!container_short_id) {
+        flb_errno();
+        return -1;
+    }
+
+    /* get metadata for this container */
+    ret = flb_hash_get(ctx->container_hash_table,
+                       container_short_id, flb_sds_len(container_short_id),
+                       (void *) metadata_buffer, &size);
+
+    if (ret == -1) {
+        /* try fetch metadata */
+        ret = get_task_metadata(ctx, container_short_id);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Requesting metadata from ECS Agent introspection endpoint failed");
+            flb_sds_destroy(container_short_id);
+            return -1;
+        }
+
+        /* get from hash table */
+        ret = flb_hash_get(ctx->container_hash_table,
+                           container_short_id, flb_sds_len(container_short_id),
+                           (void *) metadata_buffer, &size);
+    }
+
+    flb_sds_destroy(container_short_id);
+    return ret;
+}
+
 static int cb_ecs_filter(const void *data, size_t bytes,
                          const char *tag, int tag_len,
                          void **out_buf, size_t *out_size,
@@ -1111,9 +1156,11 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     struct mk_list *tmp;
     struct mk_list *head;
     struct flb_ecs_metadata_key *metadata_key;
+    struct flb_ecs_metadata_buffer *metadata_buffer;
+    size_t size;
     flb_sds_t val;
 
-    /* First check that the metadata has been retrieved */
+    /* First check that the static cluster metadata has been retrieved */
     if (ctx->has_cluster_metadata == FLB_FALSE) {
         ret = get_ecs_cluster_metadata(ctx);
         if (ret < 0) {
@@ -1123,6 +1170,13 @@ static int cb_ecs_filter(const void *data, size_t bytes,
         }
         //TODO: cluster metadata can be exposed in global env ctx
     }
+
+    ret = get_metadata_by_id(ctx, tag, tag_len, &metadata_buffer);
+    if (ret == -1) {
+        flb_plg_error(ctx->ins, "Failed to get ECS Task metadata for %s", tag);
+        return FLB_FILTER_NOTOUCH;
+    }
+
     /* Create temporary msgpack buffer */
     msgpack_sbuffer_init(&tmp_sbuf);
     msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
@@ -1172,7 +1226,7 @@ static int cb_ecs_filter(const void *data, size_t bytes,
         mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
             metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
             val = flb_ra_translate(metadata_key->ra, NULL, 0,
-                                   ctx->cluster_metadata->obj, NULL);
+                                   metadata_buffer->obj, NULL);
             if (!val) {
                 flb_plg_error(ctx->ins, "Translation failed for %s : %s",
                               metadata_key->key, metadata_key->template);
@@ -1225,6 +1279,14 @@ static struct flb_config_map config_map[] = {
      FLB_CONFIG_MAP_MULT, FLB_FALSE, 0,
      "Add a metadata key/value pair with the given key and given value from the given template. "
      "Format is `Add KEY TEMPLATE`."
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "ecs_tag_prefix", "",
+     0, FLB_TRUE, offsetof(struct flb_filter_ecs, ecs_tag_prefix),
+     "This filter must obtain the 12 character container short ID to query "
+     "for ECS metadata. The filter removes the prefx from the tag and then assumes "
+     "the next 12 characters are the short container ID."
     },
 
     {
