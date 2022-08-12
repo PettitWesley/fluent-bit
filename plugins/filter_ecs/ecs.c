@@ -504,6 +504,7 @@ static int process_container_response(struct flb_filter_ecs *ctx,
     int found_docker_name = FLB_FALSE;
     int i;
     int id;
+    int len;
     struct flb_ecs_metadata_buffer *cont_meta_buf;
     msgpack_object key;
     msgpack_object val;
@@ -668,6 +669,45 @@ static int process_container_response(struct flb_filter_ecs *ctx,
                           task_meta.task_def_version_len);
 
     /* 3rd - Add the static cluster fields from the plugin context */
+    msgpack_pack_str(&tmp_pck, 11);
+    msgpack_pack_str_body(&tmp_pck,
+                          "ClusterName",
+                          11);
+    len = flb_sds_len(ctx->cluster_metadata.cluster_name);
+    msgpack_pack_str(&tmp_pck, len);
+    msgpack_pack_str_body(&tmp_pck,
+                          ctx->cluster_metadata.cluster_name,
+                          len);
+
+    msgpack_pack_str(&tmp_pck, 20);
+    msgpack_pack_str_body(&tmp_pck,
+                          "ContainerInstanceArn",
+                          20);
+    len = flb_sds_len(ctx->cluster_metadata.container_instance_arn);
+    msgpack_pack_str(&tmp_pck, len);
+    msgpack_pack_str_body(&tmp_pck,
+                          ctx->cluster_metadata.container_instance_arn,
+                          len);
+
+    msgpack_pack_str(&tmp_pck, 19);
+    msgpack_pack_str_body(&tmp_pck,
+                          "ContainerInstanceID",
+                          19);
+    len = flb_sds_len(ctx->cluster_metadata.container_instance_id);
+    msgpack_pack_str(&tmp_pck, len);
+    msgpack_pack_str_body(&tmp_pck,
+                          ctx->cluster_metadata.container_instance_id,
+                          len);
+
+    msgpack_pack_str(&tmp_pck, 15);
+    msgpack_pack_str_body(&tmp_pck,
+                          "ECSAgentVersion",
+                          15);
+    len = flb_sds_len(ctx->cluster_metadata.ecs_agent_version);
+    msgpack_pack_str(&tmp_pck, len);
+    msgpack_pack_str_body(&tmp_pck,
+                          ctx->cluster_metadata.ecs_agent_version,
+                          len);
 
     cont_meta_buf = flb_calloc(1, sizeof(struct flb_ecs_metadata_buffer));
     if (!cont_meta_buf) {
