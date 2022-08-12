@@ -257,11 +257,12 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     size_t size;
     size_t b_sent;
     size_t off = 0;
-    struct flb_ecs_metadata_buffer *meta_buf;
     msgpack_unpacked result;
     msgpack_object root;
     msgpack_object key;
     msgpack_object val;
+    msgpack_sbuffer tmp_sbuf;
+    msgpack_packer tmp_pck;
     flb_sds_t container_instance_id = NULL;
     flb_sds_t tmp = NULL;
 
@@ -332,6 +333,13 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
         msgpack_unpacked_destroy(&result);
         return -1;
     }
+
+    /* 
+     * We copy the metadata response to a new buffer
+     * So we can define the metadata key names and parse ARN values
+     */
+    msgpack_sbuffer_init(&tmp_sbuf);
+    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
 
     /* 
 Metadata Response:
