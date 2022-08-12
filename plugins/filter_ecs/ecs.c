@@ -39,6 +39,8 @@
 
 #include "ecs.h"
 
+static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx);
+
 static int cb_ecs_init(struct flb_filter_instance *f_ins,
                        struct flb_config *config,
                        void *data)
@@ -143,7 +145,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
 
     /* entries are only evicted when TTL is reached and a get is issued */
     ctx->container_hash_table = flb_hash_create_with_ttl(ctx->ecs_meta_cache_ttl,
-                                                         FLB_HASH_TABLE_EVICT_OLDER,
+                                                         FLB_HASH_EVICT_OLDER,
                                                          FLB_ECS_FILTER_HASH_TABLE_SIZE,
                                                          FLB_ECS_FILTER_HASH_TABLE_SIZE);
     if (!ctx->container_hash_table) {
@@ -517,7 +519,7 @@ But our metadata keys names are:
     ctx->cluster_meta_buf.buf = tmp_sbuf.data;
     ctx->cluster_meta_buf.size =  tmp_sbuf.size;
 
-    ret = flb_ecs_metadata_buffer_init(ctx, ctx->cluster_meta_buf);
+    ret = flb_ecs_metadata_buffer_init(ctx, &ctx->cluster_meta_buf);
     if (ret < 0) {
         flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
@@ -666,15 +668,12 @@ static int process_container_response(struct flb_filter_ecs *ctx,
         }
     }
 
-    flb_free(buffer);
-    msgpack_unpacked_destroy(&result);
-
     if (found_id == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse Task 'DockerId' from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
-    if (found_family == FLB_FALSE) {
+    if (found_docker_name == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'DockerName' from container response");
         msgpack_sbuffer_destroy(&tmp_sbuf);
         if (short_id != NULL) {
@@ -772,7 +771,6 @@ static int process_container_response(struct flb_filter_ecs *ctx,
     if (!cont_meta_buf) {
         flb_errno();
         msgpack_sbuffer_destroy(&tmp_sbuf);
-        flb_sds_destroy(http_path);
         flb_sds_destroy(short_id);
         return -1;
     }
@@ -795,7 +793,7 @@ static int process_container_response(struct flb_filter_ecs *ctx,
      */
     id = flb_hash_add(ctx->container_hash_table,
                       short_id, strlen(short_id),
-                      task_meta_buf, 0);
+                      cont_meta_buf, 0);
     flb_sds_destroy(short_id);
     return 0;
 }
@@ -960,7 +958,7 @@ Metadata Response:
                 return -1;
             }
 
-            found_task = FLB_TRUE;
+            found_family = FLB_TRUE;
             task_meta.task_def_family = val.via.str.ptr;
             task_meta.task_def_family_len = (int) val.via.str.size;
         }
@@ -979,7 +977,7 @@ Metadata Response:
             }
 
             /* first get the ARN */
-            found_instance = FLB_TRUE;
+            found_task = FLB_TRUE;
             task_meta.task_arn = val.via.str.ptr;
             task_meta.task_arn_len = (int) val.via.str.size;
 
@@ -1016,6 +1014,20 @@ Metadata Response:
             found_version = FLB_TRUE;
             task_meta.task_def_version = val.via.str.ptr;
             task_meta.task_def_version = (int) val.via.str.size;
+        } else if (key.via.str.size == 10 && strncmp(key.via.str.ptr, "Containers", 10) == 0) {
+            val = root.via.map.ptr[i].val;
+            if (val.type != MSGPACK_OBJECT_ARRAY ) {
+                flb_plg_error(ctx->ins, "metadata parsing: unexpected 'Containers' value type=%i",
+                              val.type);
+                flb_free(buffer);
+                msgpack_unpacked_destroy(&result);
+                flb_sds_destroy(http_path);
+                if (task_id) {
+                    flb_sds_destroy(task_id);
+                }
+                return -1;
+            }
+            found_containers = FLB_TRUE;
         }
     }
 
@@ -1105,7 +1117,6 @@ Metadata Response:
                 flb_sds_destroy(task_id);
                 return -1;
             }
-            found_containers = FLB_TRUE;
 
             /* iterate through list of containers and process them*/
             for (k = 0; k < val.via.array.size; k++) {
