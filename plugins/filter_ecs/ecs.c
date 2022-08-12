@@ -822,7 +822,6 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
     size_t b_sent;
     size_t off = 0;
     msgpack_unpacked result;
-    msgpack_unpacked unpacked;
     msgpack_object root;
     msgpack_object key;
     msgpack_object val;
@@ -1121,7 +1120,6 @@ Metadata Response:
                                   k);
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
-                    msgpack_unpacked_destroy(&unpacked);
                     flb_sds_destroy(http_path);
                     flb_sds_destroy(task_id);
                     return -1;
@@ -1132,7 +1130,6 @@ Metadata Response:
 
     flb_free(buffer);
     msgpack_unpacked_destroy(&result);
-    msgpack_unpacked_destroy(&unpacked);
     flb_sds_destroy(task_id);
     flb_sds_destroy(http_path);
     return 0;
