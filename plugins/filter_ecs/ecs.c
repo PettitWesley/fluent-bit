@@ -878,6 +878,8 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
         return -1;
     }
 
+    flb_info("task resp=%s", c->resp.payload);
+
     ret = flb_pack_json(c->resp.payload, c->resp.payload_size,
                         &buffer, &size, &root_type);
 
@@ -890,12 +892,14 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
         return -1;
     }
 
+    flb_info("root_type=%i", root_type);
+
     /* parse metadata response */
     msgpack_unpacked_init(&result);
     ret = msgpack_unpack_next(&result, buffer, size, &off);
     if (ret != MSGPACK_UNPACK_SUCCESS) {
-        flb_plg_error(ctx->ins, "Cannot unpack %s response to find metadata\n%s",
-                      http_path, c->resp.payload);
+        flb_plg_error(ctx->ins, "ret=%i, Cannot unpack %s response to find metadata\n%s",
+                      ret, http_path, c->resp.payload);
         flb_free(buffer);
         msgpack_unpacked_destroy(&result);
         flb_sds_destroy(http_path);
