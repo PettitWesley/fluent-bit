@@ -1285,8 +1285,10 @@ static struct flb_config_map config_map[] = {
      FLB_CONFIG_MAP_STR, "ecs_tag_prefix", "",
      0, FLB_TRUE, offsetof(struct flb_filter_ecs, ecs_tag_prefix),
      "This filter must obtain the 12 character container short ID to query "
-     "for ECS metadata. The filter removes the prefx from the tag and then assumes "
-     "the next 12 characters are the short container ID."
+     "for ECS Task metadata. The filter removes the prefx from the tag and then assumes "
+     "the next 12 characters are the short container ID. If the container short ID, "
+     "is not found in the tag, the filter can/must fallback to only attaching cluster metadata "
+     "(cluster name, container instance ID/ARN, and ECS Agent version)."
     },
 
     {
