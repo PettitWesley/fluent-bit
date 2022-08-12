@@ -90,8 +90,18 @@ struct flb_filter_ecs {
     struct mk_list metadata_keys;
     int metadata_keys_len;
 
+    /* 
+     * This field is used when we build new container metadata objects
+     */
     struct flb_ecs_cluster_metadata cluster_metadata;
     int has_cluster_metadata;
+    /*
+     * If looking up the container fails, we should still always be able to
+     * attach cluster metadata. So we have a fallback metadata buffer for that.
+     * For example, users may want to attach cluster name to Docker Daemon logs,
+     * even though Docker is not an AWS ECS Task/container.
+     */
+    struct flb_ecs_metadata_buffer cluster_meta_buf;
 
     /* 
      * Maps 12 char container short ID to metadata buffer
