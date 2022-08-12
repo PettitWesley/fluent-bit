@@ -564,7 +564,6 @@ static int process_container_response(struct flb_filter_ecs *ctx,
     int found_ecs_name = FLB_FALSE;
     int found_docker_name = FLB_FALSE;
     int i;
-    int id;
     int len;
     struct flb_ecs_metadata_buffer *cont_meta_buf;
     msgpack_object key;
@@ -791,9 +790,10 @@ static int process_container_response(struct flb_filter_ecs *ctx,
      * Size is set to 0 so the table just stores our pointer 
      * Otherwise it will try to copy the memory to a new buffer
      */
-    id = flb_hash_add(ctx->container_hash_table,
-                      short_id, strlen(short_id),
-                      cont_meta_buf, 0);
+    flb_hash_add(ctx->container_hash_table,
+                 short_id, strlen(short_id),
+                 cont_meta_buf, 0);
+
     flb_sds_destroy(short_id);
     return 0;
 }
@@ -1236,7 +1236,6 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     struct mk_list *head;
     struct flb_ecs_metadata_key *metadata_key;
     struct flb_ecs_metadata_buffer *metadata_buffer;
-    size_t size;
     flb_sds_t val;
 
     /* First check that the static cluster metadata has been retrieved */

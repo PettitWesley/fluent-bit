@@ -70,13 +70,13 @@ struct flb_ecs_cluster_metadata {
  * So this struct just stores tmp pointers to the deserialized msgpack
  */
 struct flb_ecs_task_metadata {
-    char* task_arn;
+    const char* task_arn;
     int task_arn_len;
-    char *task_id;
+    const char *task_id;
     int task_id_len;
-    char *task_def_family;
+    const char *task_def_family;
     int task_def_family_len;
-    char *task_def_version;
+    const char *task_def_version;
     int task_def_version_len;
 };
 
