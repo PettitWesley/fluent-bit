@@ -111,6 +111,7 @@ struct flb_filter_ecs {
     int ecs_meta_cache_ttl;
     char *ecs_tag_prefix;
     int ecs_tag_prefix_len;
+    int cluster_metadata_only;
 };
 
 #endif

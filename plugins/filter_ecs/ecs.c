@@ -335,13 +335,6 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     }
 
     /* 
-     * We copy the metadata response to a new buffer
-     * So we can define the metadata key names and parse ARN values
-     */
-    msgpack_sbuffer_init(&tmp_sbuf);
-    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
-
-    /* 
 Metadata Response:
 {
     "Cluster": "cluster_name",
@@ -513,6 +506,15 @@ But our metadata keys names are:
         msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
+
+    /* 
+     * We also create a standalone cluster metadata msgpack object
+     * This is used as a fallback for logs when we can't find the
+     * task metadata for a log. It is valid to attach cluster meta
+     * to eg. Docker daemon logs which are not an AWS ECS Task. 
+     */
+    msgpack_sbuffer_init(&tmp_sbuf);
+    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
 
     ctx->cluster_meta_buf.buf = tmp_sbuf.data;
     ctx->cluster_meta_buf.size =  tmp_sbuf.size;
@@ -1355,6 +1357,16 @@ static struct flb_config_map config_map[] = {
      "the next 12 characters are the short container ID. If the container short ID, "
      "is not found in the tag, the filter can/must fallback to only attaching cluster metadata "
      "(cluster name, container instance ID/ARN, and ECS Agent version)."
+    },
+
+    {
+     FLB_CONFIG_MAP_BOOL, "cluster_metadata_only", "false",
+     0, FLB_TRUE, offsetof(struct flb_filter_ecs, cluster_metadata_only),
+     "Only attempt to attach the cluster related metadata to logs "
+     "(cluster name, container instance ID/ARN, and ECS Agent version). "
+     "With this option off, if this filter can not obtain the task metadata for a log, it will "
+     "output errors. Use this option if you have logs that are not part of an "
+     "ECS task (ex: Docker Daemon logs)."
     },
 
     {
