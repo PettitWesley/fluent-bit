@@ -816,7 +816,6 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
     int found_containers = FLB_FALSE;
     int i;
     int k;
-    int id;
     char *buffer;
     size_t size;
     size_t b_sent;
