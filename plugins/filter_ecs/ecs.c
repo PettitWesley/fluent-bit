@@ -1078,7 +1078,7 @@ Metadata Response:
     msgpack_unpacked_init(&unpacked);
     ret = msgpack_unpack_next(&unpacked, buffer, size, &off);
     if (ret != MSGPACK_UNPACK_SUCCESS) {
-        flb_plg_error(ctx->ins, "Cannot unpack %s response to find metadata",
+        flb_plg_error(ctx->ins, "Cannot unpack %s response to find container metadata",
                       http_path);
         flb_free(buffer);
         msgpack_unpacked_destroy(&result);
