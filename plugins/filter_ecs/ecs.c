@@ -253,6 +253,7 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     int found_version = FLB_FALSE;
     int found_instance = FLB_FALSE;
     int i;
+    int len;
     char *buffer;
     size_t size;
     size_t b_sent;
@@ -366,7 +367,6 @@ But our metadata keys names are:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
@@ -377,20 +377,11 @@ But our metadata keys names are:
                     flb_errno();
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
-                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     return -1;
                 }
                 ctx->cluster_metadata.cluster_name = tmp;
             }
 
-            msgpack_pack_str(&tmp_pck, 11);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "ClusterName",
-                                  11);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
         }
         else if (key.via.str.size == 20 && strncmp(key.via.str.ptr, "ContainerInstanceArn", 20) == 0) {
             val = root.via.map.ptr[i].val;
@@ -399,7 +390,6 @@ But our metadata keys names are:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
@@ -411,20 +401,10 @@ But our metadata keys names are:
                     flb_errno();
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
-                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     return -1;
                 }
                 ctx->cluster_metadata.container_instance_arn = tmp;
             }
-
-            msgpack_pack_str(&tmp_pck, 20);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "ContainerInstanceArn",
-                                  20);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
 
             /* then the ID */
             if (ctx->cluster_metadata.container_instance_id == NULL) {
@@ -434,20 +414,10 @@ But our metadata keys names are:
                                 (int) val.via.str.size, val.via.str.ptr);
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
-                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     return -1;
                 }
                 ctx->cluster_metadata.container_instance_id = container_instance_id;
             }
-
-            msgpack_pack_str(&tmp_pck, 19);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "ContainerInstanceID",
-                                  19);
-            msgpack_pack_str(&tmp_pck, flb_sds_len(ctx->cluster_metadata.container_instance_id));
-            msgpack_pack_str_body(&tmp_pck,
-                                  ctx->cluster_metadata.container_instance_id,
-                                  flb_sds_len(ctx->cluster_metadata.container_instance_id));
 
         } else if (key.via.str.size == 7 && strncmp(key.via.str.ptr, "Version", 7) == 0) {
             val = root.via.map.ptr[i].val;
@@ -456,7 +426,6 @@ But our metadata keys names are:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
                 return -1;
             }
 
@@ -467,20 +436,10 @@ But our metadata keys names are:
                     flb_errno();
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
-                    msgpack_sbuffer_destroy(&tmp_sbuf);
                     return -1;
                 }
                 ctx->cluster_metadata.ecs_agent_version = tmp;
             }
-
-            msgpack_pack_str(&tmp_pck, 15);
-            msgpack_pack_str_body(&tmp_pck,
-                                  "ECSAgentVersion",
-                                  15);
-            msgpack_pack_str(&tmp_pck, (int) val.via.str.size);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val.via.str.ptr,
-                                  (int) val.via.str.size);
         }
 
     }
@@ -491,19 +450,16 @@ But our metadata keys names are:
     if (found_cluster == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Cluster' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
     if (found_instance == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'ContainerInstanceArn' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
     if (found_version == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Version' from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
-        msgpack_sbuffer_destroy(&tmp_sbuf);
         return -1;
     }
 
@@ -511,10 +467,52 @@ But our metadata keys names are:
      * We also create a standalone cluster metadata msgpack object
      * This is used as a fallback for logs when we can't find the
      * task metadata for a log. It is valid to attach cluster meta
-     * to eg. Docker daemon logs which are not an AWS ECS Task. 
+     * to eg. Docker daemon logs which are not an AWS ECS Task via
+     * the `cluster_metadata_only` setting. 
      */
     msgpack_sbuffer_init(&tmp_sbuf);
     msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
+    msgpack_pack_map(&tmp_pck, 4);
+
+    msgpack_pack_str(&tmp_pck, 11);
+    msgpack_pack_str_body(&tmp_pck,
+                          "ClusterName",
+                          11);
+    len = flb_sds_len(ctx->cluster_metadata.cluster_name);
+    msgpack_pack_str(&tmp_pck, len);
+    msgpack_pack_str_body(&tmp_pck,
+                          ctx->cluster_metadata.cluster_name,
+                          len);
+
+    msgpack_pack_str(&tmp_pck, 20);
+    msgpack_pack_str_body(&tmp_pck,
+                          "ContainerInstanceArn",
+                          20);
+    len = flb_sds_len(ctx->cluster_metadata.container_instance_arn);
+    msgpack_pack_str(&tmp_pck, len);
+    msgpack_pack_str_body(&tmp_pck,
+                          ctx->cluster_metadata.container_instance_arn,
+                          len);
+
+    msgpack_pack_str(&tmp_pck, 19);
+    msgpack_pack_str_body(&tmp_pck,
+                          "ContainerInstanceID",
+                          19);
+    len = flb_sds_len(ctx->cluster_metadata.container_instance_id);
+    msgpack_pack_str(&tmp_pck, len);
+    msgpack_pack_str_body(&tmp_pck,
+                          ctx->cluster_metadata.container_instance_id,
+                          len);
+
+    msgpack_pack_str(&tmp_pck, 15);
+    msgpack_pack_str_body(&tmp_pck,
+                          "ECSAgentVersion",
+                          15);
+    len = flb_sds_len(ctx->cluster_metadata.container_instance_id);
+    msgpack_pack_str(&tmp_pck, len);
+    msgpack_pack_str_body(&tmp_pck,
+                          ctx->cluster_metadata.container_instance_id,
+                          len);
 
     ctx->cluster_meta_buf.buf = tmp_sbuf.data;
     ctx->cluster_meta_buf.size =  tmp_sbuf.size;
@@ -524,6 +522,8 @@ But our metadata keys names are:
         flb_plg_error(ctx->ins, "Could not init metadata buffer from %s response",
                       FLB_ECS_FILTER_CLUSTER_PATH);
         msgpack_sbuffer_destroy(&tmp_sbuf);
+        ctx->cluster_meta_buf.buf = NULL;
+        ctx->cluster_meta_buf.size =  0;
         return -1;
     }
 
