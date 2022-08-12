@@ -878,8 +878,6 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
         return -1;
     }
 
-    flb_info("task resp=%s", c->resp.payload);
-
     ret = flb_pack_json(c->resp.payload, c->resp.payload_size,
                         &buffer, &size, &root_type);
 
@@ -892,14 +890,12 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
         return -1;
     }
 
-    flb_info("root_type=%i", root_type);
-
     /* parse metadata response */
     msgpack_unpacked_init(&result);
     ret = msgpack_unpack_next(&result, buffer, size, &off);
     if (ret != MSGPACK_UNPACK_SUCCESS) {
-        flb_plg_error(ctx->ins, "ret=%i, Cannot unpack %s response to find metadata\n%s",
-                      ret, http_path, c->resp.payload);
+        flb_plg_error(ctx->ins, "Cannot unpack %s response to find metadata\n%s",
+                      http_path, c->resp.payload);
         flb_free(buffer);
         msgpack_unpacked_destroy(&result);
         flb_sds_destroy(http_path);
@@ -1040,12 +1036,16 @@ Metadata Response:
         flb_plg_error(ctx->ins, "Could not parse Task 'Arn' from %s response",
                       http_path);
         flb_sds_destroy(http_path);
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
         return -1;
     }
     if (found_family == FLB_FALSE) {
         flb_plg_error(ctx->ins, "Could not parse 'Family' from %s response",
                       http_path);
         flb_sds_destroy(http_path);
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
         if (task_id) {
             flb_sds_destroy(task_id);
         }
@@ -1055,6 +1055,8 @@ Metadata Response:
         flb_plg_error(ctx->ins, "Could not parse 'Version' from %s response",
                       http_path);
         flb_sds_destroy(http_path);
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
         if (task_id) {
             flb_sds_destroy(task_id);
         }
@@ -1064,6 +1066,8 @@ Metadata Response:
         flb_plg_error(ctx->ins, "Could not parse 'Containers' from %s response",
                       http_path);
         flb_sds_destroy(http_path);
+        flb_free(buffer);
+        msgpack_unpacked_destroy(&result);
         if (task_id) {
             flb_sds_destroy(task_id);
         }
@@ -1071,36 +1075,10 @@ Metadata Response:
     }
 
     /* 
-     * Parse metadata response a 2nd time to get the Containers list 
+     * Process metadata response a 2nd time to get the Containers list 
      * This is because we need one complete metadata buf per container
      * with all task metadata. So we collect task before we process containers.
      */
-    msgpack_unpacked_init(&unpacked);
-    ret = msgpack_unpack_next(&unpacked, buffer, size, &off);
-    if (ret != MSGPACK_UNPACK_SUCCESS) {
-        flb_plg_error(ctx->ins, "Cannot unpack %s response to find container metadata",
-                      http_path);
-        flb_free(buffer);
-        msgpack_unpacked_destroy(&result);
-        msgpack_unpacked_destroy(&unpacked);
-        flb_sds_destroy(http_path);
-        flb_sds_destroy(task_id);
-        return -1;
-    }
-
-    root = result.data;
-    if (root.type != MSGPACK_OBJECT_MAP) {
-        flb_plg_error(ctx->ins, "%s response parsing failed, msgpack_type=%i",
-                      http_path,
-                      root.type);
-        flb_free(buffer);
-        msgpack_unpacked_destroy(&result);
-        msgpack_unpacked_destroy(&unpacked);
-        flb_sds_destroy(http_path);
-        flb_sds_destroy(task_id);
-        return -1;
-    }
-
     for (i = 0; i < root.via.map.size; i++) {
         key = root.via.map.ptr[i].key;
         if (key.type != MSGPACK_OBJECT_STR) {
