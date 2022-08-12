@@ -510,10 +510,10 @@ But our metadata keys names are:
     msgpack_pack_str_body(&tmp_pck,
                           "ECSAgentVersion",
                           15);
-    len = flb_sds_len(ctx->cluster_metadata.container_instance_id);
+    len = flb_sds_len(ctx->cluster_metadata.ecs_agent_version);
     msgpack_pack_str(&tmp_pck, len);
     msgpack_pack_str_body(&tmp_pck,
-                          ctx->cluster_metadata.container_instance_id,
+                          ctx->cluster_metadata.ecs_agent_version,
                           len);
 
     ctx->cluster_meta_buf.buf = tmp_sbuf.data;
