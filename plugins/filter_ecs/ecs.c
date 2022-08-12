@@ -1094,7 +1094,6 @@ Metadata Response:
                               val.type);
                 flb_free(buffer);
                 msgpack_unpacked_destroy(&result);
-                msgpack_unpacked_destroy(&unpacked);
                 flb_sds_destroy(http_path);
                 flb_sds_destroy(task_id);
                 return -1;
@@ -1109,7 +1108,6 @@ Metadata Response:
                                   container.type);
                     flb_free(buffer);
                     msgpack_unpacked_destroy(&result);
-                    msgpack_unpacked_destroy(&unpacked);
                     flb_sds_destroy(http_path);
                     flb_sds_destroy(task_id);
                     return -1;
