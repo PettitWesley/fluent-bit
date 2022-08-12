@@ -312,10 +312,6 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
         return -1;
     }
 
-     /* release resources */
-    flb_http_client_destroy(c);
-    flb_upstream_conn_release(u_conn);
-
     /* parse metadata response */
     msgpack_unpacked_init(&result);
     ret = msgpack_unpack_next(&result, buffer, size, &off);
@@ -324,8 +320,13 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
                       FLB_ECS_FILTER_CLUSTER_PATH, c->resp.payload);
         flb_free(buffer);
         msgpack_unpacked_destroy(&result);
+        flb_http_client_destroy(c);
+        flb_upstream_conn_release(u_conn);
         return -1;
     }
+
+    flb_http_client_destroy(c);
+    flb_upstream_conn_release(u_conn);
 
     root = result.data;
     if (root.type != MSGPACK_OBJECT_MAP) {
@@ -889,10 +890,6 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
         return -1;
     }
 
-     /* release resources */
-    flb_http_client_destroy(c);
-    flb_upstream_conn_release(u_conn);
-
     /* parse metadata response */
     msgpack_unpacked_init(&result);
     ret = msgpack_unpack_next(&result, buffer, size, &off);
@@ -902,8 +899,13 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
         flb_free(buffer);
         msgpack_unpacked_destroy(&result);
         flb_sds_destroy(http_path);
+        flb_http_client_destroy(c);
+        flb_upstream_conn_release(u_conn);
         return -1;
     }
+
+    flb_http_client_destroy(c);
+    flb_upstream_conn_release(u_conn);
 
     root = result.data;
     if (root.type != MSGPACK_OBJECT_MAP) {
@@ -1072,8 +1074,8 @@ Metadata Response:
     msgpack_unpacked_init(&unpacked);
     ret = msgpack_unpack_next(&unpacked, buffer, size, &off);
     if (ret != MSGPACK_UNPACK_SUCCESS) {
-        flb_plg_error(ctx->ins, "Cannot unpack %s response to find metadata\n%s",
-                      http_path, c->resp.payload);
+        flb_plg_error(ctx->ins, "Cannot unpack %s response to find metadata",
+                      http_path);
         flb_free(buffer);
         msgpack_unpacked_destroy(&result);
         msgpack_unpacked_destroy(&unpacked);
