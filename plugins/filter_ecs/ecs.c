@@ -1013,7 +1013,7 @@ Metadata Response:
 
             found_version = FLB_TRUE;
             task_meta.task_def_version = val.via.str.ptr;
-            task_meta.task_def_version = (int) val.via.str.size;
+            task_meta.task_def_version_len = (int) val.via.str.size;
         } else if (key.via.str.size == 10 && strncmp(key.via.str.ptr, "Containers", 10) == 0) {
             val = root.via.map.ptr[i].val;
             if (val.type != MSGPACK_OBJECT_ARRAY ) {
@@ -1160,7 +1160,7 @@ static int get_metadata_by_id(struct flb_filter_ecs *ctx,
                               struct flb_ecs_metadata_buffer **metadata_buffer)
 {
     flb_sds_t container_short_id = NULL;
-    char *tmp;
+    const char *tmp;
     int ret;
     size_t size;
 
