@@ -1239,10 +1239,17 @@ static int cb_ecs_filter(const void *data, size_t bytes,
         //TODO: cluster metadata can be exposed in global env ctx
     }
 
-    ret = get_metadata_by_id(ctx, tag, tag_len, &metadata_buffer);
-    if (ret == -1) {
-        flb_plg_error(ctx->ins, "Failed to get ECS Task metadata for %s", tag);
-        return FLB_FILTER_NOTOUCH;
+    if (ctx->cluster_metadata_only == FLB_FALSE) {
+        ret = get_metadata_by_id(ctx, tag, tag_len, &metadata_buffer);
+        if (ret == -1) {
+            flb_plg_error(ctx->ins, "Failed to get ECS Task metadata for %s, "
+                        "falling back to process cluster metadata only. If "
+                        "this is intentional, set `Cluster_Metadata_Only On`",
+                        tag);
+            return FLB_FILTER_NOTOUCH;
+        }
+    } else {
+        metadata_buffer = &ctx->cluster_meta_buf;
     }
 
     /* Create temporary msgpack buffer */
