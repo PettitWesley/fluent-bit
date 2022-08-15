@@ -235,8 +235,8 @@ static void flb_test_ecs_filter_cluster_metadata_only()
     TEST_CHECK(ret == 0);
 
     /* Prepare output callback with expected result */
-    expected.expected_records = 1; /* 1 record with metadata added */
-    expected.expected_pattern = "cluster_name.$TaskID.$ContainerName";
+    expected.expected_records = 1; /* 1 record with only cluster metadata values added */
+    expected.expected_pattern = "cluster_name..";
     expected.expected_pattern_index = 0;
     cb_data.cb = cb_check_result;
     cb_data.data = (void *) &expected;
