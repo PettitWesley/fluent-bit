@@ -224,6 +224,6 @@ static void flb_test_ecs_filter()
 
 TEST_LIST = {
 
-    {"flb_test_multiline_partial_message_concat_two_ids"  , flb_test_multiline_partial_message_concat_two_ids },
+    {"flb_test_ecs_filter"  , flb_test_ecs_filter },
     {NULL, NULL}
 };
