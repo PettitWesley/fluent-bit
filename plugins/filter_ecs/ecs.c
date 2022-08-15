@@ -952,11 +952,13 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
                          http_path);
             flb_plg_debug(ctx->ins, "HTTP response\n%s",
                           c->resp.payload);
+        } else {
+            flb_plg_warn(ctx->ins, "%s response was empty, will retry", 
+                         http_path);
         }
         flb_http_client_destroy(c);
         flb_upstream_conn_release(u_conn);
         flb_sds_destroy(http_path);
-        flb_error("returning no payload");
         return -1;
     }
 
