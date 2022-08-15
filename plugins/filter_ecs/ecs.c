@@ -230,7 +230,7 @@ static struct flb_http_client *mock_http_call(char *error_env_var, char *api)
             c->resp.payload_size = strlen(c->resp.payload);
         }
         else {
-            c->resp.payload = "{\"Tasks\": [{\"Arn\": \"arn:aws:ecs:us-west-2:012345678910:task/default/example5-58ff-46c9-ae05-543f8example\", \"DesiredStatus\": \"RUNNING\", \"KnownStatus\": \"RUNNING\",\"Family\": \"hello_world\",\"Version\": \"8\",\"Containers\": [{\"DockerId\": \"9581a69a761a557fbfce1d0f6745e4af5b9dbfb86b6b2c5c4df156f1a5932ff1\",\"DockerName\": \"ecs-hello_world-8-mysql-fcae8ac8f9f1d89d8301\",\"Name\": \"mysql\"},{\"DockerId\":\"bf25c5c5b2d4dba68846c7236e75b6915e1e778d31611e3c6a06831e39814a15\",\"DockerName\": \"ecs-hello_world-8-wordpress-e8bfddf9b488dff36c00\",\"Name\": \"wordpress\"}]}]}";
+            c->resp.payload = "{\"Arn\": \"arn:aws:ecs:us-west-2:012345678910:task/default/e01d58a8-151b-40e8-bc01-22647b9ecfec\",\"Containers\": [{\"DockerId\": \"79c796ed2a7f864f485c76f83f3165488097279d296a7c05bd5201a1c69b2920\",\"DockerName\": \"ecs-nginx-efs-2-nginx-9ac0808dd0afa495f001\",\"Name\": \"nginx\"}],\"DesiredStatus\": \"RUNNING\",\"Family\": \"nginx-efs\",\"KnownStatus\": \"RUNNING\",\"Version\": \"2\"}";
             c->resp.payload_size = strlen(c->resp.payload);
         }
     }
