@@ -157,9 +157,111 @@ static void flb_test_ecs_filter()
     filter_test_destroy(ctx);
 }
 
+static void flb_test_ecs_filter_no_prefix()
+{
+    int len;
+    int ret;
+    int bytes;
+    char *p;
+    struct flb_lib_out_cb cb_data;
+    struct filter_test *ctx;
+    struct filter_test_result expected = { 0 };
+
+    /* mocks calls- signals that we are in test mode */
+    setenv("FLB_ECS_PLUGIN_UNDER_TEST", "true", 1);
+
+    /* Create test context */
+    ctx = filter_test_create((void *) &cb_data, "79c796ed2a7f");
+    if (!ctx) {
+        exit(EXIT_FAILURE);
+    }
+
+    /* Configure filter */
+    ret = flb_filter_set(ctx->flb, ctx->f_ffd,
+                         "ecs_tag_prefix", "",
+                         "ADD", "resource $ClusterName.$TaskID.$ContainerName",
+                         NULL);
+    TEST_CHECK(ret == 0);
+
+    /* Prepare output callback with expected result */
+    expected.expected_records = 1; /* 1 record with metadata added */
+    expected.expected_pattern = "cluster_name.e01d58a8-151b-40e8-bc01-22647b9ecfec.nginx";
+    expected.expected_pattern_index = 0;
+    cb_data.cb = cb_check_result;
+    cb_data.data = (void *) &expected;
+
+    /* Start the engine */
+    ret = flb_start(ctx->flb);
+    TEST_CHECK(ret == 0);
+
+    /* Ingest data samples */
+    p = "[0, {\"log\":\"error: my error\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+
+    /* check number of outputted records */
+    sleep(2);
+    TEST_CHECK(expected.actual_records == expected.expected_records);
+    filter_test_destroy(ctx);
+}
+
+static void flb_test_ecs_filter_cluster_metadata_only()
+{
+    int len;
+    int ret;
+    int bytes;
+    char *p;
+    struct flb_lib_out_cb cb_data;
+    struct filter_test *ctx;
+    struct filter_test_result expected = { 0 };
+
+    /* mocks calls- signals that we are in test mode */
+    setenv("FLB_ECS_PLUGIN_UNDER_TEST", "true", 1);
+
+    /* Create test context */
+    ctx = filter_test_create((void *) &cb_data, "var.lib.ecs.79c796ed2a7f");
+    if (!ctx) {
+        exit(EXIT_FAILURE);
+    }
+
+    /* Configure filter */
+    ret = flb_filter_set(ctx->flb, ctx->f_ffd,
+                         "ecs_tag_prefix", "",
+                         "cluster_metadata_only", "on",
+                         /* only cluster value will be populated */
+                         "ADD", "resource $ClusterName.$TaskID.$ContainerName",
+                         NULL);
+    TEST_CHECK(ret == 0);
+
+    /* Prepare output callback with expected result */
+    expected.expected_records = 1; /* 1 record with metadata added */
+    expected.expected_pattern = "cluster_name.$TaskID.$ContainerName";
+    expected.expected_pattern_index = 0;
+    cb_data.cb = cb_check_result;
+    cb_data.data = (void *) &expected;
+
+    /* Start the engine */
+    ret = flb_start(ctx->flb);
+    TEST_CHECK(ret == 0);
+
+    /* Ingest data samples */
+    p = "[0, {\"log\":\"error: my error\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+
+    /* check number of outputted records */
+    sleep(2);
+    TEST_CHECK(expected.actual_records == expected.expected_records);
+    filter_test_destroy(ctx);
+}
+
 
 TEST_LIST = {
 
     {"flb_test_ecs_filter"  , flb_test_ecs_filter },
+    {"flb_test_ecs_filter_no_prefix"  , flb_test_ecs_filter_no_prefix },
+    {"flb_test_ecs_filter_cluster_metadata_only"  , flb_test_ecs_filter_cluster_metadata_only },
     {NULL, NULL}
 };
