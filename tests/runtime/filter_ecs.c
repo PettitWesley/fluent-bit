@@ -61,17 +61,6 @@ static int get_output_num()
     return ret;
 }
 
-static void set_output_num(int num)
-{
-    pthread_mutex_lock(&result_mutex);
-    num_output = num;
-    pthread_mutex_unlock(&result_mutex);
-}
-
-static void clear_output_num()
-{
-    set_output_num(0);
-}
 
 struct str_list {
     size_t size; /* size of lists */
@@ -79,46 +68,6 @@ struct str_list {
     char **lists; /* string lists */
 };
 
-/* Callback to check expected results */
-static int cb_check_str_list(void *record, size_t size, void *data)
-{
-    char *p;
-    char *out_line = record;
-    int num = get_output_num();
-    int count = 0;
-    size_t i;
-    struct str_list *l = (struct str_list *)data;
-
-    if (!TEST_CHECK(out_line != NULL)) {
-        TEST_MSG("out_line is NULL");
-        return -1;
-    }
-
-    if (!TEST_CHECK(l != NULL)) {
-        TEST_MSG("l is NULL");
-        flb_free(out_line);
-        return -1;
-    }
-
-    if (strlen(out_line) < l->ignore_min_line_num) {
-        flb_free(out_line);
-        return 0;
-    }
-
-    for (i=0; i<l->size; i++) {
-        p = strstr(out_line, l->lists[i]);
-        if (p != NULL) {
-            count++;
-        }
-    }
-    if(!TEST_CHECK(count != 0)) {
-        TEST_MSG("%s is not matched", out_line);
-    }
-    set_output_num(num+count);
-
-    flb_free(out_line);
-    return 0;
-}
 
 static struct filter_test *filter_test_create(struct flb_lib_out_cb *data,
                                               char *tag)
@@ -194,7 +143,7 @@ static void flb_test_ecs_filter()
     /* Configure filter */
     ret = flb_filter_set(ctx->flb, ctx->f_ffd,
                          "ecs_tag_prefix", "testprefix-",
-                         "ADD", "$ClusterName.$TaskID.$ContainerName",
+                         "ADD", "resource", "$ClusterName.$TaskID.$ContainerName",
                          NULL);
     TEST_CHECK(ret == 0);
 
