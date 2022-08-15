@@ -149,7 +149,7 @@ static void flb_test_ecs_filter()
 
     /* Prepare output callback with expected result */
     expected.expected_records = 1; /* 1 record with metadata added */
-    expected.expected_pattern = "cluster_name.example5-58ff-46c9-ae05-543f8example.mysql";
+    expected.expected_pattern = "cluster_name.e01d58a8-151b-40e8-bc01-22647b9ecfec.nginx";
     expected.expected_pattern_index = 0;
     cb_data.cb = cb_check_result;
     cb_data.data = (void *) &expected;
