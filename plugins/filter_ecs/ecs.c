@@ -169,7 +169,7 @@ error:
     return -1;
 }
 
-int plugin_under_test()
+static int plugin_under_test()
 {
     if (getenv("FLB_ECS_PLUGIN_UNDER_TEST") != NULL) {
         return FLB_TRUE;
@@ -178,7 +178,7 @@ int plugin_under_test()
     return FLB_FALSE;
 }
 
-char *mock_error_response(char *error_env_var)
+static char *mock_error_response(char *error_env_var)
 {
     char *err_val = NULL;
     char *error = NULL;
@@ -201,7 +201,7 @@ char *mock_error_response(char *error_env_var)
     return NULL;
 }
 
-struct flb_http_client *mock_http_call(char *error_env_var, char *api)
+static struct flb_http_client *mock_http_call(char *error_env_var, char *api)
 {
     /* create an http client so that we can set the response */
     struct flb_http_client *c = NULL;

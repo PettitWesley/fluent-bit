@@ -182,6 +182,9 @@ static void flb_test_ecs_filter()
     struct filter_test *ctx;
     struct filter_test_result expected = { 0 };
 
+    /* mocks calls- signals that we are in test mode */
+    setenv("FLB_ECS_PLUGIN_UNDER_TEST", "true", 1);
+
     /* Create test context */
     ctx = filter_test_create((void *) &cb_data, "testprefix-9581a69a761a");
     if (!ctx) {
