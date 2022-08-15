@@ -4,6 +4,9 @@
 #include <fluent-bit/flb_sds.h>
 #include "flb_tests_runtime.h"
 
+#define ERROR_RESPONSE "NOT FOUND"
+
+
 struct filter_test {
     flb_ctx_t *flb;    /* Fluent Bit library context */
     int i_ffd;         /* Input fd  */
@@ -257,11 +260,113 @@ static void flb_test_ecs_filter_cluster_metadata_only()
     filter_test_destroy(ctx);
 }
 
+static void flb_test_ecs_filter_cluster_error()
+{
+    int len;
+    int ret;
+    int bytes;
+    char *p;
+    struct flb_lib_out_cb cb_data;
+    struct filter_test *ctx;
+    struct filter_test_result expected = { 0 };
+
+    /* mocks calls- signals that we are in test mode */
+    setenv("FLB_ECS_PLUGIN_UNDER_TEST", "true", 1);
+    setenv("TEST_CLUSTER_ERROR", ERROR_RESPONSE, 1);
+
+    /* Create test context */
+    ctx = filter_test_create((void *) &cb_data, "79c796ed2a7f");
+    if (!ctx) {
+        exit(EXIT_FAILURE);
+    }
+
+    /* Configure filter */
+    ret = flb_filter_set(ctx->flb, ctx->f_ffd,
+                         "ecs_tag_prefix", "",
+                         "ADD", "resource $ClusterName.$TaskID.$ContainerName",
+                         NULL);
+    TEST_CHECK(ret == 0);
+
+    /* this test is mainly for leak checking on error, not for checking result record */
+    expected.expected_records = 1; /* 1 record with no metadata  */
+    expected.expected_pattern = "";
+    expected.expected_pattern_index = 0;
+    cb_data.cb = cb_check_result;
+    cb_data.data = (void *) &expected;
+
+    /* Start the engine */
+    ret = flb_start(ctx->flb);
+    TEST_CHECK(ret == 0);
+
+    /* Ingest data samples */
+    p = "[0, {\"log\":\"error: my error\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+
+    /* check number of outputted records */
+    sleep(2);
+    TEST_CHECK(expected.actual_records == expected.expected_records);
+    filter_test_destroy(ctx);
+}
+
+static void flb_test_ecs_filter_task_error()
+{
+    int len;
+    int ret;
+    int bytes;
+    char *p;
+    struct flb_lib_out_cb cb_data;
+    struct filter_test *ctx;
+    struct filter_test_result expected = { 0 };
+
+    /* mocks calls- signals that we are in test mode */
+    setenv("FLB_ECS_PLUGIN_UNDER_TEST", "true", 1);
+    setenv("TEST_TASK_ERROR", ERROR_RESPONSE, 1);
+
+    /* Create test context */
+    ctx = filter_test_create((void *) &cb_data, "79c796ed2a7f");
+    if (!ctx) {
+        exit(EXIT_FAILURE);
+    }
+
+    /* Configure filter */
+    ret = flb_filter_set(ctx->flb, ctx->f_ffd,
+                         "ecs_tag_prefix", "",
+                         "ADD", "resource $ClusterName.$TaskID.$ContainerName",
+                         NULL);
+    TEST_CHECK(ret == 0);
+
+    /* this test is mainly for leak checking on error, not for checking result record */
+    expected.expected_records = 1; /* 1 record with no metadata  */
+    expected.expected_pattern = "";
+    expected.expected_pattern_index = 0;
+    cb_data.cb = cb_check_result;
+    cb_data.data = (void *) &expected;
+
+    /* Start the engine */
+    ret = flb_start(ctx->flb);
+    TEST_CHECK(ret == 0);
+
+    /* Ingest data samples */
+    p = "[0, {\"log\":\"error: my error\"}]";
+    len = strlen(p);
+    bytes = flb_lib_push(ctx->flb, ctx->i_ffd, p, len);
+    TEST_CHECK(bytes == len);
+
+    /* check number of outputted records */
+    sleep(2);
+    TEST_CHECK(expected.actual_records == expected.expected_records);
+    filter_test_destroy(ctx);
+}
 
 TEST_LIST = {
 
     {"flb_test_ecs_filter"  , flb_test_ecs_filter },
     {"flb_test_ecs_filter_no_prefix"  , flb_test_ecs_filter_no_prefix },
     {"flb_test_ecs_filter_cluster_metadata_only"  , flb_test_ecs_filter_cluster_metadata_only },
+    {"flb_test_ecs_filter_cluster_error"  , flb_test_ecs_filter_cluster_error },
+    {"flb_test_ecs_filter_task_error"  , flb_test_ecs_filter_task_error },
+
     {NULL, NULL}
 };
