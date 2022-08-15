@@ -186,7 +186,7 @@ static void flb_test_ecs_filter()
     setenv("FLB_ECS_PLUGIN_UNDER_TEST", "true", 1);
 
     /* Create test context */
-    ctx = filter_test_create((void *) &cb_data, "testprefix-9581a69a761a");
+    ctx = filter_test_create((void *) &cb_data, "testprefix-79c796ed2a7f");
     if (!ctx) {
         exit(EXIT_FAILURE);
     }
