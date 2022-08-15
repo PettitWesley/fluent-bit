@@ -169,6 +169,77 @@ error:
     return -1;
 }
 
+int plugin_under_test()
+{
+    if (getenv("FLB_ECS_PLUGIN_UNDER_TEST") != NULL) {
+        return FLB_TRUE;
+    }
+
+    return FLB_FALSE;
+}
+
+char *mock_error_response(char *error_env_var)
+{
+    char *err_val = NULL;
+    char *error = NULL;
+    int len = 0;
+
+    err_val = getenv(error_env_var);
+    if (err_val != NULL && strlen(err_val) > 0) {
+        error = flb_malloc(strlen(err_val) + sizeof(char));
+        if (error == NULL) {
+            flb_errno();
+            return NULL;
+        }
+
+        len = strlen(err_val);
+        memcpy(error, err_val, len);
+        error[len] = '\0';
+        return error;
+    }
+
+    return NULL;
+}
+
+struct flb_http_client *mock_http_call(char *error_env_var, char *api)
+{
+    /* create an http client so that we can set the response */
+    struct flb_http_client *c = NULL;
+    char *error = mock_error_response(error_env_var);
+
+    c = flb_calloc(1, sizeof(struct flb_http_client));
+    if (!c) {
+        flb_errno();
+        flb_free(error);
+        return NULL;
+    }
+    mk_list_init(&c->headers);
+
+    if (error != NULL) {
+        c->resp.status = 400;
+        /* resp.data is freed on destroy, payload is supposed to reference it */
+        c->resp.data = error;
+        c->resp.payload = c->resp.data;
+        c->resp.payload_size = strlen(error);
+    }
+    else {
+        c->resp.status = 200;
+        c->resp.payload = "";
+        c->resp.payload_size = 0;
+        if (strcmp(api, "Cluster") == 0) {
+            /* mocked success response */
+            c->resp.payload = "{\"Cluster\": \"cluster_name\",\"ContainerInstanceArn\": \"arn:aws:ecs:region:aws_account_id:container-instance/cluster_name/container_instance_id\",\"Version\": \"Amazon ECS Agent - v1.30.0 (02ff320c)\"}";
+            c->resp.payload_size = strlen(c->resp.payload);
+        }
+        else {
+            c->resp.payload = "{\"Tasks\": [{\"Arn\": \"arn:aws:ecs:us-west-2:012345678910:task/default/example5-58ff-46c9-ae05-543f8example\", \"DesiredStatus\": \"RUNNING\", \"KnownStatus\": \"RUNNING\",\"Family\": \"hello_world\",\"Version\": \"8\",\"Containers\": [{\"DockerId\": \"9581a69a761a557fbfce1d0f6745e4af5b9dbfb86b6b2c5c4df156f1a5932ff1\",\"DockerName\": \"ecs-hello_world-8-mysql-fcae8ac8f9f1d89d8301\",\"Name\": \"mysql\"},{\"DockerId\":\"bf25c5c5b2d4dba68846c7236e75b6915e1e778d31611e3c6a06831e39814a15\",\"DockerName\": \"ecs-hello_world-8-wordpress-e8bfddf9b488dff36c00\",\"Name\": \"wordpress\"}]}]}";
+            c->resp.payload_size = 0;
+        }
+    }
+
+    return c;
+}
+
 /*
  * Both container instance and task ARNs have the ID at the end after last '/'
  */
@@ -277,19 +348,24 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
     }
     
     /* Compose HTTP Client request*/
-    c = flb_http_client(u_conn, FLB_HTTP_GET,
-                        FLB_ECS_FILTER_CLUSTER_PATH,
-                        NULL, 0, 
-                        FLB_ECS_FILTER_HOST, FLB_ECS_FILTER_PORT,
-                        NULL, 0);
-    flb_http_buffer_size(c, 0); /* 0 means unlimited */
+    if (plugin_under_test() == FLB_TRUE) {
+        c = mock_http_call("TEST_CLUSTER_ERROR", "Cluster");
+    }
+    else {
+        c = flb_http_client(u_conn, FLB_HTTP_GET,
+                            FLB_ECS_FILTER_CLUSTER_PATH,
+                            NULL, 0, 
+                            FLB_ECS_FILTER_HOST, FLB_ECS_FILTER_PORT,
+                            NULL, 0);
+        flb_http_buffer_size(c, 0); /* 0 means unlimited */
 
-    flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+        flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
 
-    ret = flb_http_do(c, &b_sent);
-    flb_plg_debug(ctx->ins, "http_do=%i, "
-                  "HTTP Status: %i",
-                  ret, c->resp.status);
+        ret = flb_http_do(c, &b_sent);
+        flb_plg_debug(ctx->ins, "http_do=%i, "
+                    "HTTP Status: %i",
+                    ret, c->resp.status);
+    }
 
     if (ret != 0 || c->resp.status != 200) {
         if (c->resp.payload_size > 0) {
@@ -850,19 +926,24 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
     }
     
     /* Compose HTTP Client request*/
-    c = flb_http_client(u_conn, FLB_HTTP_GET,
-                        http_path,
-                        NULL, 0, 
-                        FLB_ECS_FILTER_HOST, FLB_ECS_FILTER_PORT,
-                        NULL, 0);
-    flb_http_buffer_size(c, 0); /* 0 means unlimited */
+    if (plugin_under_test() == FLB_TRUE) {
+        c = mock_http_call("TEST_TASK_ERROR", "Task");
+    }
+    else {
+        c = flb_http_client(u_conn, FLB_HTTP_GET,
+                            http_path,
+                            NULL, 0, 
+                            FLB_ECS_FILTER_HOST, FLB_ECS_FILTER_PORT,
+                            NULL, 0);
+        flb_http_buffer_size(c, 0); /* 0 means unlimited */
 
-    flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+        flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
 
-    ret = flb_http_do(c, &b_sent);
-    flb_plg_debug(ctx->ins, "http_do=%i, "
-                  "HTTP Status: %i",
-                  ret, c->resp.status);
+        ret = flb_http_do(c, &b_sent);
+        flb_plg_debug(ctx->ins, "http_do=%i, "
+                    "HTTP Status: %i",
+                    ret, c->resp.status);
+    }
 
     if (ret != 0 || c->resp.status != 200) {
         if (c->resp.payload_size > 0) {
