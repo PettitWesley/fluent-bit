@@ -870,11 +870,15 @@ static int process_container_response(struct flb_filter_ecs *ctx,
      * Size is set to 0 so the table just stores our pointer 
      * Otherwise it will try to copy the memory to a new buffer
      */
-    flb_hash_add(ctx->container_hash_table,
+    ret = flb_hash_add(ctx->container_hash_table,
                  short_id, strlen(short_id),
                  cont_meta_buf, 0);
 
     flb_sds_destroy(short_id);
+    if (ret == -1) {
+        flb_plg_error(ctx->ins, "Could not add container ID %s to metadata hash table"
+                      short_id);
+    }
     return 0;
 }
 
