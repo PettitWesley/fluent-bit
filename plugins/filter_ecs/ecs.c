@@ -374,7 +374,7 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
                           c->resp.payload);
         } else {
             flb_plg_warn(ctx->ins, "%s response status was %d with no payload, will retry", 
-                         http_path,
+                         FLB_ECS_FILTER_CLUSTER_PATH,
                          c->resp.status);
         }
         flb_http_client_destroy(c);
