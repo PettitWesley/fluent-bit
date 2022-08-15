@@ -1267,6 +1267,7 @@ static int get_metadata_by_id(struct flb_filter_ecs *ctx,
 
     if (ret == -1) {
         /* try fetch metadata */
+        flb_error("getting metadata for %s", container_short_id);
         ret = get_task_metadata(ctx, container_short_id);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Requesting metadata from ECS Agent introspection endpoint failed");
