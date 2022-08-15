@@ -41,6 +41,41 @@
 
 static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx);
 
+/* cluster meta is static so we can expose it on global ctx for other plugins to use */
+static void expose_ecs_cluster_meta(struct flb_filter_ecs *ctx)
+{
+    struct flb_env *env;
+    struct flb_config *config = ctx->ins->config;
+
+    env = config->env;
+
+    flb_env_set(env, "ecs", "enabled");
+
+    if (ctx->cluster_metadata.cluster_name) {
+        flb_env_set(env,
+                    "aws.ecs.cluster_name",
+                    ctx->cluster_metadata.cluster_name);
+    }
+
+    if (ctx->cluster_metadata.container_instance_arn) {
+        flb_env_set(env,
+                    "aws.ecs.container_instance_arn",
+                    ctx->cluster_metadata.container_instance_arn);
+    }
+
+    if (ctx->cluster_metadata.container_instance_id) {
+        flb_env_set(env,
+                    "aws.ecs.container_instance_id",
+                    ctx->cluster_metadata.container_instance_id);
+    }
+
+    if (ctx->cluster_metadata.ecs_agent_version) {
+        flb_env_set(env,
+                    "aws.ecs.ecs_agent_version",
+                    ctx->cluster_metadata.container_instance_id);
+    }
+}
+
 static int cb_ecs_init(struct flb_filter_instance *f_ins,
                        struct flb_config *config,
                        void *data)
@@ -158,7 +193,6 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
 
     /* attempt to get metadata in init, can retry in cb_filter */
     ret = get_ecs_cluster_metadata(ctx);
-    //TODO: cluster metadata can be exposed in global env ctx
 
     flb_filter_set_context(f_ins, ctx);
     return 0;
@@ -610,6 +644,7 @@ But our metadata keys names are:
     }
 
     ctx->has_cluster_metadata = FLB_TRUE;
+    expose_ecs_cluster_meta(ctx);
     return 0;
 }
 
@@ -874,13 +909,16 @@ static int process_container_response(struct flb_filter_ecs *ctx,
                  short_id, strlen(short_id),
                  cont_meta_buf, 0);
 
-    flb_sds_destroy(short_id);
     if (ret == -1) {
         flb_plg_error(ctx->ins, "Could not add container ID %s to metadata hash table",
                       short_id);
+    } else {
+        ret = 0;
+        flb_plg_debug(ctx->ins, "Added `%s` to container metadata hash table",
+                      short_id);
     }
-    flb_error("Added %s to hash", short_id);
-    return 0;
+    flb_sds_destroy(short_id);
+    return ret;
 }
 
 /*
