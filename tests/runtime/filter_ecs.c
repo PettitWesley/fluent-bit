@@ -49,19 +49,6 @@ static int cb_check_result(void *record, size_t size, void *data)
 }
 
 
-pthread_mutex_t result_mutex = PTHREAD_MUTEX_INITIALIZER;
-int num_output = 0;
-static int get_output_num()
-{
-    int ret;
-    pthread_mutex_lock(&result_mutex);
-    ret = num_output;
-    pthread_mutex_unlock(&result_mutex);
-
-    return ret;
-}
-
-
 struct str_list {
     size_t size; /* size of lists */
     int ignore_min_line_num; /* ignore line if the length is less than this value */
@@ -143,7 +130,7 @@ static void flb_test_ecs_filter()
     /* Configure filter */
     ret = flb_filter_set(ctx->flb, ctx->f_ffd,
                          "ecs_tag_prefix", "testprefix-",
-                         "ADD", "resource", "$ClusterName.$TaskID.$ContainerName",
+                         "ADD", "resource $ClusterName.$TaskID.$ContainerName",
                          NULL);
     TEST_CHECK(ret == 0);
 
