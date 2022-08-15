@@ -928,6 +928,7 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
     /* Compose HTTP Client request*/
     if (plugin_under_test() == FLB_TRUE) {
         c = mock_http_call("TEST_TASK_ERROR", "Task");
+        flb_error("Fake task call");
     }
     else {
         c = flb_http_client(u_conn, FLB_HTTP_GET,
