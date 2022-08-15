@@ -956,6 +956,7 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
         flb_http_client_destroy(c);
         flb_upstream_conn_release(u_conn);
         flb_sds_destroy(http_path);
+        flb_error("returning no payload");
         return -1;
     }
 
