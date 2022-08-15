@@ -1268,11 +1268,12 @@ static int get_metadata_by_id(struct flb_filter_ecs *ctx,
             flb_sds_destroy(container_short_id);
             return -1;
         }
-
+        flb_error("task metadata fetch succeeded");
         /* get from hash table */
         ret = flb_hash_get(ctx->container_hash_table,
                            container_short_id, flb_sds_len(container_short_id),
                            (void *) metadata_buffer, &size);
+        flb_error("flb_hash_get=%d", ret);
     }
 
     flb_sds_destroy(container_short_id);
