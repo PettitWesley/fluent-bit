@@ -876,7 +876,7 @@ static int process_container_response(struct flb_filter_ecs *ctx,
 
     flb_sds_destroy(short_id);
     if (ret == -1) {
-        flb_plg_error(ctx->ins, "Could not add container ID %s to metadata hash table"
+        flb_plg_error(ctx->ins, "Could not add container ID %s to metadata hash table",
                       short_id);
     }
     flb_error("Added %s to hash", short_id);
