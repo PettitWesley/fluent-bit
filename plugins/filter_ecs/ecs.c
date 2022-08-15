@@ -372,6 +372,10 @@ static int get_ecs_cluster_metadata(struct flb_filter_ecs *ctx)
                          FLB_ECS_FILTER_CLUSTER_PATH);
             flb_plg_debug(ctx->ins, "HTTP response\n%s",
                           c->resp.payload);
+        } else {
+            flb_plg_warn(ctx->ins, "%s response status was %d with no payload, will retry", 
+                         http_path,
+                         c->resp.status);
         }
         flb_http_client_destroy(c);
         flb_upstream_conn_release(u_conn);
@@ -952,14 +956,17 @@ static int get_task_metadata(struct flb_filter_ecs *ctx, char* short_id)
             flb_plg_debug(ctx->ins, "HTTP response\n%s",
                           c->resp.payload);
         } else {
-            flb_plg_warn(ctx->ins, "%s response was empty, will retry", 
-                         http_path);
+            flb_plg_warn(ctx->ins, "%s response status was %d with no payload, will retry", 
+                         http_path,
+                         c->resp.status);
         }
         flb_http_client_destroy(c);
         flb_upstream_conn_release(u_conn);
         flb_sds_destroy(http_path);
         return -1;
     }
+
+    flb_error("payload=`%s`", c->resp.payload);
 
     ret = flb_pack_json(c->resp.payload, c->resp.payload_size,
                         &buffer, &size, &root_type);
@@ -1041,7 +1048,7 @@ Metadata Response:
                 }
                 return -1;
             }
-
+            flb_error("found family");
             found_family = FLB_TRUE;
             task_meta.task_def_family = val.via.str.ptr;
             task_meta.task_def_family_len = (int) val.via.str.size;
@@ -1059,7 +1066,7 @@ Metadata Response:
                 }
                 return -1;
             }
-
+             flb_error("found arn");
             /* first get the ARN */
             found_task = FLB_TRUE;
             task_meta.task_arn = val.via.str.ptr;
@@ -1094,7 +1101,7 @@ Metadata Response:
                 }
                 return -1;
             }
-
+             flb_error("found version");
             found_version = FLB_TRUE;
             task_meta.task_def_version = val.via.str.ptr;
             task_meta.task_def_version_len = (int) val.via.str.size;
@@ -1112,6 +1119,7 @@ Metadata Response:
                 return -1;
             }
             found_containers = FLB_TRUE;
+             flb_error("found contianers");
         }
     }
 
