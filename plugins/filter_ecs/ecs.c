@@ -110,6 +110,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
 
     mk_list_init(&ctx->metadata_keys);
     ctx->metadata_keys_len = 0;
+    mk_list_init(&ctx->metadata_buffers);
 
     mk_list_foreach(head, &f_ins->properties) {
         kv = mk_list_entry(head, struct flb_kv, _head);
