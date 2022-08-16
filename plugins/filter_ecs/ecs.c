@@ -348,7 +348,7 @@ static void flb_ecs_metadata_buffer_destroy(struct flb_ecs_metadata_buffer *meta
         msgpack_unpacked_destroy(&meta->unpacked);
         flb_free(meta);
         if (meta->id) {
-            flb_sds_destroy(id);
+            flb_sds_destroy(meta->id);
         }
     }
 }
@@ -1527,8 +1527,6 @@ static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
         }
         if (ctx->cluster_meta_buf.buf) {
             flb_free(ctx->cluster_meta_buf.buf);
-        }
-        if (ctx->cluster_meta_buf.unpacked) {
             msgpack_unpacked_destroy(&ctx->cluster_meta_buf.unpacked);
         }
         mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
