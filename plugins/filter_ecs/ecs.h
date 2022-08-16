@@ -49,9 +49,11 @@ struct flb_ecs_metadata_key {
 };
 
 struct flb_ecs_metadata_buffer {
+    /* msgpack_sbuffer */
     char *buf;
     size_t size;
 
+    /* unpacked object to use with flb_ra_translate */
     msgpack_unpacked unpacked;
     msgpack_object obj;
 
@@ -59,6 +61,13 @@ struct flb_ecs_metadata_buffer {
     struct mk_list _head;
     /* we clean up the memory for these once ecs_meta_cache_ttl has expired */
     time_t last_used_time;
+
+    /* 
+     * To remove from the hash table on TTL expiration, we need the ID 
+     * While we use a TTL hash, it won't clean up the memory, so we have a separate routine for that
+     * and it needs to ensure that the list and hash table has the same contents
+     */
+    flb_sds_t id;
 };
 
 struct flb_ecs_cluster_metadata {

@@ -347,6 +347,9 @@ static void flb_ecs_metadata_buffer_destroy(struct flb_ecs_metadata_buffer *meta
         flb_free(meta->buf);
         msgpack_unpacked_destroy(&meta->unpacked);
         flb_free(meta);
+        if (meta->id) {
+            flb_sds_destroy(id);
+        }
     }
 }
 
@@ -905,6 +908,8 @@ static int process_container_response(struct flb_filter_ecs *ctx,
         flb_sds_destroy(short_id);
         return -1;
     }
+
+    cont_meta_buf->id = short_id;
     
     /* 
      * Size is set to 0 so the table just stores our pointer 
@@ -917,12 +922,12 @@ static int process_container_response(struct flb_filter_ecs *ctx,
     if (ret == -1) {
         flb_plg_error(ctx->ins, "Could not add container ID %s to metadata hash table",
                       short_id);
+        flb_ecs_metadata_buffer_destroy(cont_meta_buf);
     } else {
         ret = 0;
         flb_plg_debug(ctx->ins, "Added `%s` to container metadata hash table",
                       short_id);
     }
-    flb_sds_destroy(short_id);
     return ret;
 }
 
@@ -1340,8 +1345,8 @@ static void clean_old_metadata_buffers(struct flb_filter_ecs *ctx)
         buf = mk_list_entry(head, struct flb_ecs_metadata_buffer, _head);
         if (now > (buf->last_used_time + ctx->ecs_meta_cache_ttl)) {
             mk_list_del(&buf->_head);
+            flb_hash_del(ctx->container_hash_table, buf->id);
             flb_ecs_metadata_buffer_destroy(buf);
-            //TODO: need short id to free from table but we don't have it
         }
     }
 }
@@ -1471,6 +1476,10 @@ static int cb_ecs_filter(const void *data, size_t bytes,
         }
     }
     msgpack_unpacked_destroy(&result);
+
+    if (ctx->cluster_metadata_only == FLB_FALSE) {
+        clean_old_metadata_buffers(ctx);
+    }
 
     /* link new buffers */
     *out_buf  = tmp_sbuf.data;
