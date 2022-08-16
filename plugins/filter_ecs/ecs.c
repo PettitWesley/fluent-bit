@@ -1345,7 +1345,7 @@ static void clean_old_metadata_buffers(struct flb_filter_ecs *ctx)
     struct flb_ecs_metadata_buffer *buf;
     time_t now = time(NULL);
 
-    mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
+    mk_list_foreach_safe(head, tmp, &ctx->metadata_buffers) {
         buf = mk_list_entry(head, struct flb_ecs_metadata_buffer, _head);
         if (now > (buf->last_used_time + ctx->ecs_meta_cache_ttl)) {
             flb_error("cleaning: now=%ld, ttl=%ld, last_used_time=%ld",
