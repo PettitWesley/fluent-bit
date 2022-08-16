@@ -571,15 +571,6 @@ static int cb_s3_init(struct flb_output_instance *ins,
         return -1;
     }
 
-    tmp = flb_output_get_property("chunk_buffer_dir", ins);
-    if (tmp) {
-        len = strlen(tmp);
-        if (tmp[len - 1] == '/' || tmp[len - 1] == '\\') {
-            flb_plg_error(ctx->ins, "'chunk_buffer_dir' can not end in a / or \\");
-            return -1;
-        }
-    }
-
     /*
      * store_dir is the user input, buffer_dir is what the code uses
      * We append the bucket name to the dir, to support multiple instances
@@ -961,6 +952,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
          */
         ctx->s3_client->upstream->flags = async_flags;
     }
+
+    flb_error("store_dir_limit_size=%zu", ctx->store_dir_limit_size);
 
     /* this is done last since in the previous block we make calls to AWS */
     ctx->provider->provider_vtable->upstream_set(ctx->provider, ctx->ins);
@@ -2365,6 +2358,14 @@ static struct flb_config_map config_map[] = {
      "Directory to locally buffer data before sending. Plugin uses the S3 Multipart "
      "upload API to send data in chunks of 5 MB at a time- only a small amount of"
      " data will be locally buffered at any given point in time."
+    },
+
+    {
+     FLB_CONFIG_MAP_SIZE, "store_dir_limit_size", (char *) NULL,
+     0, FLB_TRUE, offsetof(struct flb_s3, store_dir_limit_size),
+     "S3 plugin has its own buffering system with files in the `store_dir`. "
+     "Use the `store_dir_limit_size` to limit the amount of data S3 buffers in "
+     "the `store_dir` to limit disk usage. If the limit is reached, data will be discarded. "
     },
 
     {
