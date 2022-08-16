@@ -1514,6 +1514,7 @@ static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
     struct mk_list *tmp;
     struct mk_list *head;
     struct flb_ecs_metadata_key *metadata_key;
+    struct flb_ecs_metadata_buffer *buf;
 
     if (ctx) {
         if (ctx->ecs_upstream) {
@@ -1539,6 +1540,12 @@ static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
             metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
             mk_list_del(&metadata_key->_head);
             flb_ecs_metadata_key_destroy(metadata_key);
+        }
+        mk_list_foreach_safe(head, tmp, &ctx->metadata_buffers) {
+            buf = mk_list_entry(head, struct flb_ecs_metadata_buffer, _head);
+            mk_list_del(&buf->_head);
+            flb_hash_del(ctx->container_hash_table, buf->id);
+            flb_ecs_metadata_buffer_destroy(buf);
         }
         if (ctx->container_hash_table) {
             flb_hash_destroy(ctx->container_hash_table);
