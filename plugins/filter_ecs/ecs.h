@@ -56,6 +56,7 @@ struct flb_ecs_metadata_buffer {
     /* unpacked object to use with flb_ra_translate */
     msgpack_unpacked unpacked;
     msgpack_object obj;
+    int free_packer;
 
     /* the hash table only stores a pointer- we need the list to track and free these */
     struct mk_list _head;

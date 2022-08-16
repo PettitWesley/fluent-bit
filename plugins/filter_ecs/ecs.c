@@ -337,6 +337,7 @@ static int flb_ecs_metadata_buffer_init(struct flb_filter_ecs *ctx,
     meta->unpacked = result;
     meta->obj = root;
     meta->last_used_time = time(NULL);
+    meta->free_packer = FLB_TRUE;
     mk_list_add(&meta->_head, &ctx->metadata_buffers);
 
     return 0;
@@ -346,11 +347,13 @@ static void flb_ecs_metadata_buffer_destroy(struct flb_ecs_metadata_buffer *meta
 {
     if (meta) {
         flb_free(meta->buf);
-        msgpack_unpacked_destroy(&meta->unpacked);
-        flb_free(meta);
+        if (meta->free_packer == FLB_TRUE) {
+            msgpack_unpacked_destroy(&meta->unpacked);
+        }
         if (meta->id) {
             flb_sds_destroy(meta->id);
         }
+        flb_free(meta);
     }
 }
 
@@ -1345,6 +1348,8 @@ static void clean_old_metadata_buffers(struct flb_filter_ecs *ctx)
     mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
         buf = mk_list_entry(head, struct flb_ecs_metadata_buffer, _head);
         if (now > (buf->last_used_time + ctx->ecs_meta_cache_ttl)) {
+            flb_error("cleaning: now=%ld, ttl=%ld, last_used_time=%ld",
+                      now, ctx->ecs_meta_cache_ttl, buf->last_used_time);
             mk_list_del(&buf->_head);
             flb_hash_del(ctx->container_hash_table, buf->id);
             flb_ecs_metadata_buffer_destroy(buf);
