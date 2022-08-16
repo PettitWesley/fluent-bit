@@ -169,6 +169,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
     if (!ctx->ecs_upstream) {
         flb_errno();
         flb_plg_error(ctx->ins, "Could not create upstream connection to ECS Agent");
+        goto error;
     }
 
     /* 
@@ -185,8 +186,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
                                                          FLB_ECS_FILTER_HASH_TABLE_SIZE);
     if (!ctx->container_hash_table) {
         flb_plg_error(f_ins, "failed to create container_hash_table");
-        //TODO: destroy method
-        return -1;
+        goto error;
     }
 
     ctx->ecs_tag_prefix_len = strlen(ctx->ecs_tag_prefix);
@@ -199,7 +199,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
 
 error:
     flb_plg_error(ctx->ins, "Initialization failed.");
-    flb_free(ctx);
+    flb_filter_ecs_destroy(ctx);
     return -1;
 }
 
@@ -1511,9 +1511,7 @@ static int cb_ecs_exit(void *data, struct flb_config *config)
 {
     struct flb_filter_ecs *ctx = data;
 
-    if (ctx != NULL) {
-        flb_filter_ecs_destroy(ctx);
-    }
+    flb_filter_ecs_destroy(ctx);
     return 0;
 }
 
