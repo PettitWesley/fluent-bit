@@ -338,7 +338,6 @@ static int flb_ecs_metadata_buffer_init(struct flb_filter_ecs *ctx,
     meta->obj = root;
     meta->last_used_time = time(NULL);
     meta->free_packer = FLB_TRUE;
-    mk_list_add(&meta->_head, &ctx->metadata_buffers);
 
     return 0;
 }
@@ -912,8 +911,8 @@ static int process_container_response(struct flb_filter_ecs *ctx,
         flb_sds_destroy(short_id);
         return -1;
     }
-
     cont_meta_buf->id = short_id;
+    mk_list_add(&cont_meta_buf->_head, &ctx->metadata_buffers);
     
     /* 
      * Size is set to 0 so the table just stores our pointer 
