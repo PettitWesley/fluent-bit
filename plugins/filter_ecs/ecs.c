@@ -1361,7 +1361,6 @@ static int cb_ecs_filter(const void *data, size_t bytes,
                           "from ECS Agent");
             return FLB_FILTER_NOTOUCH;
         }
-        //TODO: cluster metadata can be exposed in global env ctx
     }
 
     if (ctx->cluster_metadata_only == FLB_FALSE) {
@@ -1455,10 +1454,57 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     return FLB_FILTER_MODIFIED;
 }
 
+static void flb_ecs_metadata_key_destroy(struct flb_ecs_metadata_key *metadata_key)
+{
+    if (metadata_key) {
+        if (metadata_key->key) {
+            flb_sds_destroy(metadata_key->key);
+        }
+        if (metadata_key->template) {
+            flb_sds_destroy(metadata_key->template);
+        }
+        if (metadata_key->ra) {
+             flb_ra_destroy(metadata_key->ra);
+        }
+        flb_free(metadata_key);
+    }
+}
+
 static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
 {
-    //TODO:
-    flb_free(ctx);
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct flb_ecs_metadata_key *metadata_key;
+
+    if (ctx) {
+        if (ctx->ecs_upstream) {
+            flb_upstream_destroy(ctx->ecs_upstream);
+        }
+        if (ctx->cluster_metadata.cluster_name) {
+            flb_sds_destroy(ctx->cluster_metadata.cluster_name);
+        }
+        if (ctx->cluster_metadata.container_instance_arn) {
+            flb_sds_destroy(ctx->cluster_metadata.container_instance_arn);
+        }
+        if (ctx->cluster_metadata.container_instance_id) {
+            flb_sds_destroy(ctx->cluster_metadata.container_instance_id);
+        }
+        if (ctx->cluster_metadata.ecs_agent_version) {
+            flb_sds_destroy(ctx->cluster_metadata.ecs_agent_version);
+        }
+        if (ctx->cluster_meta_buf.buf) {
+            flb_free(ctx->cluster_meta_buf.buf);
+        }
+        mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
+            metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
+            mk_list_del(&metadata_key->_head);
+            flb_ecs_metadata_key_destroy(metadata_key);
+        }
+        if (ctx->container_hash_table) {
+            flb_hash_destroy(ctx->container_hash_table);
+        }
+        flb_free(ctx);
+    }
 }
 
 static int cb_ecs_exit(void *data, struct flb_config *config)
