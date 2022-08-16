@@ -192,6 +192,8 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
 
     ctx->ecs_tag_prefix_len = strlen(ctx->ecs_tag_prefix);
 
+    flb_error("TTL=%d seconds", ctx->ecs_meta_cache_ttl);
+
     /* attempt to get metadata in init, can retry in cb_filter */
     ret = get_ecs_cluster_metadata(ctx);
 
@@ -333,6 +335,8 @@ static int flb_ecs_metadata_buffer_init(struct flb_filter_ecs *ctx,
 
     meta->unpacked = result;
     meta->obj = root;
+    meta->last_used_time = time(NULL);
+    mk_list_add(&meta->_head, &ctx->metadata_buffers);
 
     return 0;
 }
@@ -1325,6 +1329,23 @@ static int get_metadata_by_id(struct flb_filter_ecs *ctx,
     return ret;
 }
 
+static void clean_old_metadata_buffers(struct flb_filter_ecs *ctx)
+{
+    struct mk_list *tmp;
+    struct mk_list *head;
+    struct flb_ecs_metadata_buffer *buf;
+    time_t now = time(NULL);
+
+    mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
+        buf = mk_list_entry(head, struct flb_ecs_metadata_buffer, _head);
+        if (now > (buf->last_used_time + ctx->ecs_meta_cache_ttl)) {
+            mk_list_del(&buf->_head);
+            flb_ecs_metadata_buffer_destroy(buf);
+            //TODO: need short id to free from table but we don't have it
+        }
+    }
+}
+
 static int cb_ecs_filter(const void *data, size_t bytes,
                          const char *tag, int tag_len,
                          void **out_buf, size_t *out_size,
@@ -1376,6 +1397,8 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     } else {
         metadata_buffer = &ctx->cluster_meta_buf;
     }
+
+    metadata_buffer->last_used_time = time(NULL);
 
     /* Create temporary msgpack buffer */
     msgpack_sbuffer_init(&tmp_sbuf);
@@ -1494,7 +1517,10 @@ static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
             flb_sds_destroy(ctx->cluster_metadata.ecs_agent_version);
         }
         if (ctx->cluster_meta_buf.buf) {
-            flb_ecs_metadata_buffer_destroy(ctx->cluster_meta_buf);
+            flb_free(ctx->cluster_meta_buf.buf);
+        }
+        if (ctx->cluster_meta_buf.unpacked) {
+            msgpack_unpacked_destroy(&ctx->cluster_meta_buf.unpacked);
         }
         mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
             metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);

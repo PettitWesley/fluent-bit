@@ -54,6 +54,11 @@ struct flb_ecs_metadata_buffer {
 
     msgpack_unpacked unpacked;
     msgpack_object obj;
+
+    /* the hash table only stores a pointer- we need the list to track and free these */
+    struct mk_list _head;
+    /* we clean up the memory for these once ecs_meta_cache_ttl has expired */
+    time_t last_used_time;
 };
 
 struct flb_ecs_cluster_metadata {
@@ -107,6 +112,12 @@ struct flb_filter_ecs {
      * Maps 12 char container short ID to metadata buffer
      */
     struct flb_hash *container_hash_table;
+
+    /*
+     * The hash table only stores pointers, so we keep a list of meta objects
+     * that need to be freed
+     */
+    struct mk_list metadata_buffers;
 
     int ecs_meta_cache_ttl;
     char *ecs_tag_prefix;
