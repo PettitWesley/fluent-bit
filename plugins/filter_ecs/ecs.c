@@ -1494,7 +1494,7 @@ static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
             flb_sds_destroy(ctx->cluster_metadata.ecs_agent_version);
         }
         if (ctx->cluster_meta_buf.buf) {
-            flb_ecs_metadata_buffer_destroy(ctx->cluster_meta_buf.buf);
+            flb_ecs_metadata_buffer_destroy(ctx->cluster_meta_buf);
         }
         mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
             metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
