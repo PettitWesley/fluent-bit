@@ -418,7 +418,7 @@ int flb_output_instance_destroy(struct flb_output_instance *ins)
     flb_output_free_properties(ins);
 
     /* free singleplex queue */
-    if (ins->flags & FLB_OUTPUT_SYNCHRONOUS) {
+    if (ins->singleplex_queue) {
         flb_task_queue_destroy(ins->singleplex_queue);
     }
 
