@@ -87,8 +87,6 @@ struct log_stream {
     struct mk_list _head;
 };
 
-void log_stream_destroy(struct log_stream *stream);
-
 struct flb_cloudwatch {
     /*
      * TLS instances can not be re-used. So we have one for:
@@ -123,6 +121,7 @@ struct flb_cloudwatch {
 
     /* Should requests to AWS services be retried */
     int retry_requests;
+    int disable_sequence_token;
 
     /* If set to a number greater than zero, and newly create log group's retention policy is set to this many days. */
     int log_retention_days;
@@ -140,8 +139,6 @@ struct flb_cloudwatch {
     /* if the log stream is dynamic, we'll use this */
     struct mk_list streams;
 
-    /* buffers for data processing and request payload */
-    struct cw_flush *buf;
     /* The namespace to use for the metric */
     flb_sds_t metric_namespace;
 
@@ -156,5 +153,7 @@ struct flb_cloudwatch {
 };
 
 void flb_cloudwatch_ctx_destroy(struct flb_cloudwatch *ctx);
+
+void log_stream_destroy(struct log_stream *stream);
 
 #endif
