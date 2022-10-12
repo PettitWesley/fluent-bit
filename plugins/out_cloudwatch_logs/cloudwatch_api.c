@@ -58,6 +58,8 @@
 #define ONE_DAY_IN_MILLISECONDS          86400000
 #define FOUR_HOURS_IN_SECONDS            14400
 
+#define FAKE_SEQUENCE_TOKEN             "randomsequencetoken23423984"
+
 
 static struct flb_aws_header create_group_header = {
     .key = "X-Amz-Target",
@@ -1065,6 +1067,14 @@ struct log_stream *get_or_create_log_stream(struct flb_cloudwatch *ctx,
     }
     new_stream->expiration = time(NULL) + FOUR_HOURS_IN_SECONDS;
 
+    if (ctx->disable_sequence_token == FLB_TRUE) {
+        new_stream->sequence_token = flb_sds_create(FAKE_SEQUENCE_TOKEN);
+        if (new_stream->sequence_token == NULL) {
+            log_stream_destroy(new_stream);
+            return NULL;
+        }
+    }
+
     mk_list_add(&new_stream->_head, &ctx->streams);
     return new_stream;
 }
@@ -1475,22 +1485,24 @@ retry_request:
 
 
             /* success */
-            if (c->resp.payload_size > 0) {
-                flb_plg_debug(ctx->ins, "Sent events to %s", stream->name);
-                tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
-                                       "nextSequenceToken");
-                if (tmp) {
-                    if (stream->sequence_token != NULL) {
-                        flb_sds_destroy(stream->sequence_token);
-                    }
-                    stream->sequence_token = tmp;
+            if (ctx->disable_sequence_token == FLB_FALSE) {
+                if (c->resp.payload_size > 0) {
+                    flb_plg_debug(ctx->ins, "Sent events to %s", stream->name);
+                    tmp = flb_json_get_val(c->resp.payload, c->resp.payload_size,
+                                        "nextSequenceToken");
+                    if (tmp) {
+                        if (stream->sequence_token != NULL) {
+                            flb_sds_destroy(stream->sequence_token);
+                        }
+                        stream->sequence_token = tmp;
 
-                    flb_http_client_destroy(c);
-                    return 0;
-                }
-                else {
-                    flb_plg_error(ctx->ins, "Could not find sequence token in "
-                                  "response: %s", c->resp.payload);
+                        flb_http_client_destroy(c);
+                        return 0;
+                    }
+                    else {
+                        flb_plg_error(ctx->ins, "Could not find sequence token in "
+                                    "response: response body is empty");
+                    }
                 }
             }
         
