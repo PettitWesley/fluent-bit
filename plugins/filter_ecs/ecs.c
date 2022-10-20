@@ -1388,7 +1388,7 @@ static void mark_tag_failed(struct flb_filter_ecs *ctx,
                             const char *tag, int tag_len)
 {
     int ret;
-    int *val;
+    int *val = NULL;
     size_t val_size;
 
     ret = flb_hash_get(ctx->failed_metadata_request_tags,
