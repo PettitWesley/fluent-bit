@@ -1388,28 +1388,34 @@ static void mark_tag_failed(struct flb_filter_ecs *ctx,
                             const char *tag, int tag_len)
 {
     int ret;
-    int val = 1;
+    int *val;
     size_t val_size;
 
     ret = flb_hash_get(ctx->failed_metadata_request_tags,
                        tag, tag_len,
-                       (void *) &val, &val_size);
+                       (void *) val, &val_size);
 
     if (ret == -1) {
-        /* no entry for this tag yet */
+        /* hash table copies memory to new heap block */
+        val = flb_malloc(sizeof(int));
+        if (!val) {
+            flb_errno();
+            return;
+        }
+        *val = 1;
         flb_hash_add(ctx->failed_metadata_request_tags,
                      tag, tag_len,
                      val, sizeof(int));
     } else {
         /* increment number of failed metadata requests for this tag */
-        val++;
+        *val = *val + 1;
         flb_hash_add(ctx->failed_metadata_request_tags,
                      tag, tag_len,
                      val, sizeof(int));
         flb_plg_warn(ctx->ins, "Failed to get ECS Metadata for tag %s %d times. "
                     "This might be because the logs for this tag do not come from an ECS Task Container. "
                     "This plugin will retry metadata requests at most %d times total for this tag.",
-                    tag, val, FLB_ECS_FILTER_METADATA_RETRIES);
+                    tag, *val, FLB_ECS_FILTER_METADATA_RETRIES);
 
     }
 }
