@@ -1376,7 +1376,6 @@ static int is_tag_marked_failed(struct flb_filter_ecs *ctx,
                        tag, tag_len,
                        (void *) &val, &val_size);
     if (ret != -1) {
-        flb_error("[aws filter] is_tag_marked_failed: tag %s has entry in failed tags hash", tag);
         if (val >= FLB_ECS_FILTER_METADATA_RETRIES) {
             return FLB_TRUE;
         }
@@ -1397,8 +1396,6 @@ static void mark_tag_failed(struct flb_filter_ecs *ctx,
                        (void *) val, &val_size);
 
     if (ret == -1) {
-        flb_error("[aws filter] mark_tag_failed: tag %s is added to the hash table", tag);
-
         /* hash table copies memory to new heap block */
         val = flb_malloc(sizeof(int));
         if (!val) {
@@ -1406,24 +1403,16 @@ static void mark_tag_failed(struct flb_filter_ecs *ctx,
             return;
         }
         *val = 1;
-        ret = flb_hash_add(ctx->failed_metadata_request_tags,
+        flb_hash_add(ctx->failed_metadata_request_tags,
                      tag, tag_len,
                      val, sizeof(int));
-        if (ret = -1) {
-            flb_error("[aws filter] mark_tag_failed: tag %s failed to add to hash", tag);
-        }
     } else {
-        flb_error("[aws filter] mark_tag_failed: tag %s has entry in failed tags hash", tag);
-
         /* increment number of failed metadata requests for this tag */
         *val = *val + 1;
-        ret = flb_hash_add(ctx->failed_metadata_request_tags,
+        flb_hash_add(ctx->failed_metadata_request_tags,
                      tag, tag_len,
                      val, sizeof(int));
-        if (ret = -1) {
-            flb_error("[aws filter] mark_tag_failed: tag %s failed to add to hash", tag);
-        }
-        flb_plg_warn(ctx->ins, "Failed to get ECS Metadata for tag %s %d times. "
+        flb_plg_info(ctx->ins, "Failed to get ECS Metadata for tag %s %d times. "
                     "This might be because the logs for this tag do not come from an ECS Task Container. "
                     "This plugin will retry metadata requests at most %d times total for this tag.",
                     tag, *val, FLB_ECS_FILTER_METADATA_RETRIES);
@@ -1474,7 +1463,7 @@ static int cb_ecs_filter(const void *data, size_t bytes,
     /* check if the current tag is marked as failed */
     check = is_tag_marked_failed(ctx, tag, tag_len);
     if (check == FLB_TRUE) {
-        flb_plg_info(ctx->ins, "Failed to get ECS Metadata for tag %s %d times. "
+        flb_plg_debug(ctx->ins, "Failed to get ECS Metadata for tag %s %d times. "
                       "Will not attempt to retry the metadata request. Will attach cluster metadata only.",
                       tag, FLB_ECS_FILTER_METADATA_RETRIES);
     }
