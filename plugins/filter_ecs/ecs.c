@@ -1406,6 +1406,8 @@ static void mark_tag_failed(struct flb_filter_ecs *ctx,
         flb_hash_add(ctx->failed_metadata_request_tags,
                      tag, tag_len,
                      val, sizeof(int));
+        /* hash table will contain a copy */
+        flb_free(val);
     } else {
         /* increment number of failed metadata requests for this tag */
         *val = *val + 1;
