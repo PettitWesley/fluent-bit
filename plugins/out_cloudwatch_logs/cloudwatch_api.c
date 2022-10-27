@@ -1456,13 +1456,15 @@ retry_request:
     }
     else {
         cw_client = ctx->cw_client;
+        flb_plg_info(ctx->ins, "flush=%s PLE=%d stream=%s seq_token=%s", buf->flush_id, buf->ple_requests, stream->name, stream->sequence_token);
+        buf->ple_requests++;
         c = cw_client->client_vtable->request(cw_client, FLB_HTTP_POST,
                                               "/", buf->out_buf, payload_size,
                                               put_log_events_header, num_headers);
     }
 
     if (c) {
-        flb_plg_debug(ctx->ins, "PutLogEvents http status=%d", c->resp.status);
+        flb_plg_info(ctx->ins, "flush=%s PutLogEvents http status=%d", buf->flush_id, c->resp.status);
 
         if (c->resp.status == 200) {
             if (c->resp.data == NULL || c->resp.data_len == 0 || strstr(c->resp.data, AMZN_REQUEST_ID_HEADER) == NULL) {
@@ -1495,6 +1497,7 @@ retry_request:
                             flb_sds_destroy(stream->sequence_token);
                         }
                         stream->sequence_token = tmp;
+                        flb_plg_info(ctx->ins, "flush=%s new_seq_token=%s", buf->flush_id, tmp);
 
                         flb_http_client_destroy(c);
                         return 0;
@@ -1570,5 +1573,6 @@ void cw_flush_destroy(struct cw_flush *buf)
         flb_free(buf->events);
         flb_free(buf->event_buf);
         flb_free(buf);
+        flb_free(buf->flush_id);
     }
 }

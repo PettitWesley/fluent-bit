@@ -57,6 +57,10 @@ struct cw_flush {
 
     /* current log stream that we are sending records too */
     struct log_stream *current_stream;
+
+    /* track flushes */
+    char *flush_id;
+    int ple_requests;
 };
 
 struct cw_event {

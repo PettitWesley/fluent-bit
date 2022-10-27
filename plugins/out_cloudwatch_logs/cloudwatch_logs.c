@@ -415,6 +415,12 @@ struct cw_flush *new_buffer()
     }
     buf->events_capacity = MAX_EVENTS_PER_PUT;
 
+    buf->ple_requests = 0;
+    buf->flush_id = flb_sts_session_name();
+    if (!buf->flush_id) {
+        flb_errno();
+        cw_flush_destroy(buf);
+    }
     return buf;
 }
 
@@ -435,6 +441,8 @@ static void cb_cloudwatch_flush(struct flb_event_chunk *event_chunk,
     if (!buf) {
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
+    
+    flb_plg_info(ctx->ins, "flush=%s starting..", buf->flush_id);
 
     event_count = process_and_send(ctx, i_ins->p->name, buf, event_chunk->tag, event_chunk->data, event_chunk->size);
     if (event_count < 0) {
@@ -443,7 +451,7 @@ static void cb_cloudwatch_flush(struct flb_event_chunk *event_chunk,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
-    flb_plg_info(ctx->ins, "%d events sent", event_count);
+    flb_plg_info(ctx->ins, "flush=%s %d events sent", buf->flush_id, event_count);
 
     cw_flush_destroy(buf);
 
