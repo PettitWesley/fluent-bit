@@ -443,6 +443,8 @@ static void cb_cloudwatch_flush(struct flb_event_chunk *event_chunk,
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
+    flb_plg_info(ctx->ins, "%d events sent", event_count);
+
     cw_flush_destroy(buf);
 
     FLB_OUTPUT_RETURN(FLB_OK);
