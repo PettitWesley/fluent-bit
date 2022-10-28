@@ -212,6 +212,10 @@ int flb_output_task_flush(struct flb_task *task,
         }
     }
 
+    if (out_ins->flags & FLB_OUTPUT_NO_MULTI_FLUSH) {
+        flb_output_set_flushing(out_ins, FLB_TRUE);
+    }
+
     return 0;
 }
 

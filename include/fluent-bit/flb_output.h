@@ -61,6 +61,7 @@
 #define FLB_OUTPUT_PLUGIN_PROXY    1
 #define FLB_OUTPUT_NO_MULTIPLEX  512
 #define FLB_OUTPUT_PRIVATE      1024
+#define FLB_OUTPUT_NO_MULTI_FLUSH 2048
 
 
 /* Event type handlers */
@@ -74,6 +75,9 @@
     const char *tag    = event_chunk->tag;
 
 struct flb_output_flush;
+
+static inline void flb_output_set_flushing(struct flb_output_instance *ins,
+                                           int is_flushing);
 
 /*
  * Tests callbacks
@@ -403,6 +407,9 @@ struct flb_output_instance {
     struct mk_list flush_list;
     struct mk_list flush_list_destroy;
 
+    pthread_mutex_t sync_mutex;
+    int is_flushing;
+
     /* Keep a reference to the original context this instance belongs to */
     struct flb_config *config;
 };
@@ -613,6 +620,10 @@ static inline void flb_output_return(int ret, struct flb_coro *co) {
     o_ins = out_flush->o_ins;
     task = out_flush->task;
 
+    if (o_ins->flags & FLB_OUTPUT_NO_MULTI_FLUSH) {
+        flb_output_set_flushing(o_ins, FLB_FALSE);
+    }
+
     /*
      * To compose the signal event the relevant info is:
      *
@@ -652,6 +663,25 @@ static inline void flb_output_return(int ret, struct flb_coro *co) {
      * event loop cleanup functions.
      */
     flb_output_flush_prepare_destroy(out_flush);
+}
+
+static inline int flb_output_is_flushing(struct flb_output_instance *ins)
+{
+    int is_flushing;
+
+    pthread_mutex_lock(&ins->sync_mutex);
+    is_flushing = ins->is_flushing;
+    pthread_mutex_unlock(&ins->sync_mutex);
+
+    return is_flushing;
+}
+
+static inline void flb_output_set_flushing(struct flb_output_instance *ins,
+                                          int is_flushing)
+{
+    pthread_mutex_lock(&ins->sync_mutex);
+    ins->is_flushing = is_flushing;
+    pthread_mutex_unlock(&ins->sync_mutex);
 }
 
 /* return the number of co-routines running in the instance */

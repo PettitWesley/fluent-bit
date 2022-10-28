@@ -180,6 +180,13 @@ static int tasks_start(struct flb_input_instance *in,
                 }
             }
 
+            if (out->flags & FLB_OUTPUT_NO_MULTI_FLUSH) {
+                if (flb_output_is_flushing(route->out) == FLB_TRUE) {
+                    /* do not start any new flushes */
+                    continue;
+                }
+            }
+
             hits++;
 
             /*
