@@ -420,7 +420,7 @@ static void cb_cloudwatch_flush(struct flb_event_chunk *event_chunk,
     }
 
     // TODO: this msg is innaccurate if events are skipped
-    flb_plg_debug(ctx->ins, "Sent %d events to CloudWatch", event_count);
+    flb_plg_info(ctx->ins, "%d events to CloudWatch", event_count);
 
     FLB_OUTPUT_RETURN(FLB_OK);
 }
