@@ -350,6 +350,7 @@ static int cb_cloudwatch_init(struct flb_output_instance *ins,
      * PutLogEvents requests to a log stream to be made serially
      */
     //upstream->flags &= ~(FLB_IO_ASYNC);
+    flb_plg_warn(ctx->ins, "Enabling full concurrency...");
 
     ctx->cw_client->upstream = upstream;
     flb_output_upstream_set(upstream, ctx->ins);
