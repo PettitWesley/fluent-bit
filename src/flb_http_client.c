@@ -1169,6 +1169,8 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
     c->header_buf[c->header_len++] = '\r';
     c->header_buf[c->header_len++] = '\n';
 
+    flb_info("[http] headers=\n%.*s\n______", c->header_len, c->header_buf);
+
 #ifdef FLB_HAVE_HTTP_CLIENT_DEBUG
     /* debug: request_headers callback */
     flb_http_client_debug_cb(c, "_debug.http.request_headers");
