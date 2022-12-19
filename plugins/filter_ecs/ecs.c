@@ -392,13 +392,19 @@ static int flb_ecs_metadata_buffer_init(struct flb_filter_ecs *ctx,
 
 static void flb_ecs_metadata_buffer_destroy(struct flb_ecs_metadata_buffer *meta)
 {
+    struct flb_ecs_metadata_keypair *keypair = NULL;
+
     if (meta) {
         flb_free(meta->buf);
-        if (meta->free_packer == FLB_TRUE) {
-            msgpack_unpacked_destroy(&meta->unpacked);
-        }
         if (meta->id) {
             flb_sds_destroy(meta->id);
+        }
+        mk_list_foreach_safe(head, tmp, &metadata_buffer->metadata_keypairs) {
+            keypair = mk_list_entry(head, struct flb_ecs_metadata_keypair, _head);
+            /* only need to free val. key is ref to flb_ecs_metadata_key.key*/
+            flb_sds_destroy(keypair->val);
+            mk_list_del(&keypair->_head);
+            flb_free(keypair);
         }
         flb_free(meta);
     }
@@ -1589,29 +1595,6 @@ static int cb_ecs_filter(const void *data, size_t bytes,
             }
         }
 
-        mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
-            metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
-            val = flb_ra_translate(metadata_key->ra, NULL, 0,
-                                   metadata_buffer->obj, NULL);
-            if (!val) {
-                flb_plg_info(ctx->ins, "Translation failed for %s : %s",
-                             metadata_key->key, metadata_key->template);
-                msgpack_unpacked_destroy(&result);
-                msgpack_sbuffer_destroy(&tmp_sbuf);
-                return FLB_FILTER_NOTOUCH;
-            }
-            len = flb_sds_len(metadata_key->key);
-            msgpack_pack_str(&tmp_pck, len);
-            msgpack_pack_str_body(&tmp_pck,
-                                  metadata_key->key,
-                                  len);
-            len = flb_sds_len(val);
-            msgpack_pack_str(&tmp_pck, len);
-            msgpack_pack_str_body(&tmp_pck,
-                                  val,
-                                  len);
-            flb_sds_destroy(val);
-        }
     }
     msgpack_unpacked_destroy(&result);
 
