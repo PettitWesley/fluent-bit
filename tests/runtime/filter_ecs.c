@@ -48,7 +48,7 @@ static int cb_check_result(void *record, size_t size, void *data)
 
     expected->actual_records++;
 
-    if (expected->fail_pattern !+ NULL) {
+    if (expected->fail_pattern != NULL) {
         p = strstr(result, expected->fail_pattern);
         TEST_CHECK(p == NULL);
         if (p) {
