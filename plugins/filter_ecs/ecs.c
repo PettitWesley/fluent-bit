@@ -372,7 +372,7 @@ static int flb_ecs_metadata_buffer_init(struct flb_filter_ecs *ctx,
             continue;
         }
 
-        keypair = flb_calloc(1, sizeof(flb_ecs_metadata_keypair));
+        keypair = flb_calloc(1, sizeof(struct flb_ecs_metadata_keypair));
         if (!keypair) {
             flb_errno();
             msgpack_unpacked_destroy(&result);
@@ -393,16 +393,20 @@ static int flb_ecs_metadata_buffer_init(struct flb_filter_ecs *ctx,
 static void flb_ecs_metadata_buffer_destroy(struct flb_ecs_metadata_buffer *meta)
 {
     struct flb_ecs_metadata_keypair *keypair = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
 
     if (meta) {
         flb_free(meta->buf);
         if (meta->id) {
             flb_sds_destroy(meta->id);
         }
-        mk_list_foreach_safe(head, tmp, &metadata_buffer->metadata_keypairs) {
+        mk_list_foreach_safe(head, tmp, &meta->metadata_keypairs) {
             keypair = mk_list_entry(head, struct flb_ecs_metadata_keypair, _head);
             /* only need to free val. key is ref to flb_ecs_metadata_key.key*/
-            flb_sds_destroy(keypair->val);
+            if (keypair->val) {
+                    flb_sds_destroy(keypair->val);
+            }
             mk_list_del(&keypair->_head);
             flb_free(keypair);
         }
@@ -1630,6 +1634,9 @@ static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
     struct mk_list *head;
     struct flb_ecs_metadata_key *metadata_key;
     struct flb_ecs_metadata_buffer *buf;
+    struct flb_ecs_metadata_keypair *keypair = NULL;
+    struct mk_list *tmp;
+    struct mk_list *head;
 
     if (ctx) {
         if (ctx->ecs_upstream) {
@@ -1649,7 +1656,15 @@ static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
         }
         if (ctx->cluster_meta_buf.buf) {
             flb_free(ctx->cluster_meta_buf.buf);
-            msgpack_unpacked_destroy(&ctx->cluster_meta_buf.unpacked);
+            mk_list_foreach_safe(head, tmp, &ctx->cluster_meta_buf.metadata_keypairs) {
+                keypair = mk_list_entry(head, struct flb_ecs_metadata_keypair, _head);
+                /* only need to free val. key is ref to flb_ecs_metadata_key.key*/
+                if (keypair->val) {
+                    flb_sds_destroy(keypair->val);
+                }
+                mk_list_del(&keypair->_head);
+                flb_free(keypair);
+            }
         }
         mk_list_foreach_safe(head, tmp, &ctx->metadata_keys) {
             metadata_key = mk_list_entry(head, struct flb_ecs_metadata_key, _head);
