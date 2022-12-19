@@ -387,6 +387,8 @@ static int flb_ecs_metadata_buffer_init(struct flb_filter_ecs *ctx,
         meta->keypairs_len += 1;
     }
 
+    msgpack_unpacked_destroy(&result);
+
     return 0;
 }
 
