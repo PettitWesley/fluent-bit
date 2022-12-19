@@ -15,6 +15,7 @@ struct filter_test {
 
 struct filter_test_result {
     char *expected_pattern;     /* string that must occur in output */
+    char *fail_pattern;         /* if this pattern is found in the result, fail test */
     int expected_pattern_index; /* which record to check for the pattern */
     int expected_records;       /* expected number of outputted records */
     int actual_records;         /* actual number of outputted records */
@@ -46,6 +47,15 @@ static int cb_check_result(void *record, size_t size, void *data)
     }
 
     expected->actual_records++;
+
+    if (expected->fail_pattern !+ NULL) {
+        p = strstr(result, expected->fail_pattern);
+        TEST_CHECK(p == NULL);
+        if (p) {
+            flb_error("Should not find: '%s' in result '%s'",
+                    expected->fail_pattern, result);
+        }
+    }
 
     flb_free(record);
     return 0;
