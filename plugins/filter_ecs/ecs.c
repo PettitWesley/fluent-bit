@@ -1635,8 +1635,6 @@ static void flb_filter_ecs_destroy(struct flb_filter_ecs *ctx)
     struct flb_ecs_metadata_key *metadata_key;
     struct flb_ecs_metadata_buffer *buf;
     struct flb_ecs_metadata_keypair *keypair = NULL;
-    struct mk_list *tmp;
-    struct mk_list *head;
 
     if (ctx) {
         if (ctx->ecs_upstream) {
