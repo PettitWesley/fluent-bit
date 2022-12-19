@@ -56,7 +56,7 @@ struct flb_ecs_metadata_keypair {
     flb_sds_t val;
 
     struct mk_list _head;
-}
+};
 
 struct flb_ecs_metadata_buffer {
     /* msgpack_sbuffer */
