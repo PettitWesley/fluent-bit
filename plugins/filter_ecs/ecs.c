@@ -108,6 +108,21 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
         return -1;
     }
 
+    struct mk_list list;
+    ret = mk_list_is_set(&list);
+    if (ret < 0) {
+        flb_plg_error(f_ins, "[mk_list_is_set] not set yet");
+    } else {
+        flb_plg_error(f_ins, "[mk_list_is_set] list is initialized");
+    }
+    mk_list_init(&list);
+    ret = mk_list_is_set(&list);
+    if (ret < 0) {
+        flb_plg_error(f_ins, "[mk_list_is_set] not set yet");
+    } else {
+        flb_plg_error(f_ins, "[mk_list_is_set] list is initialized");
+    }
+
     mk_list_init(&ctx->metadata_keys);
     ctx->metadata_keys_len = 0;
     mk_list_init(&ctx->metadata_buffers);
