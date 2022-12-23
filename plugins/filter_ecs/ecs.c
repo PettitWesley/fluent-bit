@@ -108,7 +108,7 @@ static int cb_ecs_init(struct flb_filter_instance *f_ins,
         return -1;
     }
 
-    struct mk_list list;
+    struct mk_list list = { 0 };
     ret = mk_list_is_set(&list);
     if (ret < 0) {
         flb_plg_error(f_ins, "[mk_list_is_set] not set yet");
