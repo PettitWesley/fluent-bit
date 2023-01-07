@@ -92,10 +92,11 @@ static int datadog_format(struct flb_config *config,
 {
     int i;
     int ind;
-    int byte_cnt;
+    int byte_cnt = 64;
     int remap_cnt;
+    int ret;
     /* for msgpack global structs */
-    int array_size = 0;
+    size_t array_size = 0;
     size_t off = 0;
     msgpack_unpacked result;
     msgpack_sbuffer mp_sbuf;
@@ -110,13 +111,23 @@ static int datadog_format(struct flb_config *config,
     msgpack_object k;
     msgpack_object v;
     struct flb_out_datadog *ctx = plugin_context;
+    struct flb_event_chunk *event_chunk;
 
     /* output buffer */
     flb_sds_t out_buf;
     flb_sds_t remapped_tags = NULL;
+    flb_sds_t tmp = NULL;
 
-    /* Count number of records */
-    array_size = flb_mp_count(data, bytes);
+    /* in normal flush callback we have the event_chunk set as flush context
+     * so we don't need to calculate the event len.
+     * But in test mode the formatter won't get the event_chunk as flush_ctx
+     */ 
+    if (flush_ctx != NULL) {
+        event_chunk = flush_ctx; 
+        array_size = event_chunk->total_events;
+    } else {
+        array_size = flb_mp_count(data, bytes);
+    }
 
     /* Create temporary msgpack buffer */
     msgpack_sbuffer_init(&mp_sbuf);
@@ -319,7 +330,7 @@ static void cb_datadog_flush(struct flb_event_chunk *event_chunk,
 
     /* Convert input data into a Datadog JSON payload */
     ret = datadog_format(config, i_ins,
-                         ctx, NULL,
+                         ctx, event_chunk,
                          event_chunk->tag, flb_sds_len(event_chunk->tag),
                          event_chunk->data, event_chunk->size,
                          &out_buf, &out_size);
