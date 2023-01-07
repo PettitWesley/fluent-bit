@@ -172,6 +172,22 @@ static int datadog_format(struct flb_config *config,
 
             if (!remapped_tags) {
                 remapped_tags = flb_sds_create_size(byte_cnt);
+                if (!remapped_tags) {
+                    flb_errno();
+                    msgpack_sbuffer_destroy(&mp_sbuf);
+                    msgpack_unpacked_destroy(&result);
+                    return -1;
+                }
+            } else if (flb_sds_len(remapped_tags) < byte_cnt) {
+                tmp = flb_sds_increase(remapped_tags, flb_sds_len(remapped_tags) - byte_cnt);
+                if (!tmp) {
+                    flb_errno();
+                    flb_sds_destroy(remapped_tags);
+                    msgpack_sbuffer_destroy(&mp_sbuf);
+                    msgpack_unpacked_destroy(&result);
+                    return -1;
+                }
+                remapped_tags = tmp;
             }
 
             /*
