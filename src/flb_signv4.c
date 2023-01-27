@@ -831,6 +831,8 @@ static flb_sds_t flb_signv4_canonical_request(struct flb_http_client *c,
     /* Iterate sorted headers and append them to the outgoing buffer */
     for (i = 0; i < items; i++) {
         kv = (struct flb_kv *) arr[i];
+        flb_info("[signv4] header: key=`%s` len=%d, val=`%s` len=%d",
+                 kv->key, strlen(kv->key), kv->val, strlen(kv->val));
         tmp = flb_sds_printf(&cr, "%s:%s\n", kv->key, kv->val);
         if (!tmp) {
             flb_error("[signv4] error composing canonical headers");
@@ -1119,6 +1121,8 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
 
+    flb_info("[signv4] len=%d request body=`%.*s`", c->body_len, c->body_len, c->body_buf);
+
     flb_info("[signv4] access=`%s`, secret=`%s`, token=`%s`", creds->access_key_id, creds->secret_access_key, creds->session_token);
 
     gmt = flb_malloc(sizeof(struct tm));
@@ -1158,7 +1162,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
         return NULL;
     }
 
-    flb_info("[signv4] canonical_request=`%s`", cr);
+    flb_info("[signv4] canonical_request=`%s`, len=%d", cr, flb_sds_len(cr));
 
     /* Task 2: string to sign */
     string_to_sign = flb_signv4_string_to_sign(c, cr, amzdate,
@@ -1172,7 +1176,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
     }
     flb_sds_destroy(cr);
 
-    flb_info("[signv4] string_to_sign=`%s`", string_to_sign);
+    flb_info("[signv4] string_to_sign=`%s`, len=%d", string_to_sign, flb_sds_len(string_to_sign));
 
     /* Task 3: calculate the signature */
     signature = flb_signv4_calculate_signature(string_to_sign, datestamp,
@@ -1187,7 +1191,7 @@ flb_sds_t flb_signv4_do(struct flb_http_client *c, int normalize_uri,
     }
     flb_sds_destroy(string_to_sign);
 
-    flb_info("[signv4] signature=`%s`", signature);
+    flb_info("[signv4] signature=`%s`, len=%d", signature, flb_sds_len(signature));
 
     /* Task 4: add signature to HTTP request */
     auth_header = flb_signv4_add_authorization(c,
