@@ -33,6 +33,8 @@ struct flb_upstream_conn {
     struct mk_event event;
     struct flb_coro *coro;
 
+    int destroyed;
+
     /* Socker */
     flb_sockfd_t fd;
 

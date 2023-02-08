@@ -424,6 +424,8 @@ static int prepare_destroy_conn(struct flb_upstream_conn *u_conn)
     struct flb_upstream *u = u_conn->u;
     struct flb_upstream_queue *uq;
 
+    flb_info("prepare_destroy_conn(): %p", u_conn);
+
     uq = flb_upstream_queue_get(u);
 
     flb_trace("[upstream] destroy connection #%i to %s:%i",
@@ -482,11 +484,14 @@ static int destroy_conn(struct flb_upstream_conn *u_conn)
         return 0;
     }
 
+    flb_info("destroy_conn(): %p", u_conn);
+
 #ifdef FLB_HAVE_TLS
     if (u_conn->tls_session) {
         flb_tls_session_destroy(u_conn->tls, u_conn);
     }
 #endif
+    u_conn->destroyed = FLB_TRUE;
     mk_list_del(&u_conn->_head);
     flb_free(u_conn);
 
