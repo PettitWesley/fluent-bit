@@ -1033,11 +1033,11 @@ int flb_http_set_keepalive(struct flb_http_client *c)
     }
 
     /* append header */
-    return flb_http_add_header(c,
+    /*return flb_http_add_header(c,
                                FLB_HTTP_HEADER_CONNECTION,
                                sizeof(FLB_HTTP_HEADER_CONNECTION) - 1,
                                FLB_HTTP_HEADER_KA,
-                               sizeof(FLB_HTTP_HEADER_KA) - 1);
+                               sizeof(FLB_HTTP_HEADER_KA) - 1); */
 }
 
 /* Adds a header specifying that the payload is compressed with gzip */
@@ -1275,7 +1275,7 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
          */
         if (c->resp.connection_close == FLB_TRUE) {
             /* Do not recycle the connection (no more keepalive) */
-            flb_upstream_conn_recycle(c->u_conn, FLB_FALSE);
+            //flb_upstream_conn_recycle(c->u_conn, FLB_FALSE);
             flb_debug("[http_client] server %s:%i will close connection #%i",
                       c->u_conn->u->tcp_host, c->u_conn->u->tcp_port,
                       c->u_conn->fd);
