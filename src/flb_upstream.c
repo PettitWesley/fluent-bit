@@ -730,6 +730,12 @@ int flb_upstream_conn_release(struct flb_upstream_conn *conn)
     struct flb_upstream *u = conn->u;
     struct flb_upstream_queue *uq;
 
+    /* 
+     * flb_io_net_read adds a read event on event loop
+     * which is not explicitly removed.
+     */
+    mk_event_del(u_conn->evl, &u_conn->event);
+
     uq = flb_upstream_queue_get(u);
 
     /* If this is a valid KA connection just recycle */
