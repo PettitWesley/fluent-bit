@@ -209,6 +209,8 @@ static void flb_proxy_output_cb_destroy(struct flb_output_plugin *plugin)
     /* cleanup */
     void (*cb_unregister)(struct flb_plugin_proxy_def *def);
 
+    flb_info("[go] cb_destroy %s", plugin->name);
+
     cb_unregister = flb_plugin_proxy_symbol(proxy, "FLBPluginUnregister");
     if (cb_unregister != NULL) {
         cb_unregister(proxy->def);
@@ -429,6 +431,8 @@ struct flb_plugin_proxy *flb_plugin_proxy_create(const char *dso_path, int type,
 {
     void *handle;
     struct flb_plugin_proxy *proxy;
+
+    flb_info("[go] loading %s", dso_path);
 
     /* Load shared library */
     handle = dlopen(dso_path, RTLD_LAZY);
