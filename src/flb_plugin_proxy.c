@@ -74,6 +74,8 @@ static int flb_proxy_cb_exit(void *data, struct flb_config *config)
     struct flb_output_plugin *instance = data;
     struct flb_plugin_proxy *proxy = (instance->proxy);
 
+    flb_info("[go] cb_exit %s", instance->name);
+
     if (proxy->def->proxy == FLB_PROXY_GOLANG) {
         proxy_go_destroy(proxy->data);
     }
@@ -204,6 +206,8 @@ struct flb_plugin_proxy *flb_plugin_proxy_create(const char *dso_path, int type,
 {
     void *handle;
     struct flb_plugin_proxy *proxy;
+
+    flb_info("[go] loading %s", dso_path);
 
     /* Load shared library */
     handle = dlopen(dso_path, RTLD_LAZY);
