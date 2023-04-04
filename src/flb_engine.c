@@ -45,6 +45,7 @@
 #include <fluent-bit/flb_parser.h>
 #include <fluent-bit/flb_sosreport.h>
 #include <fluent-bit/flb_storage.h>
+#include <fluent-bit/flb_plugins.h>
 #include <fluent-bit/flb_http_server.h>
 #include <fluent-bit/flb_metrics.h>
 #include <fluent-bit/flb_version.h>
@@ -939,6 +940,9 @@ int flb_engine_shutdown(struct flb_config *config)
         flb_hs_destroy(config->http_ctx);
     }
 #endif
+
+    /* free/destroy plugins */
+    flb_plugins_unregister(config);
 
     return 0;
 }

@@ -38,7 +38,6 @@
 #include <fluent-bit/flb_worker.h>
 #include <fluent-bit/flb_scheduler.h>
 #include <fluent-bit/flb_http_server.h>
-#include <fluent-bit/flb_plugin.h>
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_config_format.h>
 #include <fluent-bit/multiline/flb_ml.h>

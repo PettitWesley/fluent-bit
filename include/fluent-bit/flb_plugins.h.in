@@ -70,6 +70,11 @@ void flb_plugins_unregister(struct flb_config *config)
 
     mk_list_foreach_safe(head, tmp, &config->out_plugins) {
         out = mk_list_entry(head, struct flb_output_plugin, _head);
+        flb_info("destroying output flb_plugins.h.in %s", out->name);
+        if (out->proxy) {
+            flb_info("unregistering proxy plugin %s", out->name);
+            flb_plugin_proxy_unregister(out);
+        }
         mk_list_del(&out->_head);
         flb_free(out);
     }
