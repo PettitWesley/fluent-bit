@@ -77,11 +77,22 @@ static int flb_proxy_cb_exit(void *data, struct flb_config *config)
     flb_info("[go] cb_exit %s", instance->name);
 
     if (proxy->def->proxy == FLB_PROXY_GOLANG) {
+        proxy_go_exit(proxy->data);
+    }
+    return 0;
+}
+
+void flb_plugin_proxy_unregister(struct flb_output_plugin *out)
+{
+    struct flb_plugin_proxy *proxy = (out->proxy);
+    flb_info("[go] unregister 10:32 %s", out->name);
+    if (proxy->def->proxy == FLB_PROXY_GOLANG) {
         proxy_go_destroy(proxy->data);
     }
     flb_plugin_proxy_destroy(proxy);
-    return 0;
 }
+
+
 
 static int flb_proxy_register_output(struct flb_plugin_proxy *proxy,
                                      struct flb_plugin_proxy_def *def,

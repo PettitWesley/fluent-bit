@@ -446,7 +446,7 @@ void flb_output_exit(struct flb_config *config)
             flb_output_thread_pool_destroy(ins);
         }
 
-        flb_info("calling cb_exit on", p->name);
+        flb_info("calling cb_exit on %s", p->name);
 
         /* Check a exit callback */
         if (p->cb_exit) {
