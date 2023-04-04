@@ -103,6 +103,8 @@ static int flb_proxy_register_output(struct flb_plugin_proxy *proxy,
     out->description = def->description;
     mk_list_add(&out->_head, &config->out_plugins);
 
+    flb_info("adding %s to output plugin list", out->name);
+
     /*
      * Set proxy callbacks: external plugins which are not following
      * the core plugins specs, have a different callback approach, so
