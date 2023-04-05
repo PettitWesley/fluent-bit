@@ -775,8 +775,10 @@ int flb_engine_start(struct flb_config *config)
         mk_event_wait(evl); /* potentially conditional mk_event_wait or mk_event_wait_2 based on bucket queue capacity for one shot events */
         flb_event_priority_live_foreach(event, evl_bktq, evl, FLB_ENGINE_LOOP_MAX_ITER) {
             if (event->type == FLB_ENGINE_EV_CORE) {
+                flb_info("[engine] FLB_ENGINE_EV_CORE");
                 ret = flb_engine_handle_event(event->fd, event->mask, config);
                 if (ret == FLB_ENGINE_STOP) {
+                    flb_info("[engine] got FLB_ENGINE_STOP, grace_count=%d", config->grace_count++);
                     if (config->grace_count == 0) {
                         flb_warn("[engine] service will shutdown in max %u seconds",
                                  config->grace);
@@ -806,6 +808,7 @@ int flb_engine_start(struct flb_config *config)
                     event->priority = FLB_ENGINE_PRIORITY_SHUTDOWN;
                 }
                 else if (ret == FLB_ENGINE_SHUTDOWN) {
+                    flb_info("[engine] got FLB_ENGINE_SHUTDOWN, grace_count=%d", config->grace_count++);
                     if (config->shutdown_fd > 0) {
                         mk_event_timeout_destroy(config->evl,
                                                  &config->event_shutdown);
@@ -842,10 +845,12 @@ int flb_engine_start(struct flb_config *config)
                 }
             }
             else if (event->type & FLB_ENGINE_EV_SCHED) {
+                flb_info("[engine] FLB_ENGINE_EV_SCHED");
                 /* Event type registered by the Scheduler */
                 flb_sched_event_handler(config, event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD_ENGINE) {
+                flb_info("[engine] FLB_ENGINE_EV_THREAD_ENGINE");
                 struct flb_output_flush *output_flush;
 
                 /* Read the coroutine reference */
@@ -859,9 +864,11 @@ int flb_engine_start(struct flb_config *config)
                 flb_coro_resume(output_flush->coro);
             }
             else if (event->type == FLB_ENGINE_EV_CUSTOM) {
+                flb_info("[engine] FLB_ENGINE_EV_CUSTOM");
                 event->handler(event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD) {
+                flb_info("[engine] FLB_ENGINE_EV_THREAD");
                 struct flb_upstream_conn *u_conn;
                 struct flb_coro *co;
 
@@ -877,6 +884,7 @@ int flb_engine_start(struct flb_config *config)
                 }
             }
             else if (event->type == FLB_ENGINE_EV_OUTPUT) {
+                flb_info("[engine] FLB_ENGINE_EV_OUTPUT");
                 ts = cmt_time_now();
 
                 /*
@@ -886,6 +894,7 @@ int flb_engine_start(struct flb_config *config)
                 handle_output_event(event->fd, ts, config);
             }
             else if (event->type == FLB_ENGINE_EV_INPUT) {
+                flb_info("[engine] FLB_ENGINE_EV_INPUT");
                 ts = cmt_time_now();
                 handle_input_event(event->fd, ts, config);
             }

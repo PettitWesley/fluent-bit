@@ -1242,6 +1242,7 @@ static int put_all_chunks(struct flb_s3 *ctx, int is_startup)
 
         /* on startup, we only send old chunks in this routine */
         if (is_startup == FLB_TRUE && fs_stream == ctx->stream_active) {
+            flb_info("put_all_chunks: stream_active has %d chunks", mk_list_size(&fs_stream->files));
             continue;
         }
 
