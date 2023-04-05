@@ -958,8 +958,6 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->timer_ms = UPLOAD_TIMER_MIN_WAIT;
     }
 
-    flb_info("retry_limit: %d", ctx->ins->retry_limit);
-
     /* this would use sync IO which we want to avoid */
     // /* clean up any old buffers found on startup */
     // if (ctx->has_old_buffers == FLB_TRUE) {
@@ -1103,7 +1101,7 @@ put_object:
     if (ret < 0) {
         if (chunk) {
             chunk->failures += 1;
-            if (chunk->failures > ctx->ins->retry_limit){
+            if (ctx->ins->retry_limit >= 0 && chunk->failures > ctx->ins->retry_limit){
                 s3_retry_warn(ctx, tag, chunk->input_name, file_first_log_time, FLB_FALSE);
                 return -2;
             }
@@ -1149,7 +1147,7 @@ multipart:
 
         if (chunk) {
             chunk->failures += 1;
-            if (chunk->failures > ctx->ins->retry_limit) {
+            if (ctx->ins->retry_limit >= 0 &&  chunk->failures > ctx->ins->retry_limit) {
                 s3_retry_warn(ctx, (char *) chunk->fsf->meta_buf, m_upload->input_name,
                               chunk->create_time, FLB_FALSE);
                 /*
@@ -1280,7 +1278,7 @@ static int put_all_chunks(struct flb_s3 *ctx, int is_startup)
             if (ret < 0) {
                 chunk->failures += 1;
                 if (is_startup == FLB_TRUE) {
-                    if (chunk->failures > ctx->ins->retry_limit){
+                    if (ctx->ins->retry_limit >= 0 && chunk->failures > ctx->ins->retry_limit){
                         s3_retry_warn(ctx, (char *) fsf->meta_buf, NULL,
                                       chunk->create_time, FLB_FALSE);
                         if (chunk->locked == FLB_TRUE) {
@@ -1682,7 +1680,7 @@ static void cb_s3_upload(struct flb_config *config, void *data)
         m_upload = mk_list_entry(head, struct multipart_upload, _head);
         complete = FLB_FALSE;
 
-        if (m_upload->complete_errors > ctx->ins->retry_limit) {
+        if (ctx->ins->retry_limit >= 0 && m_upload->complete_errors > ctx->ins->retry_limit) {
             flb_plg_error(ctx->ins,
                           "Multipart Upload for %s has failed "
                           "s3:CompleteMultipartUpload more than configured retry_limit, "
