@@ -958,6 +958,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->timer_ms = UPLOAD_TIMER_MIN_WAIT;
     }
 
+    flb_info("retry_limit: %d", ctx->ins->retry_limit);
+
     /* this would use sync IO which we want to avoid */
     // /* clean up any old buffers found on startup */
     // if (ctx->has_old_buffers == FLB_TRUE) {
