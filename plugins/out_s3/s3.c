@@ -1234,11 +1234,13 @@ static int put_all_chunks(struct flb_s3 *ctx, int is_startup)
         if (fs_stream == ctx->stream_upload) {
             continue;
         }
+
         /* skip metadata stream */
         if (fs_stream == ctx->stream_metadata) {
             continue;
         }
 
+        /* on startup, we only send old chunks in this routine */
         if (is_startup == FLB_TRUE && fs_stream == ctx->stream_active) {
             continue;
         }
@@ -1912,6 +1914,11 @@ static void flush_startup_chunks(struct flb_s3 *ctx)
             flb_plg_error(ctx->ins,
                           "Failed to send locally buffered data left over "
                           "from previous executions; will retry. Buffer=%s",
+                          ctx->fs->root_path);
+        } else {
+            flb_plg_info(ctx->ins,
+                          "Successfully sent all locally buffered data left over "
+                          "from previous executions. Buffer=%s",
                           ctx->fs->root_path);
         }
     }
