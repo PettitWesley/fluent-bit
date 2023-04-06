@@ -282,7 +282,7 @@ static void output_thread(void *data)
                  * be terminated.
                  */
                 if (task == (struct flb_task *) 0xdeadbeef) {
-                    flb_info("[worker] 0xdeadbeef");
+                    flb_info("[worker] GOT 0xdeadbeef");
                     stopping = FLB_TRUE;
                     flb_plg_info(th_ins->ins, "thread worker #%i stopping...",
                                  thread_id);
@@ -561,6 +561,7 @@ void flb_output_thread_pool_destroy(struct flb_output_instance *ins)
         }
         flb_info("[worker] waiting on pthread_join");
         pthread_join(th->tid, NULL);
+        flb_info("[worker] pthread_join RETURNED");
         flb_free(th_ins);
     }
 
