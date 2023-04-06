@@ -1641,8 +1641,32 @@ static void cb_s3_upload(struct flb_config *config, void *data)
     struct mk_list *head;
     int complete;
     int ret;
+    time_t now;
 
+    now = time(NULL);
+    
     flb_plg_debug(ctx->ins, "Running upload daemon coro uploader (cb_s3_upload)..");
+
+    /* check chunks in active stream not marked as ready to be sent and see if any are timed out */
+    mk_list_foreach_safe(head, tmp, &ctx->stream_active->files) {
+        fsf = mk_list_entry(head, struct flb_fstore_file, _head);
+        chunk = fsf->data;
+
+        /* Locked chunks are already in the queue, skip */
+        if (chunk->locked == FLB_TRUE) {
+            continue;
+        }
+
+        if (now > (chunk->create_time + ctx->upload_timeout)) {
+            /* add to upload queue */
+            if (chunk->input_name) {
+                flb_plg_info(ctx->ins, "upload_timeout reached for chunk from %s",
+                             chunk->input_name);
+            }
+            s3_store_file_lock(chunk);
+            mk_list_add(&chunk->_head, &ctx->upload_queue);
+        }
+    }
 
     /* send any chunks that are ready */
     mk_list_foreach_safe(head, tmp, &ctx->upload_queue) {
@@ -2105,7 +2129,7 @@ static void cb_s3_flush(struct flb_event_chunk *event_chunk,
         unit_test_flush(ctx, upload_file,
                         event_chunk->tag, flb_sds_len(event_chunk->tag),
                         chunk, chunk_size,
-                        m_upload_file, file_first_log_time, out_flush->task->i_ins->name);
+                        m_upload_file, file_first_log_time, i_ins->name);
     }
 
     /* 
@@ -2114,7 +2138,7 @@ static void cb_s3_flush(struct flb_event_chunk *event_chunk,
      */
     ret = buffer_chunk(ctx, upload_file, chunk, chunk_size,
                        event_chunk->tag, flb_sds_len(event_chunk->tag),
-                       file_first_log_time, out_flush->task->i_ins->name);
+                       file_first_log_time, i_ins->name);
 
     if (ret < 0) {
         FLB_OUTPUT_RETURN(FLB_RETRY);
@@ -2124,8 +2148,8 @@ static void cb_s3_flush(struct flb_event_chunk *event_chunk,
     if (upload_file != NULL && time(NULL) >
         (upload_file->create_time + ctx->upload_timeout)) {
         upload_timeout_check = FLB_TRUE;
-        flb_plg_info(ctx->ins, "upload_timeout reached for %s",
-                     event_chunk->tag);
+        flb_plg_info(ctx->ins, "upload_timeout reached for chunk from %s, tag=%s",
+                     i_ins->name, event_chunk->tag);
     }
 
     m_upload_file = get_upload(ctx,
