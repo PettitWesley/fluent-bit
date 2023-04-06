@@ -2159,6 +2159,8 @@ static int cb_s3_exit(void *data, struct flb_config *config)
     struct mk_list *tmp;
     struct mk_list *head;
 
+    flb_plg_info(ctx->ins, "cb_exit");
+
     if (!ctx) {
         return 0;
     }

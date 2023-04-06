@@ -825,6 +825,7 @@ int flb_engine_start(struct flb_config *config)
                      * wait again for the grace period and re-check again.
                      */
                     ret = flb_task_running_count(config);
+                    flb_task_running_print(config);
                     if (ret > 0 && config->grace_count < config->grace) {
                         if (config->grace_count == 1) {
                             flb_task_running_print(config);
@@ -839,6 +840,7 @@ int flb_engine_start(struct flb_config *config)
                                  ret);
                         ret = config->exit_status_code;
                         // stuck here
+                        flb_info("[engine] flb_engine_shutdown()");
                         flb_engine_shutdown(config);
                         config = NULL;
                         return ret;

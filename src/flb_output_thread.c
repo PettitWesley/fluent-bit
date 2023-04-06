@@ -246,6 +246,7 @@ static void output_thread(void *data)
     /* Thread event loop */
     while (running) {
         mk_event_wait(th_ins->evl);
+        flb_info("[worker], flush_list has %d", mk_list_size(&th_ins->flush_list));
         flb_event_priority_live_foreach(event, th_ins->evl_bktq, th_ins->evl,
                                       FLB_ENGINE_LOOP_MAX_ITER) {
             /*
@@ -254,9 +255,11 @@ static void output_thread(void *data)
              * - handle return status by plugin flush callback.
              */
             if (event->type == FLB_ENGINE_EV_CORE) {
+                flb_info("[worker] FLB_ENGINE_EV_CORE");
 
             }
             else if (event->type & FLB_ENGINE_EV_SCHED) {
+                flb_info("[worker] FLB_ENGINE_EV_SCHED");
                 /*
                  * Note that this scheduler event handler has more features
                  * designed to be used from the parent thread, on this specific
@@ -266,6 +269,7 @@ static void output_thread(void *data)
                 flb_sched_event_handler(sched->config, event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD_OUTPUT) {
+                flb_info("[worker] FLB_ENGINE_EV_THREAD_OUTPUT");
                 /* Read the task reference */
                 n = flb_pipe_r(event->fd, &task, sizeof(struct flb_task *));
                 if (n <= 0) {
@@ -278,6 +282,7 @@ static void output_thread(void *data)
                  * be terminated.
                  */
                 if (task == (struct flb_task *) 0xdeadbeef) {
+                    flb_info("[worker] 0xdeadbeef");
                     stopping = FLB_TRUE;
                     flb_plg_info(th_ins->ins, "thread worker #%i stopping...",
                                  thread_id);
@@ -295,9 +300,11 @@ static void output_thread(void *data)
                 flb_coro_resume(out_flush->coro);
             }
             else if (event->type == FLB_ENGINE_EV_CUSTOM) {
+                flb_info("[worker] FLB_ENGINE_EV_CUSTOM");
                 event->handler(event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD) {
+                flb_info("[worker] FLB_ENGINE_EV_THREAD");
                 /*
                  * Check if we have some co-routine associated to this event,
                  * if so, resume the co-routine
@@ -309,6 +316,7 @@ static void output_thread(void *data)
                 }
             }
             else if (event->type == FLB_ENGINE_EV_OUTPUT) {
+                flb_info("[worker] FLB_ENGINE_EV_OUTPUT");
                 /*
                  * The flush callback has finished working and delivered it
                  * return status. At this intermediary step we cleanup the
@@ -533,6 +541,8 @@ void flb_output_thread_pool_destroy(struct flb_output_instance *ins)
         return;
     }
 
+    flb_info("[worker] flb_output_thread_pool_destroy");
+
     /* Signal each worker thread that needs to stop doing work */
     mk_list_foreach(head, &tp->list_threads) {
         th = mk_list_entry(head, struct flb_tp_thread, _head);
@@ -541,6 +551,7 @@ void flb_output_thread_pool_destroy(struct flb_output_instance *ins)
         }
 
         th_ins = th->params.data;
+        flb_info("[worker] writing deadbeef");
         n = flb_pipe_w(th_ins->ch_parent_events[1], &stop, sizeof(stop));
         if (n < 0) {
             flb_errno();
@@ -548,6 +559,7 @@ void flb_output_thread_pool_destroy(struct flb_output_instance *ins)
             flb_free(th_ins);
             continue;
         }
+        flb_info("[worker] waiting on pthread_join");
         pthread_join(th->tid, NULL);
         flb_free(th_ins);
     }

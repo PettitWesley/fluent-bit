@@ -437,6 +437,8 @@ void flb_output_exit(struct flb_config *config)
     struct flb_output_plugin *p;
     void *params;
 
+    flb_info("[engine] flb_output_exit");
+
     mk_list_foreach_safe(head, tmp, &config->outputs) {
         ins = mk_list_entry(head, struct flb_output_instance, _head);
         p = ins->p;
