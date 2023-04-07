@@ -174,6 +174,17 @@ static void cb_stdout_flush(struct flb_event_chunk *event_chunk,
     ctx = (struct flb_stdout *) out_context;
     cnt = 0;
 
+    flb_sds_t tmp;
+    flb_sds_t test = flb_sds_create_size(64);
+    if (!test) {
+        flb_errno();
+        FLB_OUTPUT_RETURN(FLB_ERROR);
+    }
+
+    tmp = flb_sds_printf(&test, "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz %s", "0123456789");
+    flb_info("TEST: %s", tmp);
+
+
 #ifdef FLB_HAVE_METRICS
     /* Check if the event type is metrics, handle the payload differently */
     if (event_chunk->type == FLB_EVENT_TYPE_METRICS) {
