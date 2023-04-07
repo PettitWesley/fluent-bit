@@ -187,7 +187,7 @@ static void cb_stdout_flush(struct flb_event_chunk *event_chunk,
     flb_info("TEST: %s", tmp);
 
     flb_sds_t test2 = flb_sds_create_size(64);
-    if (!tes2t) {
+    if (!test2) {
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_ERROR);
     }
