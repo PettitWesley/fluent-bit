@@ -181,7 +181,7 @@ static void cb_stdout_flush(struct flb_event_chunk *event_chunk,
         FLB_OUTPUT_RETURN(FLB_ERROR);
     }
 
-    tmp = flb_sds_printf(&test, "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz %s", "A0123456789");
+    tmp = flb_sds_printf(&test, "A0123456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
     flb_info("TEST: %s", tmp);
 
 
