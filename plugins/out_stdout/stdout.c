@@ -181,44 +181,22 @@ static void cb_stdout_flush(struct flb_event_chunk *event_chunk,
         FLB_OUTPUT_RETURN(FLB_ERROR);
     }
 
+    flb_info("Example below will work as expected:")
+
     tmp = flb_sds_printf(&test, "A0123456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
     flb_info("TEST: %s", tmp);
 
-    test = flb_sds_create_size(64);
-    if (!test) {
+    flb_sds_t test2 = flb_sds_create_size(64);
+    if (!tes2t) {
         flb_errno();
         FLB_OUTPUT_RETURN(FLB_ERROR);
     }
 
-    tmp = flb_sds_printf(&test, "0123456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
+    flb_info("Example below shows bug:")
+    tmp = flb_sds_printf(&test2, "123456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
     flb_info("TEST: %s", tmp);
 
-     test = flb_sds_create_size(64);
-    if (!test) {
-        flb_errno();
-        FLB_OUTPUT_RETURN(FLB_ERROR);
-    }
 
-    tmp = flb_sds_printf(&test, "123456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
-    flb_info("TEST: %s", tmp);
-
-     test = flb_sds_create_size(64);
-    if (!test) {
-        flb_errno();
-        FLB_OUTPUT_RETURN(FLB_ERROR);
-    }
-
-    tmp = flb_sds_printf(&test, "3456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
-    flb_info("TEST: %s", tmp);
-
-     test = flb_sds_create_size(64);
-    if (!test) {
-        flb_errno();
-        FLB_OUTPUT_RETURN(FLB_ERROR);
-    }
-
-    tmp = flb_sds_printf(&test, "AB0123456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
-    flb_info("TEST: %s", tmp);
 
 
 #ifdef FLB_HAVE_METRICS
