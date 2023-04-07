@@ -181,7 +181,7 @@ static void cb_stdout_flush(struct flb_event_chunk *event_chunk,
         FLB_OUTPUT_RETURN(FLB_ERROR);
     }
 
-    flb_info("Example below will work as expected:")
+    flb_info("Example below will work as expected:");
 
     tmp = flb_sds_printf(&test, "A0123456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
     flb_info("TEST: %s", tmp);
@@ -192,7 +192,7 @@ static void cb_stdout_flush(struct flb_event_chunk *event_chunk,
         FLB_OUTPUT_RETURN(FLB_ERROR);
     }
 
-    flb_info("Example below shows bug:")
+    flb_info("Example below shows bug:");
     tmp = flb_sds_printf(&test2, "123456789 %s", "this-is-54-chars-1234567890-abcdefghijklmnopqrstuvwxyz");
     flb_info("TEST: %s", tmp);
 
