@@ -416,6 +416,8 @@ flb_sds_t flb_sds_printf(flb_sds_t *sds, const char *fmt, ...)
 
     if (len < 64) len = 64;
 
+    flb_info("[sds] len=%d", len);
+
     s = *sds;
     if (flb_sds_avail(s)< len) {
         tmp = flb_sds_increase(s, len);
@@ -427,6 +429,7 @@ flb_sds_t flb_sds_printf(flb_sds_t *sds, const char *fmt, ...)
 
     va_start(ap, fmt);
     size = vsnprintf((char *) (s + flb_sds_len(s)), flb_sds_avail(s), fmt, ap);
+    flb_info("[sds] size1=%d", size);
     if (size < 0) {
         flb_warn("[%s] buggy vsnprintf return %d", __FUNCTION__, size);
         va_end(ap);
@@ -450,10 +453,13 @@ flb_sds_t flb_sds_printf(flb_sds_t *sds, const char *fmt, ...)
         }
         va_end(ap);
     }
+    flb_info("[sds] size2=%d", size);
 
     head = FLB_SDS_HEADER(s);
     head->len += size;
     s[head->len] = '\0';
+
+    flb_info("[sds] head->len=%d", head->len);
 
     return s;
 }
