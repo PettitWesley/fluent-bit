@@ -2036,13 +2036,21 @@ static void daemon_coroutine(struct flb_config *config, struct flb_s3 *ctx)
     /* tell engine that this task did complete successfully */
     flb_output_return_no_destroy(FLB_OK);
 
-    while (FLB_TRUE) {
+    /* 
+     * FLB engine uses a graceful cooperative shutdown model. 
+     * If coroutines never end, the system won't stop.
+     * So the daemon coroutine must exit itself when the engine is in shutdown mode.
+     */
+    while (config->is_running == FLB_TRUE) {
         /* Cleanup old buffers found on startup */
         flush_startup_chunks(ctx);
 
         /* upload any ready chunks */
         cb_s3_upload(config, ctx);
 
+        if (config->is_running == FLB_FALSE) {
+            break;
+        }
         /* 
          * special coroutine sleep
          * Doesn't block any thread
