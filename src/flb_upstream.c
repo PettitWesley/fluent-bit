@@ -437,6 +437,7 @@ static int prepare_destroy_conn(struct flb_connection *u_conn)
               u_conn->fd, u->tcp_host, u->tcp_port);
 
     if (MK_EVENT_IS_REGISTERED((&u_conn->event))) {
+        flb_error("[KA DROPPED] removed");
         mk_event_del(u_conn->evl, &u_conn->event);
     }
 
@@ -751,6 +752,7 @@ int flb_upstream_conn_release(struct flb_connection *conn)
                       conn->fd, u->tcp_host, u->tcp_port);
             return prepare_destroy_conn_safe(conn);
         }
+        flb_error("[KA DROPPED] added");
 
         flb_debug("[upstream] KA connection #%i to %s:%i is now available",
                   conn->fd, u->tcp_host, u->tcp_port);
