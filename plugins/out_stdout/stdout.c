@@ -139,6 +139,8 @@ static void cb_stdout_flush(struct flb_event_chunk *event_chunk,
     struct flb_time tmp;
     msgpack_object *p;
 
+    flb_info("%s", "inode=%"PRIu64", %s, events: ");
+
 #ifdef FLB_HAVE_METRICS
     /* Check if the event type is metrics, handle the payload differently */
     if (event_chunk->type == FLB_EVENT_TYPE_METRIC) {
