@@ -991,6 +991,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
     //      cb_s3_upload(config, ctx);
     // }
 
+    flb_plg_info(ctx->ins, "S3: april 24th: s3-fix-data-ordering-1_9-stability-test");
+
     /* this is done last since in the previous block we make calls to AWS */
     ctx->provider->provider_vtable->upstream_set(ctx->provider, ctx->ins);
 
@@ -2030,6 +2032,9 @@ static inline void flb_output_return_no_destroy(int ret)
 static void daemon_coroutine(struct flb_config *config, struct flb_s3 *ctx)
 {
     flb_plg_info(ctx->ins, "daemon coroutine starting...");
+
+    flb_plg_error(ctx->ins, "daemon: S3: april 24th: s3-fix-data-ordering-1_9-stability-test");
+    
 
     ctx->daemon_coro_started = FLB_TRUE;
 
