@@ -2029,7 +2029,7 @@ static inline void flb_output_return_no_destroy(int ret)
  */
 static void daemon_coroutine(struct flb_config *config, struct flb_s3 *ctx)
 {
-    flb_plg_info(ctx->ins, "daemon coroutine starting...");
+    flb_plg_info(ctx->ins, "daemon coroutine APRIL 24TH test starting...");
 
     ctx->daemon_coro_started = FLB_TRUE;
 
