@@ -99,6 +99,45 @@ static struct flb_aws_header storage_class_header = {
     .val_len = 0,
 };
 
+static void s3_retry_warn(struct flb_s3 *ctx, const char *tag,
+                          char *input_name, time_t create_time,
+                          int less_than_limit)
+{
+    struct tm now_time;
+    char create_time_str[20];
+    struct tm *tmp;
+
+    tmp = localtime_r(&create_time, &now_time);
+    strftime(create_time_str, 20, "%Y-%m-%d %H:%M:%S", tmp);
+    if (input_name == NULL || strlen(input_name) == 0) {
+        if (less_than_limit == FLB_TRUE) {
+            flb_plg_warn(ctx->ins,
+                        "failed to flush chunk tag=%s, create_time=%s, "
+                        "retry issued: (out_id=%d)",
+                        tag, create_time_str, ctx->ins->id);
+        }
+        else {
+            flb_plg_warn(ctx->ins,
+                        "chunk tag=%s, create_time=%s cannot be retried",
+                        tag, create_time_str);
+        }
+    }
+    else {
+        if (less_than_limit == FLB_TRUE) {
+            flb_plg_warn(ctx->ins,
+                        "failed to flush chunk tag=%s, create_time=%s, "
+                        "retry issued: input=%s > output=%s (out_id=%d)",
+                        tag, create_time_str, input_name, ctx->ins->name, ctx->ins->id);
+        }
+        else {
+            flb_plg_warn(ctx->ins,
+                        "chunk tag=%s, create_time=%s cannot be retried: "
+                        "input=%s > output=%s",
+                        tag, create_time_str, input_name, ctx->ins->name);
+        }
+    }
+}
+
 static char *mock_error_response(char *error_env_var)
 {
     char *err_val = NULL;
@@ -323,6 +362,18 @@ static int write_seq_index(char *seq_index_file, uint64_t seq_index)
 
     fclose(fp);
     return 0;
+}
+
+static void s3_decrement_index(struct flb_s3 *ctx)
+{
+    int ret;
+    ctx->seq_index--;
+
+    ret = write_seq_index(ctx->seq_index_file, ctx->seq_index);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Failed to save decremented $INDEX for s3 key to "
+                      "store_dir after request error");
+    }
 }
 
 static int init_seq_index(void *context) {
@@ -906,6 +957,10 @@ static int cb_s3_init(struct flb_output_instance *ins,
         ctx->timer_ms = UPLOAD_TIMER_MIN_WAIT;
     }
 
+    /* init must use sync mode */
+    async_flags = ctx->s3_client->upstream->flags;
+    ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
+
     /* clean up any old buffers found on startup */
     if (ctx->has_old_buffers == FLB_TRUE) {
         flb_plg_info(ctx->ins,
@@ -938,16 +993,9 @@ static int cb_s3_init(struct flb_output_instance *ins,
          cb_s3_upload(config, ctx);
     }
 
-    if (ctx->use_put_object == FLB_TRUE) {
-        /*
-         * Run S3 in async mode.
-         * Multipart uploads don't work with async mode right now in high throughput
-         * cases. Its not clear why. Realistically, the performance of sync mode
-         * will be sufficient for most users, and long term we can do the work
-         * to enable async if needed.
-         */
-        ctx->s3_client->upstream->flags = async_flags;
-    }
+    
+    /* S3 can run in async mode with daemon coro */
+    ctx->s3_client->upstream->flags = async_flags;
 
     /* this is done last since in the previous block we make calls to AWS */
     ctx->provider->provider_vtable->upstream_set(ctx->provider, ctx->ins);
@@ -1464,13 +1512,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t file_first_
 
 decrement_index:
     if (ctx->key_fmt_has_seq_index) {
-        ctx->seq_index--;
-
-        ret = write_seq_index(ctx->seq_index_file, ctx->seq_index);
-        if (ret < 0) {
-            flb_plg_error(ctx->ins, "Failed to decrement index after request error");
-            return -1;
-        }
+        s3_decrement_index(ctx);
     }
     return -1;
 }
@@ -1606,7 +1648,6 @@ static void cb_s3_upload(struct flb_config *config, void *data)
     int complete;
     int ret;
     time_t now;
-    int async_flags;
 
     now = time(NULL);
     
@@ -1708,10 +1749,6 @@ static void cb_s3_upload(struct flb_config *config, void *data)
                               m_upload->s3_key);
             }
         }
-    }
-
-    if (ctx->use_put_object == FLB_TRUE) {
-        ctx->s3_client->upstream->flags = async_flags;
     }
 }
 
