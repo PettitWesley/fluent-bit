@@ -47,29 +47,6 @@
 
 #define DEFAULT_UPLOAD_TIMEOUT 3600
 
-/*
- * If we see repeated errors on an upload/chunk, we will discard it
- * This saves us from scenarios where something goes wrong and an upload can
- * not proceed (may be some other process completed it or deleted the upload)
- * instead of erroring out forever, we eventually discard the upload.
- *
- * The same is done for chunks, just to be safe, even though realistically
- * I can't think of a reason why a chunk could become unsendable.
- */
-#define MAX_UPLOAD_ERRORS 5
-
-struct upload_queue {
-    struct s3_file *upload_file;
-    struct multipart_upload *m_upload_file;
-    flb_sds_t tag;
-    int tag_len;
-
-    int retry_counter;
-    time_t upload_time;
-
-    struct mk_list _head;
-};
-
 struct multipart_upload {
     flb_sds_t s3_key;
     flb_sds_t tag;
@@ -92,6 +69,9 @@ struct multipart_upload {
 
     /* ongoing tracker of how much data has been sent for this upload */
     size_t bytes;
+
+    /* for s3 retry warn message  */
+    char *input_name;
 
     struct mk_list _head;
 
@@ -156,9 +136,10 @@ struct flb_s3 {
 
     struct mk_list uploads;
 
-    int preserve_data_ordering;
-    int upload_queue_success;
+    /* list of locked chunks that are ready to send */
     struct mk_list upload_queue;
+
+    int preserve_data_ordering;
 
     size_t file_size;
     size_t upload_chunk_size;
@@ -173,6 +154,8 @@ struct flb_s3 {
     int key_fmt_has_seq_index;
     flb_sds_t metadata_dir;
     flb_sds_t seq_index_file;
+
+    int daemon_coro_started;
 
     struct flb_output_instance *ins;
 };
