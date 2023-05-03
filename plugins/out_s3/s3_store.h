@@ -29,6 +29,7 @@ struct s3_file {
     size_t size;                     /* file size */
     time_t create_time;              /* creation time */
     time_t first_log_time;           /* first log time */
+    char *input_name;                /* for s3_retry_warn output message */
     flb_sds_t file_path;             /* file path */
     struct flb_fstore_file *fsf;     /* reference to parent flb_fstore_file */
     struct mk_list _head;

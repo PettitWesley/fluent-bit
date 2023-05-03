@@ -51,7 +51,7 @@ static int construct_request_buffer(struct flb_s3 *ctx, flb_sds_t new_data,
 static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t file_first_log_time,
                          char *body, size_t body_size);
 
-static int put_all_chunks(struct flb_s3 *ctx);
+static int put_all_chunks(struct flb_s3 *ctx, int is_startup);
 
 static void cb_s3_upload(struct flb_config *ctx, void *data);
 
@@ -1173,7 +1173,7 @@ multipart:
  * Used on shut down to try to send all buffered data
  * Used on start up to try to send any leftover buffers from previous executions
  */
-static int put_all_chunks(struct flb_s3 *ctx)
+static int put_all_chunks(struct flb_s3 *ctx, int is_startup)
 {
     struct s3_file *chunk;
     struct mk_list *tmp;
@@ -1507,12 +1507,6 @@ static struct multipart_upload *get_upload(struct flb_s3 *ctx,
         tmp_upload = mk_list_entry(head, struct multipart_upload, _head);
 
         if (tmp_upload->upload_state == MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS) {
-            continue;
-        }
-        if (tmp_upload->upload_errors >= MAX_UPLOAD_ERRORS) {
-            tmp_upload->upload_state = MULTIPART_UPLOAD_STATE_COMPLETE_IN_PROGRESS;
-            flb_plg_error(ctx->ins, "Upload for %s has reached max upload errors",
-                          tmp_upload->s3_key);
             continue;
         }
         if (strcmp(tmp_upload->tag, tag) == 0) {
@@ -1907,7 +1901,7 @@ static void flush_startup_chunks(struct flb_s3 *ctx)
                      "executions to S3; buffer=%s",
                      ctx->fs->root_path);
         ctx->has_old_buffers = FLB_FALSE;
-        ret = put_all_chunks(ctx);
+        ret = put_all_chunks(ctx, FLB_TRUE);
         if (ret < 0) {
             ctx->has_old_buffers = FLB_TRUE;
             flb_plg_error(ctx->ins,
@@ -2177,7 +2171,7 @@ static int cb_s3_exit(void *data, struct flb_config *config)
             ctx->s3_client->upstream->flags &= ~(FLB_IO_ASYNC);
         }
         flb_plg_info(ctx->ins, "Sending all locally buffered data to S3");
-        ret = put_all_chunks(ctx);
+        ret = put_all_chunks(ctx, FLB_FALSE);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Could not send all chunks on exit");
         }

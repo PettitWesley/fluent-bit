@@ -70,6 +70,9 @@ struct multipart_upload {
     /* ongoing tracker of how much data has been sent for this upload */
     size_t bytes;
 
+    /* for s3 retry warn message  */
+    char *input_name;
+
     struct mk_list _head;
 
     /* see note for MAX_UPLOAD_ERRORS */
