@@ -1496,6 +1496,146 @@ void cb_ra_translate_check()
     msgpack_unpacked_destroy(&result);
 }
 
+/*
+ * https://github.com/fluent/fluent-bit/issues/5936
+ *  If the last nested element is an array, record accessor can't get its value.
+ */
+void cb_issue_5936_last_array()
+{
+    int len;
+    int ret;
+    int type;
+    size_t off = 0;
+    char *out_buf;
+    size_t out_size;
+    char *json;
+    char *fmt;
+    char *fmt_out;
+    flb_sds_t str;
+    msgpack_unpacked result;
+    msgpack_object map;
+    struct flb_record_accessor *ra;
+
+    /* Sample JSON message */
+    json ="{ \"key\": {\"nested\":[\"val0\", \"val1\"]}}";
+
+
+    /* Convert to msgpack */
+    len = strlen(json);
+    ret = flb_pack_json(json, len, &out_buf, &out_size, &type);
+    TEST_CHECK(ret == 0);
+    if (ret == -1) {
+        exit(EXIT_FAILURE);
+    }
+
+    /* Formatter */
+    fmt = flb_sds_create("$key['nested'][1]");
+    fmt_out = "val1";
+
+    ra = flb_ra_create(fmt, FLB_FALSE);
+    TEST_CHECK(ra != NULL);
+    if (!ra) {
+        exit(EXIT_FAILURE);
+    }
+
+    /* Unpack msgpack object */
+    msgpack_unpacked_init(&result);
+    msgpack_unpack_next(&result, out_buf, out_size, &off);
+    map = result.data;
+
+    /* Do translation */
+    str = flb_ra_translate(ra, NULL, -1, map, NULL);
+    TEST_CHECK(str != NULL);
+    if (!str) {
+        exit(EXIT_FAILURE);
+    }
+
+    TEST_CHECK(flb_sds_len(str) == strlen(fmt_out));
+    TEST_CHECK(memcmp(str, fmt_out, strlen(fmt_out)) == 0);
+    printf("== input ==\n%s\n== output ==\n%s\n", str, fmt_out);
+
+    flb_sds_destroy(str);
+    flb_sds_destroy(fmt);
+    flb_ra_destroy(ra);
+    flb_free(out_buf);
+    msgpack_unpacked_destroy(&result);
+}
+
+struct char_list_ra_str{
+    char **strs;
+    char *expect;
+};
+
+
+/*
+ * https://github.com/fluent/fluent-bit/issues/7330
+ */
+void cb_issue_7330_single_char()
+{
+    int ret;
+    int type;
+    char *json;
+    char *out_buf = NULL;
+    size_t out_size;
+    size_t off = 0;
+    flb_sds_t input = NULL;
+    flb_sds_t out_tag = NULL;
+    struct flb_regex_search regex_result;
+    struct flb_record_accessor *ra_tag = NULL;
+    msgpack_unpacked result;
+    msgpack_object map;
+
+    json = "{\"tool\":\"fluent\"}";
+    ret = flb_pack_json(json, strlen(json), &out_buf, &out_size, &type);
+    if (!TEST_CHECK(ret == 0)) {
+        TEST_MSG("flb_pack_json failed");
+        exit(EXIT_FAILURE);
+    }
+
+    input = flb_sds_create("b");
+    if (!TEST_CHECK(input != NULL)) {
+        goto issue_7330;
+    }
+
+    /* create flb_record_accessor from single character */
+    ra_tag = flb_ra_create(input, FLB_FALSE);
+    if (!TEST_CHECK(ra_tag != NULL)) {
+        TEST_MSG("flb_ra_create failed");
+        goto issue_7330;
+    }
+
+    /* Unpack msgpack object */
+    msgpack_unpacked_init(&result);
+    msgpack_unpack_next(&result, out_buf, out_size, &off);
+    map = result.data;
+
+    /* Do translation */
+    out_tag = flb_ra_translate(ra_tag, "old", 3, map, &regex_result);
+    msgpack_unpacked_destroy(&result);
+    if (!TEST_CHECK(out_tag != NULL)) {
+        TEST_MSG("flb_ra_translate failed");
+        goto issue_7330;
+    }
+    else if (!TEST_CHECK(flb_sds_len(out_tag) > 0)) {
+        TEST_MSG("out_tag len error. len=%zd", flb_sds_len(out_tag));
+        goto issue_7330;
+    }
+
+ issue_7330:
+    if (input) {
+        flb_sds_destroy(input);
+    }
+    if (out_tag) {
+        flb_sds_destroy(out_tag);
+    }
+    if (out_buf) {
+        flb_free(out_buf);
+    }
+    if (ra_tag) {
+        flb_ra_destroy(ra_tag);
+    }
+}
+
 TEST_LIST = {
     { "keys"            , cb_keys},
     { "dash_key"        , cb_dash_key},
@@ -1518,5 +1658,7 @@ TEST_LIST = {
     { "add_root_key_val", cb_add_root_key_val},
     { "issue_4917"      , cb_issue_4917},
     { "flb_ra_translate_check" , cb_ra_translate_check},
+    { "issue_5936_last_array"      , cb_issue_5936_last_array},
+    { "issue_7330_single_character"  , cb_issue_7330_single_char},
     { NULL }
 };
