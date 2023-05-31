@@ -408,6 +408,10 @@ struct flb_output_instance {
     struct mk_list flush_list;
     struct mk_list flush_list_destroy;
 
+    /* similar to flush coroutine list above, timer coroutine list */
+    struct mk_list timer_coro_list;
+    struct mk_list timer_coro_list_destroy;
+
     /* Keep a reference to the original context this instance belongs to */
     struct flb_config *config;
 };
@@ -428,6 +432,26 @@ struct flb_output_flush {
     struct mk_list _head;              /* Link to flb_task->threads */
 };
 
+/*
+ * stores timer coros on the timer_coro_list, if the output uses them
+ */
+struct flb_output_timer_coro {
+    struct flb_config *config;         /* FLB context        */
+    struct flb_output_instance *o_ins; /* output instance    */
+    struct flb_coro *coro;             /* parent coro addr   */
+    struct mk_list _head;              /* Link to flb_task->threads */
+};
+
+/*
+ * If the output uses timer coros, then this is used as the callback data
+ * passed to flb_sched_timer_cb_create
+ */
+struct flb_output_coro_timer_data {
+   struct flb_output_instance ins; /* associate coro with this output instance */
+   void (*cb) (struct flb_config *config, void *data); /* call this output callback in the coro */
+   void *data; /* opaque data to pass to the above cb */
+}
+
 static FLB_INLINE int flb_output_is_threaded(struct flb_output_instance *ins)
 {
     return ins->is_threaded;
@@ -442,6 +466,19 @@ static FLB_INLINE void flb_output_flush_destroy(struct flb_output_flush *out_flu
     flb_coro_destroy(out_flush->coro);
     flb_free(out_flush);
 }
+
+/*
+ * See below note for flb_out_flush_params
+ * this is equivalent for timer coroutines
+ */
+struct flb_out_timer_coro_params {
+    struct flb_output_timer_coro *output_timer;    /* output flush   */
+    struct flb_output_coro_timer_data *timer_data; /* callback info */
+    struct flb_config *config;                  /* Fluent Bit context  */
+    struct flb_coro *coro;                      /* coroutine context  */
+};
+
+extern FLB_TLS_DEFINE(struct flb_out_timer_coro_params, timer_coro_params);
 
 /*
  * libco do not support parameters in the entrypoint function due to the
@@ -524,6 +561,124 @@ static FLB_INLINE void output_pre_cb_flush(void)
                     persisted_params.i_ins,
                     persisted_params.out_context,
                     persisted_params.config);
+}
+
+/* same as above but for timer coros */
+static FLB_INLINE void output_pre_timer_cb(void)
+{
+    struct flb_coro *coro;
+    struct flb_output_plugin *out_p;
+    struct flb_out_flush_params *params;
+    struct flb_out_flush_params persisted_params;
+
+    params = (struct flb_out_flush_params *) FLB_TLS_GET(out_flush_params);
+    if (!params) {
+        flb_error("[output] no co-routines params defined, unexpected");
+        return;
+    }
+
+    // TODO: not implemented
+
+    /*
+     * Until this point the th->callee already set the variables, so we
+     * wait until the core wanted to resume so we really trigger the
+     * output callback.
+     *
+     * Persist params locally incase ptr data is changed while switched out.
+     */
+    coro = params->coro;
+    persisted_params = *params;
+    co_switch(coro->caller);
+
+    /* Continue, we will resume later */
+    out_p = persisted_params.out_plugin;
+    out_p->cb_flush(persisted_params.event_chunk,
+                    persisted_params.out_flush,
+                    persisted_params.i_ins,
+                    persisted_params.out_context,
+                    persisted_params.config);
+}
+
+/* 
+ * If the output uses scheduled timers with coroutines,
+ * this function is used as the callback for flb_sched_timer_cb_create
+ */
+static FLB_INLINE
+void flb_output_coro_timer_cb(struct flb_config *config, void *data)
+{
+    size_t stack_size;
+    struct flb_coro *coro;
+    struct flb_output_timer_coro *timer_coro;
+    struct flb_out_thread_instance *th_ins;
+    struct flb_output_coro_timer_data *ctx = data;
+
+    /* Custom output coroutine info */
+    timer_coro = (struct flb_output_timer_coro *) flb_calloc(1, sizeof(struct flb_output_timer_coro));
+    if (!timer_coro) {
+        flb_errno();
+        return;
+    }
+
+    /* Create a new co-routine */
+    coro = flb_coro_create(timer_coro);
+    if (!coro) {
+        flb_free(timer_coro);
+        return NULL;
+    }
+
+    timer_coro->o_ins  = ctx->ins;
+    timer_coro->config = config;
+    timer_coro->coro   = coro;
+
+    coro->caller = co_active();
+    coro->callee = co_create(config->coro_stack_size,
+                             output_pre_timer_cb, &stack_size);
+
+    if (coro->callee == NULL) {
+        flb_coro_destroy(coro);
+        flb_free(timer_coro);
+        return;
+    }
+
+#ifdef FLB_HAVE_VALGRIND
+    coro->valgrind_stack_id = \
+        VALGRIND_STACK_REGISTER(coro->callee, ((char *) coro->callee) + stack_size);
+#endif
+
+    if (o_ins->is_threaded == FLB_TRUE) {
+        th_ins = flb_output_thread_instance_get();
+        //TODO: create new mutex
+        pthread_mutex_lock(&th_ins->timer_mutex);
+        mk_list_add(&out_flush->_head, &th_ins->timer_coro_list);
+        pthread_mutex_unlock(&th_ins->timer_mutex);
+    }
+    else {
+        mk_list_add(&out_flush->_head, &o_ins->timer_coro_list);
+    }
+
+    struct flb_out_timer_coro_params *params;
+
+    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(timer_coro_params);
+    if (!params) {
+        params = (struct flb_out_timer_coro_params *) flb_malloc(sizeof(struct flb_out_flush_params));
+        if (!params) {
+            flb_errno();
+            return;
+        }
+    }
+
+    /* Callback parameters in order */
+    params->event_chunk = task->event_chunk;
+    params->out_flush   = out_flush;
+    params->i_ins       = task->i_ins;
+    params->out_context = out_context;
+    params->config      = config;
+    params->out_plugin  = out_plugin;
+    params->coro        = coro;
+
+    FLB_TLS_SET(timer_coro_params, params);
+    co_switch(coro->callee);
+    return;
 }
 
 void flb_output_flush_prepare_destroy(struct flb_output_flush *out_flush);
