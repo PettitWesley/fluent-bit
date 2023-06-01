@@ -105,6 +105,10 @@ static inline int _mk_event_add(struct mk_event_ctx *ctx, int fd,
     int ret;
     struct mk_event *event;
     struct epoll_event ep_event;
+    memset(&ep_event, 0, sizeof(ep_event));
+
+    mk_bug(ctx == NULL);
+    mk_bug(data == NULL);
 
     /* Verify the FD status and desired operation */
     event = (struct mk_event *) data;
@@ -154,13 +158,18 @@ static inline int _mk_event_del(struct mk_event_ctx *ctx, struct mk_event *event
 {
     int ret;
 
-    if ((event->status & MK_EVENT_REGISTERED) == 0) {
+    mk_bug(ctx == NULL);
+    mk_bug(event == NULL);
+
+    if (!MK_EVENT_IS_REGISTERED(event)) {
         return 0;
     }
 
     ret = epoll_ctl(ctx->efd, EPOLL_CTL_DEL, event->fd, NULL);
+
     MK_TRACE("[FD %i] Epoll, remove from QUEUE_FD=%i, ret=%i",
              event->fd, ctx->efd, ret);
+
     if (ret < 0) {
 #ifdef MK_HAVE_TRACE
         mk_libc_warn("epoll_ctl");
@@ -168,8 +177,7 @@ static inline int _mk_event_del(struct mk_event_ctx *ctx, struct mk_event *event
     }
 
     /* Remove from priority queue */
-    if (event->_priority_head.next != NULL &&
-        event->_priority_head.prev != NULL) {
+    if (!mk_list_entry_is_orphan(&event->_priority_head)) {
         mk_list_del(&event->_priority_head);
     }
 
@@ -189,7 +197,8 @@ static inline int _mk_event_timeout_create(struct mk_event_ctx *ctx,
     struct timespec now;
     struct mk_event *event;
 
-    mk_bug(!data);
+    mk_bug(data == NULL);
+
     memset(&its, '\0', sizeof(struct itimerspec));
 
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
@@ -289,6 +298,8 @@ static inline int _mk_event_timeout_create(struct mk_event_ctx *ctx,
     struct fd_timer *timer;
     pthread_t tid;
 
+    mk_bug(data == NULL);
+
     timer = mk_mem_alloc(sizeof(struct fd_timer));
     if (!timer) {
         return -1;
@@ -331,7 +342,7 @@ static inline int _mk_event_timeout_destroy(struct mk_event_ctx *ctx, void *data
 {
     struct mk_event *event;
 
-    if (!data) {
+    if (data == NULL) {
         return 0;
     }
 
@@ -347,6 +358,8 @@ static inline int _mk_event_channel_create(struct mk_event_ctx *ctx,
     int ret;
     int fd[2];
     struct mk_event *event;
+
+    mk_bug(data == NULL);
 
     ret = pipe(fd);
     if (ret < 0) {
@@ -373,12 +386,35 @@ static inline int _mk_event_channel_create(struct mk_event_ctx *ctx,
     return 0;
 }
 
+static inline int _mk_event_channel_destroy(struct mk_event_ctx *ctx,
+                                            int r_fd, int w_fd, void *data)
+{
+    struct mk_event *event;
+    int ret;
+
+
+    event = (struct mk_event *)data;
+    if (event->fd != r_fd) {
+        return -1;
+    }
+
+    ret = _mk_event_del(ctx, event);
+    if (ret != 0) {
+        return ret;
+    }
+
+    close(r_fd);
+    close(w_fd);
+
+    return 0;
+}
+
 static inline int _mk_event_inject(struct mk_event_loop *loop,
                                    struct mk_event *event,
                                    int mask,
                                    int prevent_duplication)
 {
-    size_t               index;
+    int                  index;
     struct mk_event_ctx *ctx;
 
     ctx = loop->data;
