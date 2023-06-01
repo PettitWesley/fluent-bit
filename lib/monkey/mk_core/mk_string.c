@@ -53,56 +53,37 @@ void *memrchr(const void *s, int c, size_t n)
 void *memmem(const void *haystack, size_t haystacklen,
              const void *needle, size_t needlelen)
 {
-    uint8_t *null_terminated_haystack_buffer;
-    uint8_t *null_terminated_needle_buffer;
-    uint8_t  free_haystack_buffer;
-    uint8_t  free_needle_buffer;
-    void    *result;
+    char *null_terminated_haystack_buffer;
+    char *null_terminated_needle_buffer;
+    void *result;
 
     result = NULL;
 
-    free_haystack_buffer = 0;
-    free_needle_buffer = 0;
-
-    if(1024 > haystacklen){
-        null_terminated_haystack_buffer = (uint8_t *)_alloca(haystacklen + 1);
-    }
-    else
-    {
-        null_terminated_haystack_buffer = (uint8_t*)malloc(haystacklen + 1);
-        free_haystack_buffer = 1;
-    }
+    null_terminated_haystack_buffer = (char *) calloc(haystacklen + 1,
+                                                      sizeof(char));
 
     if(NULL != null_terminated_haystack_buffer){
-        if(1024 > needlelen){
-            null_terminated_needle_buffer = (uint8_t*)_alloca(needlelen + 1);
-        }
-        else
-        {
-            null_terminated_needle_buffer = (uint8_t*)malloc(needlelen + 1);
-            free_needle_buffer = 1;
-        }
+        null_terminated_needle_buffer = (char *) calloc(needlelen + 1,
+                                                        sizeof(char));
 
         if(NULL != null_terminated_needle_buffer){
-            memset(null_terminated_haystack_buffer, 0, haystacklen + 1);
-
-            memcpy(null_terminated_haystack_buffer, haystack, haystacklen);
-
-            memset(null_terminated_needle_buffer, 0, needlelen + 1);
-
-            memcpy(null_terminated_needle_buffer, needle, needlelen);
+            strncpy(null_terminated_haystack_buffer, haystack, haystacklen);
+            strncpy(null_terminated_needle_buffer, needle, needlelen);
 
             result = strstr(null_terminated_haystack_buffer, 
                             null_terminated_needle_buffer);
 
-            if(free_needle_buffer){
-                free(null_terminated_needle_buffer);
+            if (result != NULL) {
+                result = (void *)
+                    ((((uintptr_t) null_terminated_haystack_buffer) - \
+                      ((uintptr_t) result)) +
+                     ((uintptr_t) haystack));
             }
+
+            free(null_terminated_needle_buffer);
         }
 
-        if(free_haystack_buffer){
-            free(null_terminated_haystack_buffer);
-        }
+        free(null_terminated_haystack_buffer);
     }
 
     return result;
@@ -340,11 +321,15 @@ char *mk_string_dup(const char *s)
     size_t len;
     char *p;
 
-    if (!s)
+    if (!s) {
         return NULL;
+    }
 
     len = strlen(s);
     p = mk_mem_alloc(len + 1);
+    if (!p) {
+        return NULL;
+    }
     memcpy(p, s, len);
     p[len] = '\0';
 
@@ -364,6 +349,9 @@ struct mk_list *mk_string_split_line(const char *line)
     }
 
     list = mk_mem_alloc(sizeof(struct mk_list));
+    if (!list) {
+        return NULL;
+    }
     mk_list_init(list);
 
     len = strlen(line);
@@ -590,8 +578,9 @@ char *mk_string_copy_substr(const char *string, int pos_init, int pos_end)
     }
 
     size = (unsigned int) (pos_end - pos_init) + 1;
-    if (size <= 2)
+    if (size <= 2) {
         size = 4;
+    }
 
     buffer = mk_mem_alloc(size);
 
@@ -611,6 +600,10 @@ char *mk_string_tolower(const char *in)
     char *out = mk_string_dup(in);
     const char *ip = in;
     char *op = out;
+
+    if (!out) {
+        return NULL;
+    }
 
     while (*ip) {
         *op = tolower(*ip);

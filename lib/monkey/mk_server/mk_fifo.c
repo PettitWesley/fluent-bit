@@ -34,7 +34,7 @@ static struct mk_fifo_worker *mk_fifo_worker_create(struct mk_fifo *ctx,
     /* Get an ID */
     id = mk_list_size(&ctx->workers);
 
-    fw = mk_mem_alloc(sizeof(struct mk_fifo_worker));
+    fw = mk_mem_alloc_z(sizeof(struct mk_fifo_worker));
     if (!fw) {
         perror("malloc");
         return NULL;
@@ -152,8 +152,8 @@ int mk_fifo_queue_create(struct mk_fifo *ctx, char *name,
 
     /* queue name might need to be truncated if is too long */
     len = strlen(name);
-    if (len > (int) sizeof(name) - 1) {
-        len = sizeof(name) - 1;
+    if (len > (int) sizeof(q->name) - 1) {
+        len = sizeof(q->name) - 1;
     }
 
     /* Validate that name is not a duplicated */

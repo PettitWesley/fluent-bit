@@ -122,6 +122,28 @@ struct mk_server *mk_server_create()
         return NULL;
     }
 
+    /* Library mode: start event loop */
+    server->lib_evl_start = mk_event_loop_create(1);
+    if (!server->lib_evl_start) {
+        mk_event_loop_destroy(server->lib_evl);
+        mk_mem_free(server);
+        return NULL;
+    }
+
+    memset(&server->lib_ch_start_event, 0, sizeof(struct mk_event));
+
+    ret = mk_event_channel_create(server->lib_evl_start,
+                                  &server->lib_ch_start[0],
+                                  &server->lib_ch_start[1],
+                                  &server->lib_ch_start_event);
+
+    if (ret != 0) {
+        mk_event_loop_destroy(server->lib_evl);
+        mk_event_loop_destroy(server->lib_evl_start);
+        mk_mem_free(server);
+        return NULL;
+    }
+
     /* Initialize linked list heads */
     mk_list_init(&server->plugins);
     mk_list_init(&server->sched_worker_callbacks);
@@ -177,8 +199,9 @@ int mk_server_setup(struct mk_server *server)
     /* Clock init that must happen before starting threads */
     mk_clock_sequential_init(server);
 
+printf("MK SERVER SETUP CALLED\n");
     /* Load plugins */
-    mk_plugin_api_init();
+    mk_plugin_api_init(server);
     mk_plugin_load_all(server);
 
     /* Workers: logger and clock */
@@ -212,7 +235,7 @@ void mk_exit_all(struct mk_server *server)
 
     /* Continue exiting */
     mk_plugin_exit_all(server);
-    mk_clock_exit();
+    mk_clock_exit(server);
 
     mk_sched_exit(server);
     mk_config_free_all(server);

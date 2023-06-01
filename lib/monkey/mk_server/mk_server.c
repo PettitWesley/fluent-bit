@@ -124,7 +124,7 @@ struct mk_sched_conn *mk_server_listen_handler(struct mk_sched_worker *sched,
 
 error:
     if (client_fd != -1) {
-        listener->network->network->close(client_fd);
+        listener->network->network->close(listener->network, client_fd);
     }
 
     return NULL;
@@ -157,7 +157,7 @@ void mk_server_listen_exit(struct mk_list *list)
 
     mk_list_foreach_safe(head, tmp, list) {
         listen = mk_list_entry(head, struct mk_server_listen, _head);
-        close(listen->server_fd);
+        mk_event_closesocket(listen->server_fd);
         mk_list_del(&listen->_head);
         mk_mem_free(listen);
     }
@@ -203,7 +203,7 @@ struct mk_list *mk_server_listen_init(struct mk_server *server)
 #endif
             }
 
-            listener = mk_mem_alloc(sizeof(struct mk_server_listen));
+            listener = mk_mem_alloc_z(sizeof(struct mk_server_listen));
 
             /* configure the internal event_state */
             event = &listener->event;
@@ -420,6 +420,8 @@ void mk_server_loop_balancer(struct mk_server *server)
             }
         }
     }
+    mk_event_loop_destroy(evl);
+    mk_server_listen_exit(listeners);
 }
 
 /*
@@ -498,7 +500,7 @@ void mk_server_worker_loop(struct mk_server *server)
     }
 
     /* create a new timeout file descriptor */
-    server_timeout = mk_mem_alloc(sizeof(struct mk_server_timeout));
+    server_timeout = mk_mem_alloc_z(sizeof(struct mk_server_timeout));
     MK_TLS_SET(mk_tls_server_timeout, server_timeout);
     timeout_fd = mk_event_timeout_create(evl, server->timeout, 0, server_timeout);
 
@@ -634,19 +636,18 @@ static int mk_server_lib_notify_started(struct mk_server *server)
     uint64_t val;
 
     /* Check the channel is valid (enabled by library mode) */
-    if (server->lib_ch_manager[1] <= 0) {
+    if (server->lib_ch_start[1] <= 0) {
         return -1;
     }
 
     val = MK_SERVER_SIGNAL_START;
 
 #ifdef _WIN32
-    return send(server->lib_ch_manager[1], &val, sizeof(uint64_t), 0);
+    return send(server->lib_ch_start[1], &val, sizeof(uint64_t), 0);
 #else
-    return write(server->lib_ch_manager[1], &val, sizeof(uint64_t));
+    return write(server->lib_ch_start[1], &val, sizeof(uint64_t));
 #endif
 }
-
 
 void mk_server_loop(struct mk_server *server)
 {
