@@ -309,6 +309,8 @@ struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
         return NULL;
     }
 
+    pthread_mutex_init(&provider->lock, NULL);
+
     implementation = flb_calloc(1, sizeof(struct flb_aws_provider_sts));
     if (!implementation) {
         goto error;
@@ -579,7 +581,9 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
         flb_errno();
         return NULL;
     }
-
+    
+    pthread_mutex_init(&provider->lock, NULL);
+    
     implementation = flb_calloc(1, sizeof(struct flb_aws_provider_eks));
 
     if (!implementation) {
