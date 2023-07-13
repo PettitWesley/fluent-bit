@@ -578,7 +578,10 @@ static FLB_INLINE void output_pre_timer_cb(void)
     }
 
     /*
-     * TODO: 
+     * TODO: need to free this in flb_output.c and flb_output_thread.c
+     * also flush coros are actually started in engine after they are
+     * written down a pipe. This seems unnecessary here. So we can start it right away.
+     * If this works, I can remove the persisted params. 
      */
     coro = params->coro;
     persisted_params = *params;

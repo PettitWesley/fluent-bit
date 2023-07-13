@@ -180,7 +180,8 @@ static void output_thread(void *data)
     struct flb_output_instance *ins;
     struct flb_output_flush *out_flush;
     struct flb_out_thread_instance *th_ins = data;
-    struct flb_out_flush_params *params;
+    struct flb_out_flush_params *flush_params = NULL;
+    struct flb_out_timer_coro_params *timer_params = NULL;
     struct flb_net_dns dns_ctx;
 
     /* Register thread instance */
@@ -356,9 +357,13 @@ static void output_thread(void *data)
     flb_upstream_conn_pending_destroy_list(&th_ins->upstreams);
 
     flb_sched_destroy(sched);
-    params = FLB_TLS_GET(out_flush_params);
-    if (params) {
-        flb_free(params);
+    flush_params = FLB_TLS_GET(out_flush_params);
+    if (flush_params) {
+        flb_free(flush_params);
+    }
+    timer_params = FLB_TLS_GET(timer_coro_params);
+    if (timer_params) {
+        flb_free(timer_params);
     }
     mk_event_loop_destroy(th_ins->evl);
     flb_bucket_queue_destroy(th_ins->evl_bktq);

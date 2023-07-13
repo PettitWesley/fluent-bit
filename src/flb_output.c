@@ -478,6 +478,11 @@ void flb_output_exit(struct flb_config *config)
     if (params) {
         flb_free(params);
     }
+    params = FLB_TLS_GET(timer_coro_params);
+    if (params) {
+        flb_free(params);
+    }
+    
 }
 
 static inline int instance_id(struct flb_config *config)
