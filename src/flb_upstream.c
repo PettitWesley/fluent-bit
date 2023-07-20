@@ -560,6 +560,8 @@ static struct flb_upstream_conn *create_conn(struct flb_upstream *u)
     conn->ts_available = 0;
     conn->ka_count = 0;
     conn->coro = coro;
+    conn->busy_flag = FLB_FALSE;
+    conn->shutdown_flag = FLB_FALSE;
 
     if (u->net.keepalive == FLB_TRUE) {
         flb_upstream_conn_recycle(conn, FLB_TRUE);

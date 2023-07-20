@@ -66,6 +66,14 @@ struct flb_upstream_conn {
      */
     int busy_flag;
 
+    /* This flag is used to determine if the connection was shut down to ensure we
+     * don't do it twice when a timeout is detected.
+     *
+     * This is required in order to overcome a limitation in the async read / write
+     * functions that will be addressed as soon as possible.
+     */
+    int shutdown_flag;
+
     /* Timestamps */
     time_t ts_assigned;
     time_t ts_created;
