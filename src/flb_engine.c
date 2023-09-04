@@ -543,6 +543,7 @@ int sb_segregate_chunks(struct flb_config *config)
 int flb_engine_start(struct flb_config *config)
 {
     int ret;
+    int count;
     uint64_t ts;
     char tmp[16];
     struct flb_time t_flush;
@@ -813,19 +814,19 @@ int flb_engine_start(struct flb_config *config)
                      * resources allocated by that co-routine, the best thing is to
                      * wait again for the grace period and re-check again.
                      */
-                    ret = flb_task_running_count(config);
-                    if (ret > 0 && config->grace_count < config->grace) {
+                    count = flb_task_running_count(config);
+                    if (count > 0 && config->grace_count < config->grace) {
                         if (config->grace_count == 1) {
                             flb_task_running_print(config);
                         }
                         flb_engine_exit(config);
                     }
                     else {
-                        if (ret > 0) {
+                        if (count > 0) {
                             flb_task_running_print(config);
                         }
                         flb_info("[engine] service has stopped (%i pending tasks)",
-                                 ret);
+                                 count);
                         ret = config->exit_status_code;
                         flb_engine_shutdown(config);
                         config = NULL;

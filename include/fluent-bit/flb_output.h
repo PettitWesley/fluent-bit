@@ -825,7 +825,11 @@ static inline void flb_output_return(int ret, struct flb_coro *co) {
     flb_output_flush_prepare_destroy(out_flush);
 }
 
-/* return the number of co-routines running in the instance */
+/* 
+ * return the number of flush co-routines running in the instance 
+ * Currently, this function is only used for FLB_OUTPUT_NO_MULTIPLEX
+ * and does not count timer_coros, used by S3 output
+ */
 static inline int flb_output_coros_size(struct flb_output_instance *ins)
 {
     int size = 0;
@@ -839,6 +843,25 @@ static inline int flb_output_coros_size(struct flb_output_instance *ins)
     }
     else {
         size = mk_list_size(&ins->flush_list);
+    }
+
+    return size;
+}
+
+/* Used in engine flb_running_count */
+static inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
+{
+    int size = 0;
+
+    if (flb_output_is_threaded(ins) == FLB_TRUE) {
+        /*
+         * On threaded mode, we need to count the active co-routines of
+         * every running thread of the thread pool.
+         */
+        size = flb_output_thread_pool_timer_coros_size(ins);
+    }
+    else {
+        size = mk_list_size(&ins->timer_coro_list);
     }
 
     return size;

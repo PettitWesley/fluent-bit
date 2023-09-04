@@ -331,7 +331,7 @@ static void output_thread(void *data)
         flb_sched_timer_cleanup(sched);
 
         /* Check if we should stop the event loop */
-        if (stopping == FLB_TRUE && mk_list_size(&th_ins->flush_list) == 0) {
+        if (stopping == FLB_TRUE && mk_list_size(&th_ins->flush_list) == 0 && mk_list_size(&th_ins->timer_coro_list) == 0) {
             /*
              * If there are no busy network connections (and no coroutines) its
              * safe to stop it.
@@ -500,6 +500,33 @@ int flb_output_thread_pool_create(struct flb_config *config,
     return 0;
 }
 
+int flb_output_thread_pool_timer_coros_size(struct flb_output_instance *ins)
+{
+    int n;
+    int size = 0;
+    struct mk_list *head;
+    struct flb_tp *tp = ins->tp;
+    struct flb_tp_thread *th;
+    struct flb_out_thread_instance *th_ins;
+
+    mk_list_foreach(head, &tp->list_threads) {
+        th = mk_list_entry(head, struct flb_tp_thread, _head);
+        if (th->status != FLB_THREAD_POOL_RUNNING) {
+            continue;
+        }
+
+        th_ins = th->params.data;
+
+        pthread_mutex_lock(&th_ins->flush_mutex);
+        n = mk_list_size(&th_ins->timer_coro_list);
+        pthread_mutex_unlock(&th_ins->flush_mutex);
+
+        size += n;
+    }
+
+    return size;
+}
+
 int flb_output_thread_pool_coros_size(struct flb_output_instance *ins)
 {
     int n;
@@ -509,7 +536,6 @@ int flb_output_thread_pool_coros_size(struct flb_output_instance *ins)
     struct flb_tp_thread *th;
     struct flb_out_thread_instance *th_ins;
 
-    /* Signal each worker thread that needs to stop doing work */
     mk_list_foreach(head, &tp->list_threads) {
         th = mk_list_entry(head, struct flb_tp_thread, _head);
         if (th->status != FLB_THREAD_POOL_RUNNING) {
