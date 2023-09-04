@@ -439,7 +439,10 @@ int flb_output_thread_pool_create(struct flb_config *config,
         th_ins->flush_id = 0;
         mk_list_init(&th_ins->flush_list);
         mk_list_init(&th_ins->flush_list_destroy);
+        mk_list_init(&th_ins->timer_coro_list);
+        mk_list_init(&th_ins->timer_coro_list_destroy);
         pthread_mutex_init(&th_ins->flush_mutex, NULL);
+        pthread_mutex_init(&th_ins->timer_mutex, NULL);
         mk_list_init(&th_ins->upstreams);
 
         upstream_thread_create(th_ins, ins);

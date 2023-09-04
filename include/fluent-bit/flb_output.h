@@ -438,8 +438,9 @@ struct flb_output_flush {
 struct flb_output_timer_coro {
     struct flb_config *config;         /* FLB context        */
     struct flb_output_instance *o_ins; /* output instance    */
+    struct flb_output_coro_timer_data *timer_data; /* callback info */
     struct flb_coro *coro;             /* parent coro addr   */
-    struct mk_list _head;              /* Link to flb_task->threads */
+    struct mk_list _head;              /* Link to timer_coro_list */
 };
 
 /*
@@ -448,6 +449,7 @@ struct flb_output_timer_coro {
  */
 struct flb_output_coro_timer_data {
    struct flb_output_instance ins; /* associate coro with this output instance */
+   flb_sds_t job_name; /* used on engine shutdown, print pending "custom" jobs */
    void (*cb) (struct flb_config *config, void *data); /* call this output callback in the coro */
    void *data; /* opaque data to pass to the above cb */
 }
@@ -570,26 +572,47 @@ static FLB_INLINE void output_pre_timer_cb(void)
     struct flb_out_timer_coro_params *params;
     struct flb_out_timer_coro_params persisted_params;
     struct flb_output_coro_timer_data *timer_data;
+    struct flb_output_instance *o_ins;
+    struct flb_out_thread_instance *th_ins;
+    struct flb_output_timer_coro *timer_coro;
 
-    params = (struct flb_out_flush_params *) FLB_TLS_GET(timer_coro_params);
+
+    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(timer_coro_params);
     if (!params) {
         flb_error("[output] no timer coro params defined, unexpected");
         return;
     }
 
     /*
-     * TODO: need to free this in flb_output.c and flb_output_thread.c
-     * also flush coros are actually started in engine after they are
+     * flush coros are actually started in engine after they are
      * written down a pipe. This seems unnecessary here. So we can start it right away.
      * If this works, I can remove the persisted params. 
      */
     coro = params->coro;
     persisted_params = *params;
-    co_switch(coro->caller);
+    timer_coro = params->output_timer;
+    o_ins = params->output_timer->o_ins;
+    // co_switch(coro->caller);
 
-    /* Continue, we will resume later */
     timer_data = persisted_params.timer_data;
     timer_data->cb(persisted_params.config, timer_data->data);
+    // after output callback is done, just do clean up here?
+    // similar to: flb_output_flush_prepare_destroy
+    /* Move timer coroutine context from active list to the destroy one */
+    if (flb_output_is_threaded(o_ins) == FLB_TRUE) {
+        th_ins = flb_output_thread_instance_get();
+        pthread_mutex_lock(&th_ins->timer_mutex);
+        mk_list_del(&timer_coro->_head);
+        mk_list_add(&timer_coro->_head, &th_ins->timer_coro_list_destroy);
+        pthread_mutex_unlock(&th_ins->timer_mutex);
+    }
+    else {
+        mk_list_del(&timer_coro->_head);
+        mk_list_add(&timer_coro->_head, &ins->timer_coro_list_destroy);
+    }
+
+    /* yield back to caller/control code */
+    flb_coro_yield(coro, FLB_TRUE);
 }
 
 /* 
@@ -641,7 +664,6 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
 
     if (o_ins->is_threaded == FLB_TRUE) {
         th_ins = flb_output_thread_instance_get();
-        //TODO: create new mutex
         pthread_mutex_lock(&th_ins->timer_mutex);
         mk_list_add(&timer_coro->_head, &th_ins->timer_coro_list);
         pthread_mutex_unlock(&th_ins->timer_mutex);

@@ -86,7 +86,10 @@ struct flb_out_thread_instance {
      * 'flushes' running by a threaded instance, then the access to the 'flush_list'
      * must be protected: we use 'flush_mutex for that purpose.
      */
-     pthread_mutex_t flush_mutex;         /* mutex for 'flush_list' */
+    pthread_mutex_t flush_mutex;         /* mutex for 'flush_list' */
+    
+    /* Same as flush_mutex but for timer coros */
+    pthread_mutex_t timer_mutex;         /* mutex for 'flush_list' */
 
     /* List of mapped 'upstream' contexts */
     struct mk_list upstreams;
