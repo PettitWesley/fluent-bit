@@ -534,7 +534,6 @@ void flb_output_thread_pool_timer_coros_print(struct flb_output_instance *ins)
     struct flb_tp *tp = ins->tp;
     struct flb_tp_thread *th;
     struct flb_out_thread_instance *th_ins;
-    struct flb_output_timer_coro *timer_coro;
 
     mk_list_foreach_safe(head, tmp, &tp->list_threads) {
         th = mk_list_entry(head, struct flb_tp_thread, _head);
