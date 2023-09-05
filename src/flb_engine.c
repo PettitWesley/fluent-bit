@@ -406,8 +406,6 @@ static int flb_running_print(struct flb_config *config)
 {
     struct mk_list *head ;
     struct mk_list *tmp;
-    struct mk_list *t_head;
-    struct mk_list *t_tmp;
     struct flb_output_instance *o_ins;
 
     flb_task_running_print(config);
