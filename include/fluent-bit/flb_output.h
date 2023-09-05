@@ -891,7 +891,7 @@ inline void flb_output_timer_coros_print(struct flb_output_instance *ins)
         flb_output_thread_pool_timer_coros_print(ins);
     }
     else {
-        
+        flb_timer_coros_print(&ins->timer_coro_list);
     }
 
     return size;

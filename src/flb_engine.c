@@ -414,7 +414,7 @@ static int flb_running_print(struct flb_config *config)
 
     mk_list_foreach_safe(head, tmp, &config->outputs) {
         o_ins = mk_list_entry(head, struct flb_output_instance, _head);
-        flb_output_thread_pool_timer_coros_print(o_ins);
+        flb_output_timer_coros_print(o_ins);
     }
 }
 
