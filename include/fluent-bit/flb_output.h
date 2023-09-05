@@ -881,7 +881,7 @@ static inline void flb_timer_coros_print(struct mk_list *timer_coro_list)
             timer_coro = mk_list_entry(head, struct flb_output_timer_coro, _head);
             if (timer_coro != NULL) {
                 flb_info("[task]   output=%s still running %d %s(s)",
-                         ins->alias, n, timer_coro->timer_data->job_name);
+                         timer_coro->o_ins->alias, n, timer_coro->timer_data->job_name);
                 break;
             }
         }
