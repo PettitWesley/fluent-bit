@@ -402,7 +402,7 @@ static int flb_running_count(struct flb_config *config)
     return tasks + timers;
 }
 
-static int flb_running_print(struct flb_config *config)
+static void flb_running_print(struct flb_config *config)
 {
     struct mk_list *head ;
     struct mk_list *tmp;
