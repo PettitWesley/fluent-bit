@@ -448,11 +448,11 @@ struct flb_output_timer_coro {
  * passed to flb_sched_timer_cb_create
  */
 struct flb_output_coro_timer_data {
-   struct flb_output_instance ins; /* associate coro with this output instance */
+   struct flb_output_instance *ins; /* associate coro with this output instance */
    flb_sds_t job_name; /* used on engine shutdown, print pending "custom" jobs */
    void (*cb) (struct flb_config *config, void *data); /* call this output callback in the coro */
    void *data; /* opaque data to pass to the above cb */
-}
+};
 
 static FLB_INLINE int flb_output_is_threaded(struct flb_output_instance *ins)
 {
@@ -608,7 +608,7 @@ static FLB_INLINE void output_pre_timer_cb(void)
     }
     else {
         mk_list_del(&timer_coro->_head);
-        mk_list_add(&timer_coro->_head, &ins->timer_coro_list_destroy);
+        mk_list_add(&timer_coro->_head, &o_ins->timer_coro_list_destroy);
     }
 
     /* yield back to caller/control code */
@@ -628,6 +628,7 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     struct flb_out_thread_instance *th_ins;
     struct flb_output_coro_timer_data *ctx = data;
     struct flb_out_timer_coro_params *params;
+    struct flb_output_instance *o_ins;
 
     /* Custom output coroutine info */
     timer_coro = (struct flb_output_timer_coro *) flb_calloc(1, sizeof(struct flb_output_timer_coro));
@@ -640,10 +641,11 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     coro = flb_coro_create(timer_coro);
     if (!coro) {
         flb_free(timer_coro);
-        return NULL;
+        return;
     }
 
-    timer_coro->o_ins  = ctx->ins;
+    o_ins = ctx->ins;
+    timer_coro->o_ins  = o_ins;
     timer_coro->config = config;
     timer_coro->coro   = coro;
 
@@ -849,7 +851,7 @@ static inline int flb_output_coros_size(struct flb_output_instance *ins)
 }
 
 /* Used in engine flb_running_count */
-inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
+static inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
 {
     int size = 0;
 
@@ -867,13 +869,13 @@ inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
     return size;
 }
 
-inline void flb_timer_coros_print(struct mk_list *timer_coro_list)
+static inline void flb_timer_coros_print(struct mk_list *timer_coro_list)
 { 
 
     int n = mk_list_size(timer_coro_list);
     if (n != 0) {
         /* get one coro for the job_name */
-        mk_list_foreach(head, tmp, &th_ins->timer_coro_list) {
+        mk_list_foreach_safe(head, tmp, &th_ins->timer_coro_list) {
             timer_coro = mk_list_entry(head, struct flb_output_timer_coro, _head);
             if (timer_coro != NULL) {
                 flb_info("[task]   output=%s still running %d %s(s)",
@@ -885,7 +887,7 @@ inline void flb_timer_coros_print(struct mk_list *timer_coro_list)
 }
 
 /* Used in engine flb_running_print */
-inline void flb_output_timer_coros_print(struct flb_output_instance *ins)
+static inline void flb_output_timer_coros_print(struct flb_output_instance *ins)
 {
     if (flb_output_is_threaded(ins) == FLB_TRUE) {
         flb_output_thread_pool_timer_coros_print(ins);
@@ -893,8 +895,6 @@ inline void flb_output_timer_coros_print(struct flb_output_instance *ins)
     else {
         flb_timer_coros_print(&ins->timer_coro_list);
     }
-
-    return size;
 }
 
 static inline void flb_output_return_do(int x)

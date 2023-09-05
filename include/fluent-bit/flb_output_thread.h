@@ -105,7 +105,8 @@ int flb_output_thread_pool_start(struct flb_output_instance *ins);
 int flb_output_thread_pool_flush(struct flb_task *task,
                                  struct flb_output_instance *out_ins,
                                  struct flb_config *config);
-
+int flb_output_thread_pool_timer_coros_size(struct flb_output_instance *ins);
+void flb_output_thread_pool_timer_coros_print(struct flb_output_instance *ins);
 
 void flb_output_thread_instance_init();
 struct flb_out_thread_instance *flb_output_thread_instance_get();
