@@ -527,6 +527,28 @@ int flb_output_thread_pool_timer_coros_size(struct flb_output_instance *ins)
     return size;
 }
 
+void flb_output_thread_pool_timer_coros_print(struct flb_output_instance *ins)
+{
+    struct mk_list *head;
+    struct mk_list *tmp;
+    struct flb_tp *tp = ins->tp;
+    struct flb_tp_thread *th;
+    struct flb_out_thread_instance *th_ins;
+    struct flb_output_timer_coro *timer_coro;
+
+    mk_list_foreach(head, tmp, &tp->list_threads) {
+        th = mk_list_entry(head, struct flb_tp_thread, _head);
+        if (th->status != FLB_THREAD_POOL_RUNNING) {
+            continue;
+        }
+
+        th_ins = th->params.data;
+        pthread_mutex_lock(&th_ins->timer_mutex);
+        flb_timer_coros_print(&th_ins->timer_coro_list);
+        pthread_mutex_unlock(&th_ins->timer_mutex);
+    }
+}
+
 int flb_output_thread_pool_coros_size(struct flb_output_instance *ins)
 {
     int n;

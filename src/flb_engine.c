@@ -385,6 +385,39 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
     return 0;
 }
 
+static int flb_running_count(struct flb_config *config)
+{
+    int tasks, timers, n = 0;
+    struct mk_list *head;
+    struct mk_list *tmp;
+    struct flb_output_instance *o_ins;
+
+    mk_list_foreach_safe(head, tmp, &config->outputs) {
+        o_ins = mk_list_entry(head, struct flb_output_instance, _head);
+        n = flb_output_timer_coros_size(o_ins);
+        timers += n;
+    }
+
+    tasks = flb_task_running_count(config);
+    return tasks + timers;
+}
+
+static int flb_running_print(struct flb_config *config)
+{
+    struct mk_list *head ;
+    struct mk_list *tmp;
+    struct mk_list *t_head;
+    struct mk_list *t_tmp;
+    struct flb_output_instance *o_ins;
+
+    flb_task_running_print(config);
+
+    mk_list_foreach_safe(head, tmp, &config->outputs) {
+        o_ins = mk_list_entry(head, struct flb_output_instance, _head);
+        flb_output_thread_pool_timer_coros_print(o_ins);
+    }
+}
+
 static inline int flb_engine_manager(flb_pipefd_t fd, struct flb_config *config)
 {
     int bytes;
@@ -814,16 +847,16 @@ int flb_engine_start(struct flb_config *config)
                      * resources allocated by that co-routine, the best thing is to
                      * wait again for the grace period and re-check again.
                      */
-                    count = flb_task_running_count(config);
+                    count = flb_running_count(config);
                     if (count > 0 && config->grace_count < config->grace) {
                         if (config->grace_count == 1) {
-                            flb_task_running_print(config);
+                            flb_running_print(config);
                         }
                         flb_engine_exit(config);
                     }
                     else {
                         if (count > 0) {
-                            flb_task_running_print(config);
+                            flb_running_print(config);
                         }
                         flb_info("[engine] service has stopped (%i pending tasks)",
                                  count);

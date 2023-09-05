@@ -849,7 +849,7 @@ static inline int flb_output_coros_size(struct flb_output_instance *ins)
 }
 
 /* Used in engine flb_running_count */
-static inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
+inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
 {
     int size = 0;
 
@@ -862,6 +862,36 @@ static inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
     }
     else {
         size = mk_list_size(&ins->timer_coro_list);
+    }
+
+    return size;
+}
+
+inline void flb_timer_coros_print(struct mk_list *timer_coro_list)
+{ 
+
+    int n = mk_list_size(timer_coro_list);
+    if (n != 0) {
+        /* get one coro for the job_name */
+        mk_list_foreach(head, tmp, &th_ins->timer_coro_list) {
+            timer_coro = mk_list_entry(head, struct flb_output_timer_coro, _head);
+            if (timer_coro != NULL) {
+                flb_info("[task]   output=%s still running %d %s(s)",
+                         ins->alias, n, timer_coro->timer_data->job_name);
+                break;
+            }
+        }
+    }
+}
+
+/* Used in engine flb_running_print */
+inline void flb_output_timer_coros_print(struct flb_output_instance *ins)
+{
+    if (flb_output_is_threaded(ins) == FLB_TRUE) {
+        flb_output_thread_pool_timer_coros_print(ins);
+    }
+    else {
+        
     }
 
     return size;
