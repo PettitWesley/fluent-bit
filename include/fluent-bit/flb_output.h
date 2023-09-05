@@ -626,7 +626,7 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     struct flb_coro *coro;
     struct flb_output_timer_coro *timer_coro;
     struct flb_out_thread_instance *th_ins;
-    struct flb_output_coro_timer_data *ctx = data;
+    struct flb_output_coro_timer_data *ctx = (struct flb_output_coro_timer_data *) data;
     struct flb_out_timer_coro_params *params;
     struct flb_output_instance *o_ins;
 
