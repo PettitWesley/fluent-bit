@@ -871,11 +871,13 @@ static inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
 
 static inline void flb_timer_coros_print(struct mk_list *timer_coro_list)
 { 
-
+    struct flb_output_timer_coro *timer_coro;
+    struct mk_list *tmp;
+    struct mk_list *head;
     int n = mk_list_size(timer_coro_list);
     if (n != 0) {
         /* get one coro for the job_name */
-        mk_list_foreach_safe(head, tmp, &th_ins->timer_coro_list) {
+        mk_list_foreach_safe(head, tmp, timer_coro_list) {
             timer_coro = mk_list_entry(head, struct flb_output_timer_coro, _head);
             if (timer_coro != NULL) {
                 flb_info("[task]   output=%s still running %d %s(s)",
