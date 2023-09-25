@@ -2020,7 +2020,7 @@ static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
             flb_sds_destroy(job_name);
             return;
         }
-
+        flb_plg_debug(ctx->ins, "Created timer");
         ctx->timer_created = FLB_TRUE;
     }
 }

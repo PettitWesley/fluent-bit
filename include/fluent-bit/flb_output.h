@@ -630,6 +630,8 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     struct flb_out_timer_coro_params *params;
     struct flb_output_instance *o_ins;
 
+    flb_debug("[timer coro] new: flb_output_coro_timer_cb");
+
     /* Custom output coroutine info */
     timer_coro = (struct flb_output_timer_coro *) flb_calloc(1, sizeof(struct flb_output_timer_coro));
     if (!timer_coro) {
