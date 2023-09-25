@@ -573,6 +573,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     mk_list_init(&ctx->uploads);
     mk_list_init(&ctx->upload_queue);
 
+    pthread_mutex_init(&ctx->flush_mutex, NULL);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -1651,9 +1652,15 @@ static void cb_s3_upload(struct flb_config *config, void *data)
     int ret;
     time_t now;
 
+    ret = pthread_mutex_trylock(&ctx->flush_mutex);
+    if (ret != 0) {
+        /* don't block the thread, a coro is already flushing */
+        return;
+    }
+
     now = time(NULL);
     
-    flb_plg_debug(ctx->ins, "Running upload daemon coro uploader (cb_s3_upload)..");
+    flb_plg_debug(ctx->ins, "Running scheduled timer uploader with coroutines (cb_s3_upload)..");
 
     /* check chunks in active stream not marked as ready to be sent and see if any are timed out */
     mk_list_foreach_safe(head, tmp, &ctx->stream_active->files) {
@@ -1757,6 +1764,8 @@ static void cb_s3_upload(struct flb_config *config, void *data)
             }
         }
     }
+
+    pthread_mutex_unlock(&ctx->flush_mutex);
 }
 
 static flb_sds_t flb_pack_msgpack_extract_log_key(void *out_context, const char *data,
@@ -1962,115 +1971,57 @@ static void flush_startup_chunks(struct flb_s3 *ctx)
 
 }
 
-
-/* 
- * Same as flb_output_return_do() but no coro prepare destroy 
- * and no coro yield.
- * Using for S3 daemon thread so we can clean up the task
- * But keep the coroutine. 
- * This is the best way to do it because task clean up is
- * handled by the control thread in the engine AFAICT
- * But writing to the output pipe is done from coro. 
- */
-static inline void flb_output_return_no_destroy(int ret)
+static void timer_coro_cb(struct flb_config *config, void *data)
 {
-    struct flb_coro *coro;
-    int n;
-    int pipe_fd;
-    uint32_t set;
-    uint64_t val;
-    struct flb_task *task;
-    struct flb_output_flush *out_flush;
-    struct flb_output_instance *o_ins;
-    struct flb_out_thread_instance *th_ins = NULL;
+    struct flb_s3 *ctx = data;
 
-    coro = flb_coro_get();
-
-    out_flush = (struct flb_output_flush *) coro->data;
-    o_ins = out_flush->o_ins;
-    task = out_flush->task;
-
-    /*
-     * To compose the signal event the relevant info is:
-     *
-     * - Unique Task events id: 2 in this case
-     * - Return value: FLB_OK (0), FLB_ERROR (1) or FLB_RETRY (2)
-     * - Task ID
-     * - Output Instance ID (struct flb_output_instance)->id
-     *
-     * We put together the return value with the task_id on the 32 bits at right
-     */
-    set = FLB_TASK_SET(ret, task->id, o_ins->id);
-    val = FLB_BITS_U64_SET(2 /* FLB_ENGINE_TASK */, set);
-
-    /*
-     * Set the target pipe channel: if this return code is running inside a
-     * thread pool worker, use the specific worker pipe/event loop to handle
-     * the return status, otherwise use the channel connected to the parent
-     * event loop.
-     */
-    if (flb_output_is_threaded(o_ins) == FLB_TRUE) {
-        /* Retrieve the thread instance and prepare pipe channel */
-        th_ins = flb_output_thread_instance_get();
-        pipe_fd = th_ins->ch_thread_events[1];
-    }
-    else {
-        pipe_fd = out_flush->o_ins->ch_events[1];
+    /* ensure that once shutdown begins, no new timer coros run */
+    if (config->is_running == FLB_FALSE) {
+        return;
     }
 
-    /* Notify the event loop about our return status */
-    n = flb_pipe_w(pipe_fd, (void *) &val, sizeof(val));
-    if (n == -1) {
-        flb_errno();
-    }
+    /* upload any ready chunks */
+    cb_s3_upload(config, ctx);
 }
 
-/* 
- * We need to use async IO for S3 because it is more stable
- * However, S3 has unique needs. The chunk list, multipart code, etc
- * all is not concurrent safe. 
- * Additionally, timer callbacks don't run in coroutines and
- * can't using async IO. 
- * Solution: daemon coroutine
- * The first coroutine that that flushes to S3 never ends,
- * and just uploads and sleeps. 
- * 
- * We increment the metrics counters for the chunk originally
- * associated with the coroutine and decrement the task users
- * in release_chunk_upstream()
- */
-static void daemon_coroutine(struct flb_config *config, struct flb_s3 *ctx)
+static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
 {
-    flb_plg_info(ctx->ins, "May 14th: daemon coroutine starting...");
+    struct flb_sched *sched;
+    struct flb_output_coro_timer_data *timer_data = NULL;
+    flb_sds_t job_name;
+    int ret;
 
-    ctx->daemon_coro_started = FLB_TRUE;
+    flush_startup_chunks(ctx);
 
-    /* tell engine that this task did complete successfully */
-    flb_output_return_no_destroy(FLB_OK);
+    if (ctx->timer_created == FLB_FALSE) {
+        sched = flb_sched_ctx_get();
 
-    /* 
-     * FLB engine uses a graceful cooperative shutdown model. 
-     * If coroutines never end, the system won't stop.
-     * So the daemon coroutine must exit itself when the engine is in shutdown mode.
-     */
-    while (config->is_running == FLB_TRUE) {
-        /* Cleanup old buffers found on startup */
-        flush_startup_chunks(ctx);
-
-        /* upload any ready chunks */
-        cb_s3_upload(config, ctx);
-
-        if (config->is_running == FLB_FALSE) {
-            break;
+        job_name = flb_sds_create(S3_UPLOAD_JOB_NAME);
+        if (!job_name) {
+            return;
         }
-        /* 
-         * special coroutine sleep
-         * Doesn't block any thread
-         * Puts an event on the event
-         * loop which will wake this coro back up
-         */
-        flb_time_sleep(ctx->timer_ms);
-        flb_plg_info(ctx->ins, "May 14th: daemon coroutine resumed...");
+
+        timer_data = flb_calloc(1, sizeof(struct flb_output_coro_timer_data));
+        if (!timer_data) {
+            flb_sds_destroy(job_name);
+            return;
+        }
+
+        timer_data->ins = ctx->ins;
+        timer_data->job_name = job_name;
+        timer_data->cb = timer_coro_cb;
+        timer_data->data = ctx;
+
+        ret = flb_sched_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM,
+                                        ctx->timer_ms, flb_output_coro_timer_cb, timer_data, NULL);
+        if (ret < 0) {
+            flb_plg_error(ctx->ins, "Failed to create upload timer");
+            flb_free(timer_data);
+            flb_sds_destroy(job_name);
+            return;
+        }
+
+        ctx->timer_created = FLB_TRUE;
     }
 }
 
@@ -2093,6 +2044,8 @@ static void cb_s3_flush(struct flb_event_chunk *event_chunk,
     size_t off = 0;
     struct flb_time tms;
     time_t file_first_log_time = 0;
+
+    s3_flush_init(config, ctx);
 
     /* Process chunk */
     if (ctx->log_key) {
@@ -2187,10 +2140,6 @@ static void cb_s3_flush(struct flb_event_chunk *event_chunk,
         /* sends only happen from upload daemon coroutine which iterates over queue */
         flb_plg_info(ctx->ins, "cb_s3_flush mk_list_add chunk=%p", upload_file);
         mk_list_add(&upload_file->_head, &ctx->upload_queue);
-    }
-
-    if (ctx->daemon_coro_started == FLB_FALSE) {
-        daemon_coroutine(config, ctx);
     }
 
     FLB_OUTPUT_RETURN(FLB_OK);

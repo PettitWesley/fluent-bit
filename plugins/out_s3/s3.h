@@ -25,6 +25,7 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
+#include <pthread.h>
 
 /* Upload data to S3 in 5MB chunks */
 #define MIN_CHUNKED_UPLOAD_SIZE 5242880
@@ -41,6 +42,9 @@
 #define DEFAULT_FILE_SIZE     100000000
 #define MAX_FILE_SIZE         50000000000
 #define MAX_FILE_SIZE_STR     "50,000,000,000"
+
+/* Used by engine to print active timer coro's on shutdown */
+#define S3_UPLOAD_JOB_NAME    "Upload"
 
 /* Allowed max file size 1 GB for publishing to S3 */
 #define MAX_FILE_SIZE_PUT_OBJECT        1000000000 
@@ -154,7 +158,12 @@ struct flb_s3 {
     flb_sds_t metadata_dir;
     flb_sds_t seq_index_file;
 
-    int daemon_coro_started;
+    /* 
+     * Multiple timer coros can run at the same time,
+     * but modifying the pending chunk and upload lists, and deleting S3 store files needs
+     * to be concurrent safe
+     */
+    pthread_mutex_t flush_mutex;
 
     struct flb_output_instance *ins;
 };
