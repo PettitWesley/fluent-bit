@@ -387,7 +387,7 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
 
 static int flb_running_count(struct flb_config *config)
 {
-    int tasks, timers, n = 0;
+    int tasks = 0, timers = 0, n = 0;
     struct mk_list *head;
     struct mk_list *tmp;
     struct flb_output_instance *o_ins;
