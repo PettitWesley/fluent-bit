@@ -520,7 +520,6 @@ int flb_output_thread_pool_timer_coros_size(struct flb_output_instance *ins)
         pthread_mutex_lock(&th_ins->flush_mutex);
         n = mk_list_size(&th_ins->timer_coro_list);
         pthread_mutex_unlock(&th_ins->flush_mutex);
-        flb_info("flb_output_thread_pool_timer_coros_size: n=%d", n);
         size += n;
     }
 
