@@ -401,6 +401,7 @@ static int flb_running_count(struct flb_config *config)
 
     tasks = flb_task_running_count(config);
     flb_info("tasks=%d", tasks);
+    flb_info("timers=%d", timers);
     return tasks + timers;
 }
 
@@ -848,6 +849,7 @@ int flb_engine_start(struct flb_config *config)
                      * wait again for the grace period and re-check again.
                      */
                     count = flb_running_count(config);
+                    flb_info("flb_running_count=%d", count);
                     if (count > 0 && config->grace_count < config->grace) {
                         if (config->grace_count == 1) {
                             flb_running_print(config);
@@ -858,7 +860,7 @@ int flb_engine_start(struct flb_config *config)
                         if (count > 0) {
                             flb_running_print(config);
                         }
-                        flb_info("[engine] service has stopped (%i pending tasks)",
+                        flb_info("[engine] service has stopped (%d pending tasks)",
                                  count);
                         ret = config->exit_status_code;
                         flb_engine_shutdown(config);
