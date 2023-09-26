@@ -395,10 +395,12 @@ static int flb_running_count(struct flb_config *config)
     mk_list_foreach_safe(head, tmp, &config->outputs) {
         o_ins = mk_list_entry(head, struct flb_output_instance, _head);
         n = flb_output_timer_coros_size(o_ins);
+        flb_info("out=%s has %d timers", o_ins->name, n);
         timers += n;
     }
 
     tasks = flb_task_running_count(config);
+    flb_info("tasks=%d", tasks);
     return tasks + timers;
 }
 

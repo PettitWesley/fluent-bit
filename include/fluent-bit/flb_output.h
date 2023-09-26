@@ -863,9 +863,11 @@ static inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
          * every running thread of the thread pool.
          */
         size = flb_output_thread_pool_timer_coros_size(ins);
+        flb_info("flb_output_thread_pool_timer_coros_size for out=%s: {%d}", ins->name, size);
     }
     else {
         size = mk_list_size(&ins->timer_coro_list);
+        flb_info("flb_output_timer_coros_size out=%s: mk_list_size{%d}", ins->name, size);
     }
 
     return size;
