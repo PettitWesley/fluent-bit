@@ -418,7 +418,6 @@ int s3_store_file_inactive(struct flb_s3 *ctx, struct s3_file *s3_file)
 int s3_store_file_delete(struct flb_s3 *ctx, struct s3_file *s3_file)
 {
     struct flb_fstore_file *fsf;
-    flb_plg_info(ctx->ins, "s3_store_file_delete chunk=%p", s3_file);
 
     fsf = s3_file->fsf;
     ctx->current_buffer_size -= s3_file->size;
