@@ -306,6 +306,13 @@ static flb_sds_t concat_path(char *p1, char *p2)
 {
     flb_sds_t dir;
     flb_sds_t tmp;
+    int len = 0;
+
+    /* remove trailing slash from p1 if needed */
+    len = strlen(p1);
+    if (p1[len - 1] == '/') {
+        p1[len - 1] = '\0';
+    }
 
     dir = flb_sds_create_size(64);
 
