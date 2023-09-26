@@ -846,7 +846,6 @@ int flb_engine_start(struct flb_config *config)
                      * wait again for the grace period and re-check again.
                      */
                     count = flb_running_count(config);
-                    flb_info("flb_running_count=%d", count);
                     if (count > 0 && config->grace_count < config->grace) {
                         if (config->grace_count == 1) {
                             flb_running_print(config);
