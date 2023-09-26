@@ -995,7 +995,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     }
 
     
-    /* S3 can run in async mode with daemon coro */
+    /* S3 can run in async mode with timer coroutines */
     ctx->s3_client->upstream->flags = async_flags;
 
     /* this is done last since in the previous block we make calls to AWS */

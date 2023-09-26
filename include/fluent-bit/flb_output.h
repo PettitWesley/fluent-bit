@@ -651,7 +651,6 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     timer_coro->config = config;
     timer_coro->coro   = coro;
 
-    coro->caller = co_active();
     coro->callee = co_create(config->coro_stack_size,
                              output_pre_timer_cb, &stack_size);
 
@@ -692,7 +691,8 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     params->coro        = coro;
 
     FLB_TLS_SET(timer_coro_params, params);
-    co_switch(coro->callee);
+    coro->caller = co_active();
+    flb_coro_resume(coro);
     return;
 }
 
