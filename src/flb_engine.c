@@ -396,7 +396,8 @@ static int flb_running_count(struct flb_config *config)
         o_ins = mk_list_entry(head, struct flb_output_instance, _head);
         n = flb_output_timer_coros_size(o_ins);
         flb_info("out=%s has %d timers", o_ins->name, n);
-        timers += n;
+        flb_info("beg loop: timers=%d, n=%d", timers, n);
+        timers = timers + n;
         flb_info("end loop: timers=%d", timers);
     }
 
