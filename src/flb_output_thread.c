@@ -333,7 +333,7 @@ static void output_thread(void *data)
         flb_sched_timer_cleanup(sched);
 
         /* Check if we should stop the event loop */
-        if (stopping == FLB_TRUE && mk_list_size(&th_ins->flush_list) == 0 && mk_list_size(&th_ins->timer_coro_list) == 0) {
+        if (stopping == FLB_TRUE && mk_list_size(&th_ins->flush_list) == 0 && mk_list_size(&th_ins->async_timer_list) == 0) {
             /*
              * If there are no busy network connections (and no coroutines) its
              * safe to stop it.
@@ -363,7 +363,7 @@ static void output_thread(void *data)
     if (flush_params) {
         flb_free(flush_params);
     }
-    timer_params = FLB_TLS_GET(timer_coro_params);
+    timer_params = FLB_TLS_GET(out_async_timer_param);
     if (timer_params) {
         flb_free(timer_params);
     }
@@ -441,8 +441,8 @@ int flb_output_thread_pool_create(struct flb_config *config,
         th_ins->flush_id = 0;
         mk_list_init(&th_ins->flush_list);
         mk_list_init(&th_ins->flush_list_destroy);
-        mk_list_init(&th_ins->timer_coro_list);
-        mk_list_init(&th_ins->timer_coro_list_destroy);
+        mk_list_init(&th_ins->async_timer_list);
+        mk_list_init(&th_ins->async_timer_list_destroy);
         pthread_mutex_init(&th_ins->flush_mutex, NULL);
         pthread_mutex_init(&th_ins->timer_mutex, NULL);
         mk_list_init(&th_ins->upstreams);
@@ -520,7 +520,7 @@ int flb_output_thread_pool_timer_coros_size(struct flb_output_instance *ins)
         th_ins = th->params.data;
 
         pthread_mutex_lock(&th_ins->flush_mutex);
-        n = mk_list_size(&th_ins->timer_coro_list);
+        n = mk_list_size(&th_ins->async_timer_list);
         pthread_mutex_unlock(&th_ins->flush_mutex);
         size += n;
     }
@@ -544,7 +544,7 @@ void flb_output_thread_pool_timer_coros_print(struct flb_output_instance *ins)
 
         th_ins = th->params.data;
         pthread_mutex_lock(&th_ins->timer_mutex);
-        flb_timer_coros_print(&th_ins->timer_coro_list);
+        flb_timer_coros_print(&th_ins->async_timer_list);
         pthread_mutex_unlock(&th_ins->timer_mutex);
     }
 }

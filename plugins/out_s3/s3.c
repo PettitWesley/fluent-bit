@@ -1985,7 +1985,7 @@ static void timer_coro_cb(struct flb_config *config, void *data)
 static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
 {
     struct flb_sched *sched;
-    struct flb_output_coro_timer_data *timer_data = NULL;
+    struct flb_out_async_timer_cb_data *timer_data = NULL;
     flb_sds_t job_name;
     int ret;
 
@@ -2011,7 +2011,7 @@ static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
         timer_data->data = ctx;
 
         ret = flb_sched_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM,
-                                        ctx->timer_ms, flb_output_coro_timer_cb, timer_data, NULL);
+                                        ctx->timer_ms, flb_out_async_sched_timer_cb, timer_data, NULL);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Failed to create upload timer");
             flb_free(timer_data);

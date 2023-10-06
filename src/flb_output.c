@@ -40,12 +40,12 @@
 #include <fluent-bit/flb_pack.h>
 
 FLB_TLS_DEFINE(struct flb_out_flush_params, out_flush_params);
-FLB_TLS_DEFINE(struct flb_out_timer_coro_params, timer_coro_params);
+FLB_TLS_DEFINE(struct flb_out_timer_coro_params, out_async_timer_param);
 
 void flb_output_prepare()
 {
     FLB_TLS_INIT(out_flush_params);
-    FLB_TLS_INIT(timer_coro_params);
+    FLB_TLS_INIT(out_async_timer_param);
 }
 
 /* Validate the the output address protocol */
@@ -480,7 +480,7 @@ void flb_output_exit(struct flb_config *config)
     if (params) {
         flb_free(params);
     }
-    params = FLB_TLS_GET(timer_coro_params);
+    params = FLB_TLS_GET(out_async_timer_param);
     if (params) {
         flb_free(params);
     }

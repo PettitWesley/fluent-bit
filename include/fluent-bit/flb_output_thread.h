@@ -89,8 +89,8 @@ struct flb_out_thread_instance {
     pthread_mutex_t flush_mutex;         /* mutex for 'flush_list' */
     
     /* Same as flush_mutex but for timer coros */
-    struct mk_list timer_coro_list;            /* flush context list */
-    struct mk_list timer_coro_list_destroy;    /* flust context destroy list */
+    struct mk_list async_timer_list;            /* flush context list */
+    struct mk_list async_timer_list_destroy;    /* flust context destroy list */
     pthread_mutex_t timer_mutex;         /* mutex for 'flush_list' */
 
     /* List of mapped 'upstream' contexts */

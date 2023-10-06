@@ -409,8 +409,8 @@ struct flb_output_instance {
     struct mk_list flush_list_destroy;
 
     /* similar to flush coroutine list above, timer coroutine list */
-    struct mk_list timer_coro_list;
-    struct mk_list timer_coro_list_destroy;
+    struct mk_list async_timer_list;
+    struct mk_list async_timer_list_destroy;
 
     /* Keep a reference to the original context this instance belongs to */
     struct flb_config *config;
@@ -433,24 +433,24 @@ struct flb_output_flush {
 };
 
 /*
- * stores timer coros on the timer_coro_list, if the output uses them
+ * stores timer coros on the async_timer_list, if the output uses them
  */
-struct flb_output_timer_coro {
+struct flb_out_async_timer{
     struct flb_config *config;         /* FLB context        */
     struct flb_output_instance *o_ins; /* output instance    */
-    struct flb_output_coro_timer_data *timer_data; /* callback info */
+    struct flb_out_async_timer_cb_data *timer_data; /* callback info */
     struct flb_coro *coro;             /* parent coro addr   */
-    struct mk_list _head;              /* Link to timer_coro_list */
+    struct mk_list _head;              /* Link to async_timer_list */
 };
 
 /*
  * If the output uses timer coros, then this is used as the callback data
  * passed to flb_sched_timer_cb_create
  */
-struct flb_output_coro_timer_data {
+struct flb_out_async_timer_cb_data {
    struct flb_output_instance *ins; /* associate coro with this output instance */
    flb_sds_t job_name; /* used on engine shutdown, print pending "custom" jobs */
-   void (*cb) (struct flb_config *config, void *data); /* call this output callback in the coro */
+   void (*async_cb) (struct flb_config *config, void *data); /* call this output callback in the coro */
    void *data; /* opaque data to pass to the above cb */
 };
 
@@ -474,13 +474,13 @@ static FLB_INLINE void flb_output_flush_destroy(struct flb_output_flush *out_flu
  * this is equivalent for timer coroutines
  */
 struct flb_out_timer_coro_params {
-    struct flb_output_timer_coro *output_timer;    /* output flush   */
-    struct flb_output_coro_timer_data *timer_data; /* callback info */
+    struct flb_out_async_timer*output_timer;    /* output flush   */
+    struct flb_out_async_timer_cb_data *timer_data; /* callback info */
     struct flb_config *config;                  /* Fluent Bit context  */
     struct flb_coro *coro;                      /* coroutine context  */
 };
 
-extern FLB_TLS_DEFINE(struct flb_out_timer_coro_params, timer_coro_params);
+extern FLB_TLS_DEFINE(struct flb_out_timer_coro_params, out_async_timer_param);
 
 /*
  * libco do not support parameters in the entrypoint function due to the
@@ -566,16 +566,16 @@ static FLB_INLINE void output_pre_cb_flush(void)
 }
 
 /* same as above but for timer coros */
-static FLB_INLINE void output_pre_timer_cb(void)
+static FLB_INLINE void out_async_timer_cb(void)
 {
     struct flb_coro *coro;
     struct flb_out_timer_coro_params *params;
     struct flb_output_instance *o_ins;
     struct flb_out_thread_instance *th_ins;
-    struct flb_output_timer_coro *timer_coro;
+    struct flb_out_async_timer*timer_coro;
 
 
-    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(timer_coro_params);
+    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(out_async_timer_param);
     if (!params) {
         flb_error("[output] no timer coro params defined, unexpected");
         return;
@@ -593,12 +593,12 @@ static FLB_INLINE void output_pre_timer_cb(void)
         th_ins = flb_output_thread_instance_get();
         pthread_mutex_lock(&th_ins->timer_mutex);
         mk_list_del(&timer_coro->_head);
-        mk_list_add(&timer_coro->_head, &th_ins->timer_coro_list_destroy);
+        mk_list_add(&timer_coro->_head, &th_ins->async_timer_list_destroy);
         pthread_mutex_unlock(&th_ins->timer_mutex);
     }
     else {
         mk_list_del(&timer_coro->_head);
-        mk_list_add(&timer_coro->_head, &o_ins->timer_coro_list_destroy);
+        mk_list_add(&timer_coro->_head, &o_ins->async_timer_list_destroy);
     }
 
     /* timer coro is complete; yield back to caller/control code */
@@ -610,18 +610,18 @@ static FLB_INLINE void output_pre_timer_cb(void)
  * this function is used as the callback for flb_sched_timer_cb_create
  */
 static FLB_INLINE
-void flb_output_coro_timer_cb(struct flb_config *config, void *data)
+void flb_out_async_sched_timer_cb(struct flb_config *config, void *data)
 {
     size_t stack_size;
     struct flb_coro *coro;
-    struct flb_output_timer_coro *timer_coro;
+    struct flb_out_async_timer*timer_coro;
     struct flb_out_thread_instance *th_ins;
-    struct flb_output_coro_timer_data *ctx = (struct flb_output_coro_timer_data *) data;
+    struct flb_out_async_timer_cb_data *ctx = (struct flb_out_async_timer_cb_data *) data;
     struct flb_out_timer_coro_params *params;
     struct flb_output_instance *o_ins;
 
     /* Custom output coroutine info */
-    timer_coro = (struct flb_output_timer_coro *) flb_calloc(1, sizeof(struct flb_output_timer_coro));
+    timer_coro = (struct flb_out_async_timer*) flb_calloc(1, sizeof(struct flb_output_timer_coro));
     if (!timer_coro) {
         flb_errno();
         return;
@@ -640,7 +640,7 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     timer_coro->coro   = coro;
 
     coro->callee = co_create(config->coro_stack_size,
-                             output_pre_timer_cb, &stack_size);
+                             out_async_timer_cb, &stack_size);
 
     if (coro->callee == NULL) {
         flb_coro_destroy(coro);
@@ -656,14 +656,14 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     if (o_ins->is_threaded == FLB_TRUE) {
         th_ins = flb_output_thread_instance_get();
         pthread_mutex_lock(&th_ins->timer_mutex);
-        mk_list_add(&timer_coro->_head, &th_ins->timer_coro_list);
+        mk_list_add(&timer_coro->_head, &th_ins->async_timer_list);
         pthread_mutex_unlock(&th_ins->timer_mutex);
     }
     else {
-        mk_list_add(&timer_coro->_head, &o_ins->timer_coro_list);
+        mk_list_add(&timer_coro->_head, &o_ins->async_timer_list);
     }
 
-    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(timer_coro_params);
+    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(out_async_timer_param);
     if (!params) {
         params = (struct flb_out_timer_coro_params *) flb_calloc(1, sizeof(struct flb_out_flush_params));
         if (!params) {
@@ -678,7 +678,7 @@ void flb_output_coro_timer_cb(struct flb_config *config, void *data)
     params->config      = config;
     params->coro        = coro;
 
-    FLB_TLS_SET(timer_coro_params, params);
+    FLB_TLS_SET(out_async_timer_param, params);
     coro->caller = co_active();
     flb_coro_resume(coro);
     return;
@@ -853,21 +853,21 @@ static inline int flb_output_timer_coros_size(struct flb_output_instance *ins)
         size = flb_output_thread_pool_timer_coros_size(ins);
     }
     else {
-        size = mk_list_size(&ins->timer_coro_list);
+        size = mk_list_size(&ins->async_timer_list);
     }
 
     return size;
 }
 
-static inline void flb_timer_coros_print(struct mk_list *timer_coro_list)
+static inline void flb_timer_coros_print(struct mk_list *async_timer_list)
 { 
-    struct flb_output_timer_coro *timer_coro;
+    struct flb_out_async_timer*timer_coro;
     struct mk_list *tmp;
     struct mk_list *head;
-    int n = mk_list_size(timer_coro_list);
+    int n = mk_list_size(async_timer_list);
     if (n != 0) {
         /* get one coro for the job_name */
-        mk_list_foreach_safe(head, tmp, timer_coro_list) {
+        mk_list_foreach_safe(head, tmp, async_timer_list) {
             timer_coro = mk_list_entry(head, struct flb_output_timer_coro, _head);
             if (timer_coro != NULL) {
                 flb_info("[task]   output=%s still running %d %s(s)",
@@ -885,7 +885,7 @@ static inline void flb_output_timer_coros_print(struct flb_output_instance *ins)
         flb_output_thread_pool_timer_coros_print(ins);
     }
     else {
-        flb_timer_coros_print(&ins->timer_coro_list);
+        flb_timer_coros_print(&ins->async_timer_list);
     }
 }
 
