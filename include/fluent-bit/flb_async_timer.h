@@ -31,5 +31,7 @@
 #include <fluent-bit/flb_output.h>
 
 
+int flb_out_async_timer_cleanup(struct mk_list *list);
+
 
 #endif
