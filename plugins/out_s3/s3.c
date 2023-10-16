@@ -580,7 +580,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
     mk_list_init(&ctx->uploads);
     mk_list_init(&ctx->upload_queue);
 
-    pthread_mutex_init(&ctx->flush_mutex, NULL);
+    pthread_mutex_init(&ctx->upload_queue_mutex, NULL);
+    pthread_mutex_init(&ctx->cb_flush_mutex, NULL);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -1655,7 +1656,7 @@ static void cb_s3_upload(struct flb_config *config, void *data)
     int ret;
     time_t now;
 
-    ret = pthread_mutex_trylock(&ctx->flush_mutex);
+    ret = pthread_mutex_trylock(&ctx->upload_queue_mutex);
     if (ret != 0) {
         /* don't block the thread, a coro is already flushing */
         return;
@@ -1763,7 +1764,7 @@ static void cb_s3_upload(struct flb_config *config, void *data)
         }
     }
 
-    pthread_mutex_unlock(&ctx->flush_mutex);
+    pthread_mutex_unlock(&ctx->upload_queue_mutex);
 }
 
 static flb_sds_t flb_pack_msgpack_extract_log_key(void *out_context, const char *data,
@@ -1969,7 +1970,7 @@ static void flush_startup_chunks(struct flb_s3 *ctx)
 
 }
 
-static void timer_coro_cb(struct flb_config *config, void *data)
+static void async_timer_cb(struct flb_config *config, void *data)
 {
     struct flb_s3 *ctx = data;
 
@@ -1985,8 +1986,6 @@ static void timer_coro_cb(struct flb_config *config, void *data)
 static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
 {
     struct flb_sched *sched;
-    struct flb_out_async_timer_cb_data *timer_data = NULL;
-    flb_sds_t job_name;
     int ret;
 
     flush_startup_chunks(ctx);
@@ -1994,28 +1993,12 @@ static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
     if (ctx->timer_created == FLB_FALSE) {
         sched = flb_sched_ctx_get();
 
-        job_name = flb_sds_create(S3_UPLOAD_JOB_NAME);
-        if (!job_name) {
-            return;
-        }
-
-        timer_data = flb_calloc(1, sizeof(struct flb_output_coro_timer_data));
-        if (!timer_data) {
-            flb_sds_destroy(job_name);
-            return;
-        }
-
-        timer_data->ins = ctx->ins;
-        timer_data->job_name = job_name;
-        timer_data->cb = timer_coro_cb;
-        timer_data->data = ctx;
-
-        ret = flb_sched_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM,
-                                        ctx->timer_ms, flb_out_async_sched_timer_cb, timer_data, NULL);
+        ret = flb_sched_out_async_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM, 
+                                                  ctx->timer_ms, ctx->ins,
+                                                  S3_UPLOAD_JOB_NAME, async_timer_cb,
+                                                  ctx, NULL)
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Failed to create upload timer");
-            flb_free(timer_data);
-            flb_sds_destroy(job_name);
             return;
         }
         ctx->timer_created = FLB_TRUE;
@@ -2062,6 +2045,8 @@ static void cb_s3_flush(struct flb_event_chunk *event_chunk,
         FLB_OUTPUT_RETURN(FLB_ERROR);
     }
     chunk_size = flb_sds_len(chunk);
+
+    pthread_mutex_lock(&ctx->cb_flush_mutex);
 
     /* Get a file candidate matching the given 'tag' */
     upload_file = s3_store_file_get(ctx,
@@ -2111,6 +2096,7 @@ static void cb_s3_flush(struct flb_event_chunk *event_chunk,
                        file_first_log_time, i_ins->name);
 
     if (ret < 0) {
+        pthread_mutex_unlock(&ctx->cb_flush_mutex);
         FLB_OUTPUT_RETURN(FLB_RETRY);
     }
 
@@ -2138,6 +2124,7 @@ static void cb_s3_flush(struct flb_event_chunk *event_chunk,
         mk_list_add(&upload_file->_head, &ctx->upload_queue);
     }
 
+    pthread_mutex_unlock(&ctx->cb_flush_mutex);
     FLB_OUTPUT_RETURN(FLB_OK);
 }
 

@@ -160,10 +160,17 @@ struct flb_s3 {
 
     /* 
      * Multiple timer coros can run at the same time,
+     * (even with single worker case, as one timer might yield and then another start)
      * but modifying the pending chunk and upload lists, and deleting S3 store files needs
      * to be concurrent safe
      */
-    pthread_mutex_t flush_mutex;
+    pthread_mutex_t upload_queue_mutex;
+    /*
+     * If multiple workers are configured, then multiple cb_s3_flush can run at once
+     * (or cb_s3_flush can run at same time as a timer_coro does something)
+     * mutex is needed to protect chunk, upload_queue, multipart lists
+     */
+    pthread_mutex_t cb_flush_mutex;
 
     struct flb_output_instance *ins;
 };

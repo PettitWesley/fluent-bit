@@ -435,7 +435,7 @@ struct flb_output_flush {
 /*
  * stores timer coros on the async_timer_list, if the output uses them
  */
-struct flb_out_async_timer{
+struct flb_out_async_timer {
     struct flb_config *config;         /* FLB context        */
     struct flb_output_instance *o_ins; /* output instance    */
     struct flb_out_async_timer_cb_data *timer_data; /* callback info */
@@ -480,7 +480,7 @@ struct flb_out_timer_coro_params {
     struct flb_coro *coro;                      /* coroutine context  */
 };
 
-extern FLB_TLS_DEFINE(struct flb_out_timer_coro_params, out_async_timer_param);
+extern FLB_TLS_DEFINE(struct flb_out_timer_coro_params, async_timer_coro_params);
 
 /*
  * libco do not support parameters in the entrypoint function due to the
@@ -575,7 +575,7 @@ static FLB_INLINE void out_async_timer_cb(void)
     struct flb_out_async_timer*timer_coro;
 
 
-    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(out_async_timer_param);
+    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(async_timer_coro_params);
     if (!params) {
         flb_error("[output] no timer coro params defined, unexpected");
         return;
@@ -663,7 +663,7 @@ void flb_out_async_sched_timer_cb(struct flb_config *config, void *data)
         mk_list_add(&timer_coro->_head, &o_ins->async_timer_list);
     }
 
-    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(out_async_timer_param);
+    params = (struct flb_out_timer_coro_params *) FLB_TLS_GET(async_timer_coro_params);
     if (!params) {
         params = (struct flb_out_timer_coro_params *) flb_calloc(1, sizeof(struct flb_out_flush_params));
         if (!params) {
@@ -678,7 +678,7 @@ void flb_out_async_sched_timer_cb(struct flb_config *config, void *data)
     params->config      = config;
     params->coro        = coro;
 
-    FLB_TLS_SET(out_async_timer_param, params);
+    FLB_TLS_SET(async_timer_coro_params, params);
     coro->caller = co_active();
     flb_coro_resume(coro);
     return;

@@ -17,27 +17,33 @@
  *  limitations under the License.
  */
 
-#ifndef FLB_ASYNC_TIMER_H
-#define FLB_ASYNC_TIMER_H
-
-#ifndef _XOPEN_SOURCE
-#define _XOPEN_SOURCE
-#endif
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-
+#include <fluent-bit/flb_coro.h>
 #include <fluent-bit/flb_output.h>
-#include <fluent-bit/flb_scheduler.h>
 
-
-int flb_out_async_timer_cleanup(struct mk_list *list);
 int flb_sched_out_async_timer_cb_create(struct flb_sched *sched, int type, int ms,
                                         struct flb_output_instance *o_ins,
                                         char *job_name,
                                         void (*async_cb)(struct flb_config *, void *),
-                                        void *data, struct flb_sched_timer **out_timer);
+                                        void *data, struct flb_sched_timer **out_timer)
+{
+    flb_sds_t job_name;
+    struct flb_out_async_timer_cb_data *timer_data;
 
+    job_name = flb_sds_create(job_name);
+    if (!job_name) {
+        return;
+    }
 
-#endif
+    timer_data = flb_calloc(1, sizeof(struct flb_out_async_timer_cb_data));
+    if (!timer_data) {
+        flb_sds_destroy(job_name);
+        return;
+    }
+
+    timer_data->ins = o_ins;
+    timer_data->job_name = job_name;
+    timer_data->cb = async_cb;
+    timer_data->data = data;
+
+    return flb_sched_timer_cb_create(sched, type, ms, flb_out_async_sched_timer_cb, timer_data, NULL);
+}

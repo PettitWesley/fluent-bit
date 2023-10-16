@@ -363,7 +363,7 @@ static void output_thread(void *data)
     if (flush_params) {
         flb_free(flush_params);
     }
-    timer_params = FLB_TLS_GET(out_async_timer_param);
+    timer_params = FLB_TLS_GET(async_timer_coro_params);
     if (timer_params) {
         flb_free(timer_params);
     }
