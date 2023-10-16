@@ -416,14 +416,14 @@ static int init_seq_index(void *context) {
 
     ctx->seq_index_file = flb_sds_create(ctx->metadata_dir);
     if (ctx->seq_index_file == NULL) {
-        flb_plg_error(ctx->ins, "Failed to create sequential index file path");
+        flb_plg_error(ctx->ins, "Failed to create $INDEX file path");
         flb_errno();
         return -1;
     }
     tmp = "/seq_index_";
     ret = flb_sds_cat_safe(&ctx->seq_index_file, tmp, strlen(tmp));
     if (ret < 0) {
-        flb_plg_error(ctx->ins, "Failed to create sequential index file path");
+        flb_plg_error(ctx->ins, "Failed to concat $INDEX file path");
         flb_errno();
         return -1;
     }
@@ -431,7 +431,7 @@ static int init_seq_index(void *context) {
     sprintf(tmp_buf, "%d", ctx->ins->id);
     ret = flb_sds_cat_safe(&ctx->seq_index_file, tmp_buf, strlen(tmp_buf));
     if (ret < 0) {
-        flb_plg_error(ctx->ins, "Failed to create sequential index file path");
+        flb_plg_error(ctx->ins, "Failed to concat output ID to $INDEX file path");
         flb_errno();
         return -1;
     }
@@ -455,11 +455,11 @@ static int init_seq_index(void *context) {
     else {
         ret = read_seq_index(ctx->seq_index_file, &ctx->seq_index);
         if (ret < 0) {
-            flb_plg_error(ctx->ins, "Failed to read from sequential index "
+            flb_plg_error(ctx->ins, "Failed to read from $INDEX "
                           "metadata file");
             return -1;
         }
-        flb_plg_info(ctx->ins, "Successfully recovered index. "
+        flb_plg_info(ctx->ins, "Successfully recovered existing $INDEX in store_dir. "
                      "Continuing at index=%d", ctx->seq_index);
     }
     return 0;
@@ -1469,7 +1469,7 @@ static int s3_put_object(struct flb_s3 *ctx, const char *tag, time_t file_first_
         if (ret < 0 && access(ctx->seq_index_file, F_OK) == 0) {
             ctx->seq_index--;
             flb_sds_destroy(s3_key);
-            flb_plg_error(ctx->ins, "Failed to update sequential index metadata file");
+            flb_plg_error(ctx->ins, "Failed to update $INDEX tracking file");
             return -1;
         }
     }
@@ -1612,7 +1612,7 @@ static struct multipart_upload *create_upload(struct flb_s3 *ctx, const char *ta
         if (ret < 0) {
             ctx->seq_index--;
             flb_sds_destroy(s3_key);
-            flb_plg_error(ctx->ins, "Failed to write to sequential index metadata file");
+            flb_plg_error(ctx->ins, "Failed to write to $INDEX tracking file");
             return NULL;
         }
     }
