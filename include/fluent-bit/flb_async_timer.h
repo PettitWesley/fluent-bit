@@ -82,8 +82,8 @@ static FLB_INLINE void out_async_timer_cb(void)
 
 
     async_timer = (struct flb_out_async_timer *) FLB_TLS_GET(async_timer_coro_params);
-    if (!params) {
-        flb_error("[output] no timer coro params defined, unexpected");
+    if (!async_timer) {
+        flb_error("[output] no async timer coro params defined, unexpected");
         return;
     }
 
@@ -174,7 +174,7 @@ void flb_out_async_sched_timer_cb(struct flb_config *config, void *data)
     timer_thread_key = (struct flb_out_async_timer *) FLB_TLS_GET(async_timer_coro_params);
     if (!timer_thread_key) {
         timer_thread_key = (struct flb_out_async_timer *) flb_calloc(1, sizeof(struct flb_out_async_timer));
-        if (!params) {
+        if (!timer_thread_key) {
             flb_errno();
             return;
         }
