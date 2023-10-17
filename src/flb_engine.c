@@ -48,6 +48,7 @@
 #include <fluent-bit/flb_http_server.h>
 #include <fluent-bit/flb_metrics.h>
 #include <fluent-bit/flb_version.h>
+#include <fluent-bit/flb_async_timer.h>
 
 #ifdef FLB_HAVE_METRICS
 #include <fluent-bit/flb_metrics_exporter.h>

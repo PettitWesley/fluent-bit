@@ -32,6 +32,7 @@
 #include <fluent-bit/flb_scheduler.h>
 #include <fluent-bit/flb_gzip.h>
 #include <fluent-bit/flb_base64.h>
+#include <fluent-bit/flb_async_timer.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 
