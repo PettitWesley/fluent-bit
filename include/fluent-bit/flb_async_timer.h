@@ -28,7 +28,6 @@
 #define _GNU_SOURCE
 #endif
 
-#include <fluent-bit/flb_output.h>
 #include <fluent-bit/flb_scheduler.h>
 #include <fluent-bit/flb_async_timer.h>
 
