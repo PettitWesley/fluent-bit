@@ -19,6 +19,7 @@
 
 #include <fluent-bit/flb_coro.h>
 #include <fluent-bit/flb_output.h>
+#include <fluent-bit/flb_async_timer.h>
 
 void flb_async_timer_destroy(struct flb_out_async_timer *timer)
 {
