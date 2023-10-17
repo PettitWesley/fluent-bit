@@ -1996,7 +1996,7 @@ static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
         ret = flb_sched_out_async_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM, 
                                                   ctx->timer_ms, ctx->ins,
                                                   S3_UPLOAD_JOB_NAME, async_timer_cb,
-                                                  ctx, NULL)
+                                                  ctx, NULL);
         if (ret < 0) {
             flb_plg_error(ctx->ins, "Failed to create upload timer");
             return;

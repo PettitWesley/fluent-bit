@@ -40,7 +40,7 @@
 #include <fluent-bit/flb_pack.h>
 
 FLB_TLS_DEFINE(struct flb_out_flush_params, out_flush_params);
-FLB_TLS_DEFINE(struct flb_out_timer_coro_params, async_timer_coro_params);
+FLB_TLS_DEFINE(struct flb_out_async_timer, async_timer_coro_params);
 
 void flb_output_prepare()
 {

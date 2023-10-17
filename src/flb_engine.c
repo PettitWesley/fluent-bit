@@ -402,7 +402,7 @@ static int flb_running_count(struct flb_config *config)
 
     mk_list_foreach_safe(head, tmp, &config->outputs) {
         o_ins = mk_list_entry(head, struct flb_output_instance, _head);
-        n = flb_output_timer_coros_size(o_ins);
+        n = flb_async_timers_size(o_ins);
         timers = timers + n;
     }
 
@@ -420,7 +420,7 @@ static void flb_running_print(struct flb_config *config)
 
     mk_list_foreach_safe(head, tmp, &config->outputs) {
         o_ins = mk_list_entry(head, struct flb_output_instance, _head);
-        flb_output_timer_coros_print(o_ins);
+        flb_thread_pool_async_timers_print(o_ins);
     }
 }
 
@@ -928,6 +928,7 @@ int flb_engine_start(struct flb_config *config)
             flb_net_dns_lookup_context_cleanup(&dns_ctx);
             flb_sched_timer_cleanup(config->sched);
             flb_upstream_conn_pending_destroy_list(&config->upstreams);
+            flb_output_async_timer_cleanup(config);
 
             /*
             * depend on main thread to clean up expired message
