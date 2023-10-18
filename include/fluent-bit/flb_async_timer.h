@@ -33,8 +33,8 @@
 
 
 void flb_async_timer_destroy(struct flb_out_async_timer *timer);
-int flb_async_timer_cleanup(struct mk_list *list);
-int flb_output_async_timer_cleanup(struct flb_config *config);
+void flb_async_timer_cleanup(struct mk_list *list);
+void flb_output_async_timer_cleanup(struct flb_config *config);
 int flb_sched_out_async_timer_cb_create(struct flb_sched *sched, int type, int ms,
                                         struct flb_output_instance *o_ins,
                                         char *job_name,

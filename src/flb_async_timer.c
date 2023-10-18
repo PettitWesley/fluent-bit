@@ -18,6 +18,8 @@
  */
 
 #include <fluent-bit/flb_coro.h>
+#include <fluent-bit/flb_thread_pool.h>
+#include <fluent-bit/flb_output_thread.h>
 #include <fluent-bit/flb_async_timer.h>
 
 void flb_async_timer_destroy(struct flb_out_async_timer *timer)
@@ -27,7 +29,7 @@ void flb_async_timer_destroy(struct flb_out_async_timer *timer)
     flb_free(timer);
 }
 
-int flb_async_timer_cleanup(struct mk_list *destroy_list)
+void flb_async_timer_cleanup(struct mk_list *destroy_list)
 {
     struct flb_out_async_timer *async_timer;
     struct mk_list *tmp;
@@ -38,7 +40,7 @@ int flb_async_timer_cleanup(struct mk_list *destroy_list)
     }
 }
 
-int flb_output_async_timer_cleanup(struct flb_config *config)
+void flb_output_async_timer_cleanup(struct flb_config *config)
 {
     struct flb_output_instance *o_ins;
     struct mk_list *tmp;
