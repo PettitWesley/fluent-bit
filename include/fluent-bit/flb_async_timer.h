@@ -63,7 +63,7 @@ struct flb_out_async_timer {
  */
 struct flb_out_async_timer_cb_data {
    struct flb_output_instance *ins; /* associate coro with this output instance */
-   flb_sds_t job_name; /* used on engine shutdown, print pending "custom" jobs */
+   char *job_name; /* used on engine shutdown, print pending "custom" jobs */
    void (*async_cb) (struct flb_config *config, void *data); /* call this output callback in the coro */
    void *data; /* opaque data to pass to the above cb */
 };

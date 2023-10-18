@@ -43,7 +43,7 @@ int flb_output_async_timer_cleanup(struct flb_config *config)
     struct flb_output_instance *o_ins;
     struct mk_list *tmp;
     struct mk_list *head;
-    mk_list_foreach_safe(head, tmp, config->outputs) {
+    mk_list_foreach_safe(head, tmp, &config->outputs) {
         o_ins = mk_list_entry(head, struct flb_output_instance, _head);
         flb_async_timer_cleanup(o_ins->async_timer_list_destroy);
     }
@@ -55,17 +55,10 @@ int flb_sched_out_async_timer_cb_create(struct flb_sched *sched, int type, int m
                                         void (*async_cb)(struct flb_config *, void *),
                                         void *data, struct flb_sched_timer **out_timer)
 {
-    flb_sds_t job_name;
     struct flb_out_async_timer_cb_data *timer_data;
-
-    job_name = flb_sds_create(job_name);
-    if (!job_name) {
-        return;
-    }
 
     timer_data = flb_calloc(1, sizeof(struct flb_out_async_timer_cb_data));
     if (!timer_data) {
-        flb_sds_destroy(job_name);
         return;
     }
 
