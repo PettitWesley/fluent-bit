@@ -95,6 +95,9 @@ struct flb_out_thread_instance {
 
     /* List of mapped 'upstream' contexts */
     struct mk_list upstreams;
+
+    /* Each event loop has a scheduler instance */
+    struct flb_sched *sched;
 };
 
 int flb_output_thread_pool_create(struct flb_config *config,

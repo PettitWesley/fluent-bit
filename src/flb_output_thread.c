@@ -215,6 +215,7 @@ static void output_thread(void *data)
         return;
     }
     flb_sched_ctx_set(sched);
+    th_ins->sched = sched;
 
     /*
      * Sched a permanent callback triggered every 1.5 second to let other
