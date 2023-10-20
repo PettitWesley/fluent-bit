@@ -409,10 +409,6 @@ struct flb_output_instance {
     struct mk_list flush_list;
     struct mk_list flush_list_destroy;
 
-    /* similar to flush coroutine list above, timer coroutine list */
-    struct mk_list async_timer_list;
-    struct mk_list async_timer_list_destroy;
-
     /* Keep a reference to the original context this instance belongs to */
     struct flb_config *config;
 };
@@ -465,7 +461,7 @@ struct flb_out_flush_params {
 };
 
 extern FLB_TLS_DEFINE(struct flb_out_flush_params, out_flush_params);
-extern FLB_TLS_DEFINE(struct flb_out_async_timer, async_timer_coro_params);
+extern FLB_TLS_DEFINE(struct flb_async_timer, async_timer_coro_params);
 
 static FLB_INLINE void output_params_set(struct flb_output_flush *out_flush,
                                          struct flb_coro *coro,

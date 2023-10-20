@@ -243,7 +243,7 @@ struct flb_config {
      */
     uint16_t in_table_id[512];
 
-    void *sched;
+    struct flb_sched *sched;
     unsigned int sched_cap;
     unsigned int sched_base;
 

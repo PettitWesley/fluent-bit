@@ -87,14 +87,12 @@ struct flb_out_thread_instance {
      * must be protected: we use 'flush_mutex for that purpose.
      */
     pthread_mutex_t flush_mutex;         /* mutex for 'flush_list' */
-    
-    /* Same as flush_mutex but for timer coros */
-    struct mk_list async_timer_list;            /* timer list */
-    struct mk_list async_timer_list_destroy;    /* timer destroy list */
-    pthread_mutex_t async_timer_mutex;          /* mutex for async timer lists */
 
     /* List of mapped 'upstream' contexts */
     struct mk_list upstreams;
+
+    /* Each event loop has a scheduler instance */
+    struct flb_sched *sched;
 };
 
 int flb_output_thread_pool_create(struct flb_config *config,
@@ -105,8 +103,6 @@ int flb_output_thread_pool_start(struct flb_output_instance *ins);
 int flb_output_thread_pool_flush(struct flb_task *task,
                                  struct flb_output_instance *out_ins,
                                  struct flb_config *config);
-int flb_thread_pool_async_timers_size(struct flb_output_instance *ins);
-void flb_thread_pool_async_timers_print(struct flb_output_instance *ins);
 
 void flb_output_thread_instance_init();
 struct flb_out_thread_instance *flb_output_thread_instance_get();
