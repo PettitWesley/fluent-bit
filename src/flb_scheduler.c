@@ -530,6 +530,9 @@ struct flb_sched *flb_sched_create(struct flb_config *config,
     mk_list_init(&sched->requests_wait);
     mk_list_init(&sched->timers);
     mk_list_init(&sched->timers_drop);
+    mk_list_init(&sched->async_timer_list);
+    mk_list_init(&sched->async_timer_list_destroy);
+    pthread_mutex_init(&sched->async_timer_mutex, NULL);
 
     /* Create the frame timer who enqueue 'requests' for future time */
     timer = flb_sched_timer_create(sched);
