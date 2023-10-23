@@ -172,6 +172,8 @@ struct flb_s3 {
      */
     pthread_mutex_t cb_flush_mutex;
 
+    struct flb_out_thread_instance **thread_instances;
+
     struct flb_output_instance *ins;
 };
 

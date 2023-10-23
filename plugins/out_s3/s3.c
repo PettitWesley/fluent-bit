@@ -593,6 +593,16 @@ static int cb_s3_init(struct flb_output_instance *ins,
         return -1;
     }
 
+    if (ctx->ins->is_threaded == FLB_TRUE) {
+        ctx->thread_instances = flb_calloc(1, sizeof(struct flb_out_thread_instance *) * ctx->ins->tp_workers);
+        if (!ctx->thread_instances) {
+            flb_errno();
+            return -1;
+        }
+    } else {
+        ctx->thread_instances = NULL;
+    }
+
     /* the check against -1 is works here because size_t is unsigned
      * and (int) -1 == unsigned max value
      * Fluent Bit uses -1 (which becomes max value) to indicate undefined
@@ -1988,10 +1998,35 @@ static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
 {
     struct flb_sched *sched;
     int ret;
+    struct flb_out_thread_instance *current_th_ins;
+    struct flb_out_thread_instance *th_ins;
+    int start = FLB_FALSE;
+    int i;
 
     flush_startup_chunks(ctx);
 
-    if (ctx->timer_created == FLB_FALSE) {
+
+    /* Check if current worker thread has a timer scheduled on its evl */
+    if (ctx->ins->is_threaded == FLB_TRUE) {
+        current_th_ins = flb_output_thread_instance_get();
+        start = FLB_TRUE;
+        if (current_th_ins == NULL) {
+            //TODO: ?
+        }
+
+        for (i = 0; i < ctx->ins->tp_workers; i++) {
+            th_ins = ctx->thread_instances[i];
+
+            if (th_ins != NULL && th_ins == current_th_ins) {
+                start = FLB_FALSE;
+            }
+        }
+    } else {
+        start = !ctx->timer_created;
+    }
+
+    /* Schedule the new timer */
+    if (start == FLB_TRUE) {
         sched = flb_sched_ctx_get();
 
         ret = flb_sched_out_async_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM, 
@@ -2003,6 +2038,16 @@ static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
             return;
         }
         ctx->timer_created = FLB_TRUE;
+
+        /* Save the worker thread pointer in our list */
+        if (ctx->ins->is_threaded == FLB_TRUE) {
+            for (i = 0; i < ctx->ins->tp_workers; i++) {
+                th_ins = ctx->thread_instances[i];
+                if (th_ins == NULL) {
+                    ctx->thread_instances[i] = current_th_ins;
+                }
+            }
+        }
     }
 }
 
