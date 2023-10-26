@@ -360,7 +360,7 @@ static void output_thread(void *data)
     upstream_thread_destroy(th_ins);
     flb_upstream_conn_active_destroy_list(&th_ins->upstreams);
     flb_upstream_conn_pending_destroy_list(&th_ins->upstreams);
-    flb_async_timer_cleanup(&th_ins->sched);
+    flb_async_timer_cleanup(th_ins->sched);
 
     flb_sched_destroy(sched);
     flush_params = FLB_TLS_GET(out_flush_params);

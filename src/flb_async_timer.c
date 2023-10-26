@@ -167,7 +167,7 @@ void flb_thread_pool_async_timers_print(struct flb_output_instance *ins)
 
         th_ins = th->params.data;
         pthread_mutex_lock(&th_ins->sched->async_timer_mutex);
-        flb_async_timers_print(&th_ins->sched->async_timer_list);
+        flb_async_timers_print(th_ins->sched);
         pthread_mutex_unlock(&th_ins->sched->async_timer_mutex);
     }
 }
