@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_engine.h>
 #include <fluent-bit/flb_engine_dispatch.h>
 #include <fluent-bit/flb_random.h>
+#include <fluent-bit/flb_async_timer.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>

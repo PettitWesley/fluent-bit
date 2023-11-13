@@ -25,6 +25,7 @@
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_output_thread.h>
 #include <fluent-bit/flb_thread_pool.h>
+#include <fluent-bit/flb_async_timer.h>
 
 static pthread_once_t local_thread_instance_init = PTHREAD_ONCE_INIT;
 FLB_TLS_DEFINE(struct flb_out_thread_instance, local_thread_instance);
@@ -180,7 +181,8 @@ static void output_thread(void *data)
     struct flb_output_instance *ins;
     struct flb_output_flush *out_flush;
     struct flb_out_thread_instance *th_ins = data;
-    struct flb_out_flush_params *params;
+    struct flb_out_flush_params *flush_params = NULL;
+    struct flb_out_async_timer *timer_params = NULL;
     struct flb_net_dns dns_ctx;
 
     /* Register thread instance */
@@ -330,9 +332,10 @@ static void output_thread(void *data)
         /* Destroy upstream connections from the 'pending destroy list' */
         flb_upstream_conn_pending_destroy_list(&th_ins->upstreams);
         flb_sched_timer_cleanup(sched);
+        flb_async_timer_cleanup(&th_ins->async_timer_list_destroy);
 
         /* Check if we should stop the event loop */
-        if (stopping == FLB_TRUE && mk_list_size(&th_ins->flush_list) == 0) {
+        if (stopping == FLB_TRUE && mk_list_size(&th_ins->flush_list) == 0 && mk_list_size(&th_ins->async_timer_list) == 0) {
             /*
              * If there are no busy network connections (and no coroutines) its
              * safe to stop it.
@@ -356,11 +359,16 @@ static void output_thread(void *data)
     upstream_thread_destroy(th_ins);
     flb_upstream_conn_active_destroy_list(&th_ins->upstreams);
     flb_upstream_conn_pending_destroy_list(&th_ins->upstreams);
+    flb_async_timer_cleanup(&th_ins->async_timer_list_destroy);
 
     flb_sched_destroy(sched);
-    params = FLB_TLS_GET(out_flush_params);
-    if (params) {
-        flb_free(params);
+    flush_params = FLB_TLS_GET(out_flush_params);
+    if (flush_params) {
+        flb_free(flush_params);
+    }
+    timer_params = FLB_TLS_GET(async_timer_coro_params);
+    if (timer_params) {
+        flb_free(timer_params);
     }
     mk_event_loop_destroy(th_ins->evl);
     flb_bucket_queue_destroy(th_ins->evl_bktq);
@@ -436,7 +444,10 @@ int flb_output_thread_pool_create(struct flb_config *config,
         th_ins->flush_id = 0;
         mk_list_init(&th_ins->flush_list);
         mk_list_init(&th_ins->flush_list_destroy);
+        mk_list_init(&th_ins->async_timer_list);
+        mk_list_init(&th_ins->async_timer_list_destroy);
         pthread_mutex_init(&th_ins->flush_mutex, NULL);
+        pthread_mutex_init(&th_ins->async_timer_mutex, NULL);
         mk_list_init(&th_ins->upstreams);
 
         upstream_thread_create(th_ins, ins);
@@ -503,7 +514,6 @@ int flb_output_thread_pool_coros_size(struct flb_output_instance *ins)
     struct flb_tp_thread *th;
     struct flb_out_thread_instance *th_ins;
 
-    /* Signal each worker thread that needs to stop doing work */
     mk_list_foreach(head, &tp->list_threads) {
         th = mk_list_entry(head, struct flb_tp_thread, _head);
         if (th->status != FLB_THREAD_POOL_RUNNING) {

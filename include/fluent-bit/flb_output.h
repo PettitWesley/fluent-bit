@@ -43,6 +43,7 @@
 #include <fluent-bit/flb_str.h>
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/tls/flb_tls.h>
+#include <fluent-bit/flb_thread_pool.h>
 #include <fluent-bit/flb_output_thread.h>
 #include <fluent-bit/flb_upstream.h>
 #include <fluent-bit/flb_upstream_ha.h>
@@ -408,6 +409,10 @@ struct flb_output_instance {
     struct mk_list flush_list;
     struct mk_list flush_list_destroy;
 
+    /* similar to flush coroutine list above, timer coroutine list */
+    struct mk_list async_timer_list;
+    struct mk_list async_timer_list_destroy;
+
     /* Keep a reference to the original context this instance belongs to */
     struct flb_config *config;
 };
@@ -460,6 +465,7 @@ struct flb_out_flush_params {
 };
 
 extern FLB_TLS_DEFINE(struct flb_out_flush_params, out_flush_params);
+extern FLB_TLS_DEFINE(struct flb_out_async_timer, async_timer_coro_params);
 
 static FLB_INLINE void output_params_set(struct flb_output_flush *out_flush,
                                          struct flb_coro *coro,
@@ -659,7 +665,11 @@ static inline void flb_output_return(int ret, struct flb_coro *co) {
     flb_output_flush_prepare_destroy(out_flush);
 }
 
-/* return the number of co-routines running in the instance */
+/* 
+ * return the number of flush co-routines running in the instance 
+ * Currently, this function is only used for FLB_OUTPUT_NO_MULTIPLEX
+ * and does not count timer_coros, used by S3 output
+ */
 static inline int flb_output_coros_size(struct flb_output_instance *ins)
 {
     int size = 0;
