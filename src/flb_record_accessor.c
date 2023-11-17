@@ -631,6 +631,11 @@ flb_sds_t flb_ra_translate_check(struct flb_record_accessor *ra,
         rp = mk_list_entry(head, struct flb_ra_parser, _head);
         if (rp->type == FLB_RA_PARSER_STRING) {
             tmp = ra_translate_string(rp, buf);
+            if (!tmp) {
+                flb_error("[record accessor] translation failed");
+                flb_sds_destroy(buf);
+                return NULL;
+            }
         }
         else if (rp->type == FLB_RA_PARSER_KEYMAP) {
             tmp = ra_translate_keymap(rp, buf, map, &found);
@@ -650,15 +655,76 @@ flb_sds_t flb_ra_translate_check(struct flb_record_accessor *ra,
             tmp = ra_translate_tag_part(rp, buf, tag, tag_len);
         }
 
-        //else if (rp->type == FLB_RA_PARSER_FUNC) {
-            //tmp = ra_translate_func(rp, buf, tag, tag_len);
-        //}
-
-        if (!tmp) {
-            flb_error("[record accessor] translation failed");
-            flb_sds_destroy(buf);
-            return NULL;
+        if (tmp != buf) {
+            buf = tmp;
         }
+    }
+
+    return buf;
+}
+
+/*
+ * Translate a record accessor buffer, tag and records are optional
+ * parameters.
+ *
+ * When translation fails it returns the string key that could not 
+ * be found in the record in the 'error' argument.
+ */
+flb_sds_t flb_ra_translate_return_error(struct flb_record_accessor *ra,
+                                        char *tag, int tag_len,
+                                        msgpack_object map, struct flb_regex_search *result
+                                        char **error)
+{
+    flb_sds_t tmp = NULL;
+    flb_sds_t buf;
+    struct mk_list *head;
+    struct flb_ra_parser *rp;
+    int found = FLB_FALSE;
+
+    buf = flb_sds_create_size(ra->size_hint);
+    if (!buf) {
+        flb_error("[record accessor] cannot create outgoing buffer");
+        return NULL;
+    }
+
+    mk_list_foreach(head, &ra->list) {
+        rp = mk_list_entry(head, struct flb_ra_parser, _head);
+        if (rp->type == FLB_RA_PARSER_STRING) {
+            tmp = ra_translate_string(rp, buf);
+            if (!tmp) {
+                *error = rp->key->name;
+                flb_sds_destroy(buf);
+                return NULL;
+            }
+        }
+        else if (rp->type == FLB_RA_PARSER_KEYMAP) {
+            tmp = ra_translate_keymap(rp, buf, map, &found);
+            if (check == FLB_TRUE && found == FLB_FALSE) {
+                *error = rp->key->name;
+                flb_sds_destroy(buf);
+                return NULL;
+            }
+        }
+        else if (rp->type == FLB_RA_PARSER_REGEX_ID && result) {
+            tmp = ra_translate_regex_id(rp, result, buf);
+            // static error str?
+            // cat fail == NULL
+            // modify ra_translate_regex_id with fail return
+        }
+        else if (rp->type == FLB_RA_PARSER_TAG && tag) {
+            tmp = ra_translate_tag(rp, buf, tag, tag_len);
+            if (!tmp) {
+                // static only on sds cat fail
+            }
+        }
+        else if (rp->type == FLB_RA_PARSER_TAG_PART && tag) {
+            tmp = ra_translate_tag_part(rp, buf, tag, tag_len);
+            if (!tmp) {
+                // cat fail
+                // can fail if tag does not have that many parts
+            }
+        }
+
         if (tmp != buf) {
             buf = tmp;
         }
