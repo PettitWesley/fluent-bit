@@ -77,6 +77,8 @@
 struct flb_output_flush;
 
 struct flb_out_thread_instance;
+
+struct flb_out_thread_instance;
 int flb_output_thread_pool_coros_size(struct flb_output_instance *ins);
 struct flb_out_thread_instance *flb_output_thread_instance_get();
 
