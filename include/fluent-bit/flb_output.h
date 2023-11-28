@@ -76,7 +76,43 @@
 
 struct flb_output_flush;
 
-struct flb_out_thread_instance;
+struct flb_out_thread_instance {
+    struct mk_event event;               /* event context to associate events */
+    struct mk_event_loop *evl;           /* thread event loop context */
+    struct flb_bucket_queue *evl_bktq;    /* bucket queue for evl track event priority */
+    flb_pipefd_t ch_parent_events[2];    /* channel to receive parent notifications */
+    flb_pipefd_t ch_thread_events[2];    /* channel to send messages local event loop */
+    struct flb_output_instance *ins;     /* output plugin instance */
+    struct flb_config *config;
+    struct flb_tp_thread *th;
+    struct mk_list _head;
+
+    /*
+     * In multithread mode, we move some contexts to independent references per thread
+     * so we can avoid to have shared resources and mutexes.
+     *
+     * The following 'coro' fields maintains a state of co-routines inside the thread
+     * event loop.
+     *
+     * note: in single-thread mode, the same fields are in 'struct flb_output_instance'.
+     */
+    int flush_id;                             /* coroutine id counter */
+    struct mk_list flush_list;                /* flush context list */
+    struct mk_list flush_list_destroy;        /* flust context destroy list */
+
+    /*
+     * If the main engine (parent thread) needs to query the number of active
+     * 'flushes' running by a threaded instance, then the access to the 'flush_list'
+     * must be protected: we use 'flush_mutex for that purpose.
+     */
+    pthread_mutex_t flush_mutex;         /* mutex for 'flush_list' */
+
+    /* List of mapped 'upstream' contexts */
+    struct mk_list upstreams;
+
+    /* Each event loop has a scheduler instance */
+    struct flb_sched *sched;
+};
 
 struct flb_out_thread_instance;
 int flb_output_thread_pool_coros_size(struct flb_output_instance *ins);
