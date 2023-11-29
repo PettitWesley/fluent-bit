@@ -106,6 +106,11 @@ struct flb_sched {
     /* Timers: list of timers for different purposes */
     struct mk_list timers;
 
+    /* async timers can create coros, this tracks the coros */
+    struct mk_list async_timer_list;            /* timer list */
+    struct mk_list async_timer_list_destroy;    /* timer destroy list */
+    pthread_mutex_t async_timer_mutex;          /* mutex because the engine needs to count the coros */
+
     /*
      * Timers_Drop: list of invalidated timers that needs to
      * be free()d once the event loop finish the cycle.

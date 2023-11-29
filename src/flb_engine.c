@@ -53,6 +53,7 @@
 #include <fluent-bit/flb_upstream.h>
 #include <fluent-bit/flb_downstream.h>
 #include <fluent-bit/flb_ring_buffer.h>
+#include <fluent-bit/flb_async_timer.h>
 
 #ifdef FLB_HAVE_METRICS
 #include <fluent-bit/flb_metrics_exporter.h>
@@ -481,35 +482,22 @@ static inline int handle_output_events(flb_pipefd_t fd,
     return result;
 }
 
+/* Count of running coros */
 static int flb_running_count(struct flb_config *config)
 {
-    int tasks = 0, timers = 0, n = 0;
-    struct mk_list *head;
-    struct mk_list *tmp;
-    struct flb_output_instance *o_ins;
+    int tasks = 0, timers = 0;
 
-    mk_list_foreach_safe(head, tmp, &config->outputs) {
-        o_ins = mk_list_entry(head, struct flb_output_instance, _head);
-        n = flb_output_timer_coros_size(o_ins);
-        timers = timers + n;
-    }
-
+    timers = flb_async_timers_size(config);
     tasks = flb_task_running_count(config);
+
     return tasks + timers;
 }
 
+/* Print running coros */
 static void flb_running_print(struct flb_config *config)
 {
-    struct mk_list *head;
-    struct mk_list *tmp;
-    struct flb_output_instance *o_ins;
-
     flb_task_running_print(config);
-
-    mk_list_foreach_safe(head, tmp, &config->outputs) {
-        o_ins = mk_list_entry(head, struct flb_output_instance, _head);
-        flb_output_timer_coros_print(o_ins);
-    }
+    flb_async_timers_print_all(config);
 }
 
 static inline int flb_engine_manager(flb_pipefd_t fd, struct flb_config *config)
@@ -1084,6 +1072,7 @@ int flb_engine_start(struct flb_config *config)
             flb_sched_timer_cleanup(config->sched);
             flb_upstream_conn_pending_destroy_list(&config->upstreams);
             flb_downstream_conn_pending_destroy_list(&config->downstreams);
+            flb_async_timer_cleanup(config->sched);
 
             /*
             * depend on main thread to clean up expired message

@@ -98,6 +98,10 @@ int flb_chunk_trace_output(struct flb_chunk_trace *trace, struct flb_output_inst
 
 struct flb_output_flush;
 
+struct flb_out_thread_instance;
+int flb_output_thread_pool_coros_size(struct flb_output_instance *ins);
+struct flb_out_thread_instance *flb_output_thread_instance_get();
+
 /*
  * Tests callbacks
  * ===============
@@ -541,6 +545,7 @@ struct flb_out_flush_params {
 };
 
 extern FLB_TLS_DEFINE(struct flb_out_flush_params, out_flush_params);
+extern FLB_TLS_DEFINE(struct flb_async_timer, async_timer_coro_params);
 
 #define FLB_OUTPUT_RETURN(x)                                            \
     flb_output_return_do(x);                                            \

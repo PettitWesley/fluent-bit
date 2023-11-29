@@ -6,6 +6,7 @@ set(src
   flb_mp.c
   flb_kv.c
   flb_api.c
+  flb_async_timer.c
   flb_csv.c
   flb_lib.c
   flb_log.c
