@@ -125,7 +125,9 @@ struct s3_file *s3_store_file_get(struct flb_s3 *ctx, const char *tag,
 /* Append data to a new or existing fstore file */
 int s3_store_buffer_put(struct flb_s3 *ctx, struct s3_file *s3_file,
                         const char *tag, int tag_len,
-                        char *data, size_t bytes)
+                        char *data, size_t bytes,
+                        time_t file_first_log_time,
+                        char* input_name)
 {
     int ret;
     flb_sds_t name;
@@ -175,7 +177,9 @@ int s3_store_buffer_put(struct flb_s3 *ctx, struct s3_file *s3_file,
             return -1;
         }
         s3_file->fsf = fsf;
+        s3_file->first_log_time = file_first_log_time;
         s3_file->create_time = time(NULL);
+        s3_file->input_name = input_name;
 
         /* Use fstore opaque 'data' reference to keep our context */
         fsf->data = s3_file;
@@ -241,6 +245,7 @@ static int set_files_context(struct flb_s3 *ctx)
                 continue;
             }
             s3_file->fsf = fsf;
+            s3_file->first_log_time = time(NULL);
             s3_file->create_time = time(NULL);
 
             /* Use fstore opaque 'data' reference to keep our context */
@@ -534,7 +539,3 @@ void s3_store_file_lock(struct s3_file *s3_file)
     s3_file->locked = FLB_TRUE;
 }
 
-void s3_store_file_unlock(struct s3_file *s3_file)
-{
-    s3_file->locked = FLB_FALSE;
-}

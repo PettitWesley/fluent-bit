@@ -25,6 +25,7 @@
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
+#include <pthread.h>
 
 /* Upload data to S3 in 5MB chunks */
 #define MIN_CHUNKED_UPLOAD_SIZE 5242880
@@ -42,33 +43,13 @@
 #define MAX_FILE_SIZE         50000000000
 #define MAX_FILE_SIZE_STR     "50,000,000,000"
 
+/* Used by engine to print active timer coro's on shutdown */
+#define S3_UPLOAD_JOB_NAME    "Upload"
+
 /* Allowed max file size 1 GB for publishing to S3 */
 #define MAX_FILE_SIZE_PUT_OBJECT        1000000000 
 
 #define DEFAULT_UPLOAD_TIMEOUT 3600
-
-/*
- * If we see repeated errors on an upload/chunk, we will discard it
- * This saves us from scenarios where something goes wrong and an upload can
- * not proceed (may be some other process completed it or deleted the upload)
- * instead of erroring out forever, we eventually discard the upload.
- *
- * The same is done for chunks, just to be safe, even though realistically
- * I can't think of a reason why a chunk could become unsendable.
- */
-#define MAX_UPLOAD_ERRORS 5
-
-struct upload_queue {
-    struct s3_file *upload_file;
-    struct multipart_upload *m_upload_file;
-    flb_sds_t tag;
-    int tag_len;
-
-    int retry_counter;
-    time_t upload_time;
-
-    struct mk_list _head;
-};
 
 struct multipart_upload {
     flb_sds_t s3_key;
@@ -92,6 +73,9 @@ struct multipart_upload {
 
     /* ongoing tracker of how much data has been sent for this upload */
     size_t bytes;
+
+    /* for s3 retry warn message  */
+    char *input_name;
 
     struct mk_list _head;
 
@@ -156,16 +140,15 @@ struct flb_s3 {
 
     struct mk_list uploads;
 
-    int preserve_data_ordering;
-    int upload_queue_success;
+    /* list of locked chunks that are ready to send */
     struct mk_list upload_queue;
+
+    int preserve_data_ordering;
 
     size_t file_size;
     size_t upload_chunk_size;
     time_t upload_timeout;
-    time_t retry_time;
 
-    int timer_created;
     int timer_ms;
     int key_fmt_has_uuid;
 
@@ -173,6 +156,29 @@ struct flb_s3 {
     int key_fmt_has_seq_index;
     flb_sds_t metadata_dir;
     flb_sds_t seq_index_file;
+
+    /* 
+     * Multiple timer coros can run at the same time,
+     * (even with single worker case, as one timer might yield and then another start)
+     * but modifying the pending chunk and upload lists, and deleting S3 store files needs
+     * to be concurrent safe
+     */
+    pthread_mutex_t upload_queue_mutex;
+    /*
+     * If multiple workers are configured, then multiple cb_s3_flush can run at once
+     * (or cb_s3_flush can run at same time as a timer_coro does something)
+     * mutex is needed to protect chunk, upload_queue, multipart lists
+     */
+    pthread_mutex_t cb_flush_mutex;
+
+    /*
+     * Need to create a timer on each worker thread. Store a 
+     * array of pointers to the thread instance with a mutex to
+     * protect the array and timers_created counter.
+     */
+    pthread_mutex_t create_timer_mutex;
+    struct flb_out_thread_instance **thread_instances;
+    int timers_created;
 
     struct flb_output_instance *ins;
 };

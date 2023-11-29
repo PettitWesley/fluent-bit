@@ -48,6 +48,7 @@
 #include <fluent-bit/flb_http_server.h>
 #include <fluent-bit/flb_metrics.h>
 #include <fluent-bit/flb_version.h>
+#include <fluent-bit/flb_async_timer.h>
 
 #ifdef FLB_HAVE_METRICS
 #include <fluent-bit/flb_metrics_exporter.h>
@@ -393,6 +394,24 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
     return 0;
 }
 
+/* Count of running coros */
+static int flb_running_count(struct flb_config *config)
+{
+    int tasks = 0, timers = 0;
+
+    timers = flb_async_timers_size(config);
+    tasks = flb_task_running_count(config);
+
+    return tasks + timers;
+}
+
+/* Print running coros */
+static void flb_running_print(struct flb_config *config)
+{
+    flb_task_running_print(config);
+    flb_async_timers_print_all(config);
+}
+
 static inline int flb_engine_manager(flb_pipefd_t fd, struct flb_config *config)
 {
     int bytes;
@@ -551,6 +570,7 @@ int sb_segregate_chunks(struct flb_config *config)
 int flb_engine_start(struct flb_config *config)
 {
     int ret;
+    int count;
     uint64_t ts;
     char tmp[16];
     struct flb_time t_flush;
@@ -821,19 +841,19 @@ int flb_engine_start(struct flb_config *config)
                      * resources allocated by that co-routine, the best thing is to
                      * wait again for the grace period and re-check again.
                      */
-                    ret = flb_task_running_count(config);
-                    if (ret > 0 && config->grace_count < config->grace) {
+                    count = flb_running_count(config);
+                    if (count > 0 && config->grace_count < config->grace) {
                         if (config->grace_count == 1) {
-                            flb_task_running_print(config);
+                            flb_running_print(config);
                         }
                         flb_engine_exit(config);
                     }
                     else {
-                        if (ret > 0) {
-                            flb_task_running_print(config);
+                        if (count > 0) {
+                            flb_running_print(config);
                         }
-                        flb_info("[engine] service has stopped (%i pending tasks)",
-                                 ret);
+                        flb_info("[engine] service has stopped (%d pending tasks)",
+                                 count);
                         ret = config->exit_status_code;
                         flb_engine_shutdown(config);
                         config = NULL;
@@ -896,6 +916,7 @@ int flb_engine_start(struct flb_config *config)
             flb_net_dns_lookup_context_cleanup(&dns_ctx);
             flb_sched_timer_cleanup(config->sched);
             flb_upstream_conn_pending_destroy_list(&config->upstreams);
+            flb_async_timer_cleanup(config->sched);
 
             /*
             * depend on main thread to clean up expired message

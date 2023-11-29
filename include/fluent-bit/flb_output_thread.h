@@ -86,10 +86,13 @@ struct flb_out_thread_instance {
      * 'flushes' running by a threaded instance, then the access to the 'flush_list'
      * must be protected: we use 'flush_mutex for that purpose.
      */
-     pthread_mutex_t flush_mutex;         /* mutex for 'flush_list' */
+    pthread_mutex_t flush_mutex;         /* mutex for 'flush_list' */
 
     /* List of mapped 'upstream' contexts */
     struct mk_list upstreams;
+
+    /* Each event loop has a scheduler instance */
+    struct flb_sched *sched;
 };
 
 int flb_output_thread_pool_create(struct flb_config *config,
@@ -100,7 +103,6 @@ int flb_output_thread_pool_start(struct flb_output_instance *ins);
 int flb_output_thread_pool_flush(struct flb_task *task,
                                  struct flb_output_instance *out_ins,
                                  struct flb_config *config);
-
 
 void flb_output_thread_instance_init();
 struct flb_out_thread_instance *flb_output_thread_instance_get();
