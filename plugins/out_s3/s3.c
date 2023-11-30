@@ -594,15 +594,15 @@ static int cb_s3_init(struct flb_output_instance *ins,
         return -1;
     }
 
-    if (ctx->ins->is_threaded == FLB_TRUE) {
-        ctx->thread_instances = flb_calloc(1, sizeof(struct flb_out_thread_instance *) * ctx->ins->tp_workers);
-        if (!ctx->thread_instances) {
-            flb_errno();
-            return -1;
-        }
-    } else {
-        ctx->thread_instances = NULL;
-    }
+    // if (ctx->ins->is_threaded == FLB_TRUE) {
+    //     ctx->thread_instances = flb_calloc(1, sizeof(struct flb_out_thread_instance *) * ctx->ins->tp_workers);
+    //     if (!ctx->thread_instances) {
+    //         flb_errno();
+    //         return -1;
+    //     }
+    // } else {
+    //     ctx->thread_instances = NULL;
+    // }
 
     /* the check against -1 is works here because size_t is unsigned
      * and (int) -1 == unsigned max value

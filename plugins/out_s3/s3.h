@@ -177,7 +177,7 @@ struct flb_s3 {
      * protect the array and timers_created counter.
      */
     pthread_mutex_t create_timer_mutex;
-    struct flb_out_thread_instance **thread_instances;
+    struct flb_out_thread_instance *thread_instances[5];
     int timers_created;
 
     struct flb_output_instance *ins;
