@@ -19,7 +19,6 @@
 
 #include <fluent-bit/flb_coro.h>
 #include <fluent-bit/flb_thread_pool.h>
-#include <fluent-bit/flb_output_thread.h>
 #include <fluent-bit/flb_async_timer.h>
 #include <fluent-bit/flb_scheduler.h>
 
