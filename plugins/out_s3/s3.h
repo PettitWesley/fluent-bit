@@ -178,6 +178,7 @@ struct flb_s3 {
      */
     pthread_mutex_t create_timer_mutex;
     struct flb_out_thread_instance *thread_instances[5];
+    struct flb_out_thread_instance **thread_instances;
     int timers_created;
 
     struct flb_output_instance *ins;
