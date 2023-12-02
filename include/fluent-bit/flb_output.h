@@ -76,6 +76,10 @@
 
 struct flb_output_flush;
 
+struct flb_out_thread_instance;
+int flb_output_thread_pool_coros_size(struct flb_output_instance *ins);
+struct flb_out_thread_instance *flb_output_thread_instance_get();
+
 /*
  * Tests callbacks
  * ===============
@@ -460,6 +464,7 @@ struct flb_out_flush_params {
 };
 
 extern FLB_TLS_DEFINE(struct flb_out_flush_params, out_flush_params);
+extern FLB_TLS_DEFINE(struct flb_async_timer, async_timer_coro_params);
 
 static FLB_INLINE void output_params_set(struct flb_output_flush *out_flush,
                                          struct flb_coro *coro,
@@ -659,7 +664,11 @@ static inline void flb_output_return(int ret, struct flb_coro *co) {
     flb_output_flush_prepare_destroy(out_flush);
 }
 
-/* return the number of co-routines running in the instance */
+/* 
+ * return the number of flush co-routines running in the instance 
+ * Currently, this function is only used for FLB_OUTPUT_NO_MULTIPLEX
+ * and does not count timer_coros, used by S3 output
+ */
 static inline int flb_output_coros_size(struct flb_output_instance *ins)
 {
     int size = 0;
