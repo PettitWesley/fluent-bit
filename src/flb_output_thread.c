@@ -333,7 +333,6 @@ static void output_thread(void *data)
         /* Destroy upstream connections from the 'pending destroy list' */
         flb_upstream_conn_pending_destroy_list(&th_ins->upstreams);
         flb_sched_timer_cleanup(sched);
-        flb_async_timer_cleanup(&th_ins->sched);
 
         /* Check if we should stop the event loop */
         if (stopping == FLB_TRUE && mk_list_size(&th_ins->flush_list) == 0 && mk_list_size(&th_ins->sched->async_timer_list) == 0) {
@@ -360,7 +359,7 @@ static void output_thread(void *data)
     upstream_thread_destroy(th_ins);
     flb_upstream_conn_active_destroy_list(&th_ins->upstreams);
     flb_upstream_conn_pending_destroy_list(&th_ins->upstreams);
-    flb_async_timer_cleanup(&th_ins->sched);
+    flb_async_timer_cleanup(th_ins->sched);
 
     flb_sched_destroy(sched);
     flush_params = FLB_TLS_GET(out_flush_params);

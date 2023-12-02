@@ -149,7 +149,6 @@ struct flb_s3 {
     size_t upload_chunk_size;
     time_t upload_timeout;
 
-    int timer_created;
     int timer_ms;
     int key_fmt_has_uuid;
 
@@ -171,6 +170,16 @@ struct flb_s3 {
      * mutex is needed to protect chunk, upload_queue, multipart lists
      */
     pthread_mutex_t cb_flush_mutex;
+
+    /*
+     * Need to create a timer on each worker thread. Store a 
+     * array of pointers to the thread instance with a mutex to
+     * protect the array and timers_created counter.
+     */
+    pthread_mutex_t create_timer_mutex;
+    struct flb_out_thread_instance *thread_instances[5];
+    struct flb_out_thread_instance **thread_instances;
+    int timers_created;
 
     struct flb_output_instance *ins;
 };

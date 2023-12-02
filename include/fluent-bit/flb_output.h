@@ -43,7 +43,6 @@
 #include <fluent-bit/flb_str.h>
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/tls/flb_tls.h>
-#include <fluent-bit/flb_thread_pool.h>
 #include <fluent-bit/flb_output_thread.h>
 #include <fluent-bit/flb_upstream.h>
 #include <fluent-bit/flb_upstream_ha.h>
@@ -76,6 +75,10 @@
     const char *tag    = event_chunk->tag;
 
 struct flb_output_flush;
+
+struct flb_out_thread_instance;
+int flb_output_thread_pool_coros_size(struct flb_output_instance *ins);
+struct flb_out_thread_instance *flb_output_thread_instance_get();
 
 /*
  * Tests callbacks

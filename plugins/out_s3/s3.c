@@ -583,6 +583,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
 
     pthread_mutex_init(&ctx->upload_queue_mutex, NULL);
     pthread_mutex_init(&ctx->cb_flush_mutex, NULL);
+    pthread_mutex_init(&ctx->create_timer_mutex, NULL);
 
     /* Export context */
     flb_output_set_context(ins, ctx);
@@ -591,6 +592,19 @@ static int cb_s3_init(struct flb_output_instance *ins,
     ret = flb_output_config_map_set(ins, (void *) ctx);
     if (ret == -1) {
         return -1;
+    }
+
+    // alloc here doesn't work somehow??
+    if (ctx->ins->is_threaded == FLB_TRUE && ctx->ins->tp_workers > 0) {
+        ctx->thread_instances = flb_calloc(1, 
+                    sizeof(struct flb_out_thread_instance *) 
+                    * ctx->ins->tp_workers); // check that its not zero
+        if (!ctx->thread_instances) {
+            flb_errno();
+            return -1;
+        }
+    } else {
+        ctx->thread_instances = NULL;
     }
 
     /* the check against -1 is works here because size_t is unsigned
@@ -958,7 +972,7 @@ static int cb_s3_init(struct flb_output_instance *ins,
     ctx->provider->provider_vtable->sync(ctx->provider);
     ctx->provider->provider_vtable->init(ctx->provider);
 
-    ctx->timer_created = FLB_FALSE;
+    ctx->timers_created = 0;
     ctx->timer_ms = (int) (ctx->upload_timeout / 6) * 1000;
     if (ctx->timer_ms > UPLOAD_TIMER_MAX_WAIT) {
         ctx->timer_ms = UPLOAD_TIMER_MAX_WAIT;
@@ -1984,25 +1998,66 @@ static void async_timer_cb(struct flb_config *config, void *data)
     cb_s3_upload(config, ctx);
 }
 
-static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
+static void create_timer_on_thread(struct flb_config *config, struct flb_s3 *ctx)
 {
     struct flb_sched *sched;
+    struct flb_out_thread_instance *th_ins;
+    struct flb_out_thread_instance *current_th_ins;
+    int i;
     int ret;
+
+    pthread_mutex_lock(&ctx->create_timer_mutex);
+    sched = flb_sched_ctx_get();
+    ret = flb_sched_out_async_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM, 
+                                              ctx->timer_ms, ctx->ins,
+                                              S3_UPLOAD_JOB_NAME, async_timer_cb,
+                                              ctx, NULL);
+    if (ret < 0) {
+        flb_plg_error(ctx->ins, "Failed to create upload timer");
+        pthread_mutex_unlock(&ctx->create_timer_mutex);
+        return;
+    }
+
+    ctx->timers_created++;
+    /* Save the worker thread pointer in the list */
+    if (ctx->ins->is_threaded == FLB_TRUE) {
+        current_th_ins = flb_output_thread_instance_get();
+        for (i = 0; i < ctx->ins->tp_workers; i++) {
+            th_ins = ctx->thread_instances[i];
+            if (th_ins == current_th_ins) {
+                return;
+            }
+            if (th_ins == NULL) {
+                ctx->thread_instances[i] = current_th_ins;
+            }
+        }
+    }
+    pthread_mutex_unlock(&ctx->create_timer_mutex);
+}
+
+static void s3_flush_init(struct flb_config *config, struct flb_s3 *ctx)
+{
+    struct flb_out_thread_instance *current_th_ins;
+    struct flb_out_thread_instance *th_ins;
+    int i;
 
     flush_startup_chunks(ctx);
 
-    if (ctx->timer_created == FLB_FALSE) {
-        sched = flb_sched_ctx_get();
+    if (ctx->timers_created == 0 ) {
+        create_timer_on_thread(config, ctx);
+    }
+    if (ctx->timers_created < ctx->ins->tp_workers && ctx->ins->is_threaded == FLB_TRUE) {
+        /* Check if current worker thread has a timer scheduled on its evl */
+        current_th_ins = flb_output_thread_instance_get();
 
-        ret = flb_sched_out_async_timer_cb_create(sched, FLB_SCHED_TIMER_CB_PERM, 
-                                                  ctx->timer_ms, ctx->ins,
-                                                  S3_UPLOAD_JOB_NAME, async_timer_cb,
-                                                  ctx, NULL);
-        if (ret < 0) {
-            flb_plg_error(ctx->ins, "Failed to create upload timer");
-            return;
+        for (i = 0; i < ctx->ins->tp_workers; i++) {
+            th_ins = ctx->thread_instances[i];
+
+            if (th_ins != NULL && th_ins == current_th_ins) {
+                return;
+            }
         }
-        ctx->timer_created = FLB_TRUE;
+        create_timer_on_thread(config, ctx);
     }
 }
 
