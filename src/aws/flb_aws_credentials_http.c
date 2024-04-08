@@ -34,9 +34,10 @@
 #define AWS_HTTP_RESPONSE_TOKEN              "Token"
 #define AWS_CREDENTIAL_RESPONSE_EXPIRATION   "Expiration"
 
-#define ECS_CREDENTIALS_HOST           "169.254.170.2"
-#define ECS_CREDENTIALS_HOST_LEN       13
-#define ECS_CREDENTIALS_PATH_ENV_VAR   "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
+#define AWS_CREDENTIALS_HOST           "169.254.170.2"
+#define AWS_CREDENTIALS_HOST_LEN       13
+#define AWS_CREDENTIALS_PATH           "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
+#define AWS_CREDENTIALS_FULL_URI       "AWS_CONTAINER_CREDENTIALS_FULL_URI"
 
 
 /* Declarations */
@@ -229,12 +230,12 @@ static struct flb_aws_provider_vtable http_provider_vtable = {
     .upstream_set = upstream_set_fn_http,
 };
 
-struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
-                                                  flb_sds_t host,
-                                                  flb_sds_t path,
-                                                  struct
-                                                  flb_aws_client_generator
-                                                  *generator)
+struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
+                                                      flb_sds_t host,
+                                                      flb_sds_t path,
+                                                      struct
+                                                      flb_aws_client_generator
+                                                      *generator)
 {
     struct flb_aws_provider_http *implementation = NULL;
     struct flb_aws_provider *provider = NULL;
@@ -308,17 +309,45 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
                                                   flb_aws_client_generator
                                                   *generator)
 {
+    char *out_host;
+    char *protocol;
     flb_sds_t host = NULL;
     flb_sds_t path = NULL;
-    char *path_var = NULL;
+    char *relative_uri = NULL;
+    char *full_uri = NULL:
 
-    host = flb_sds_create_len(ECS_CREDENTIALS_HOST, ECS_CREDENTIALS_HOST_LEN);
+    relative_uri = getenv(AWS_CREDENTIALS_PATH);
+    full_uri = getenv(AWS_CREDENTIALS_FULL_URI);
+
+    if (path_var && strlen(path_var) > 0) {
+        host = flb_sds_create_len(AWS_CREDENTIALS_HOST, AWS_CREDENTIALS_HOST_LEN);
+        if (!host) {
+            flb_errno();
+            return NULL;
+        }
+        path = flb_sds_create(path_var);
+        if (!path) {
+            flb_errno();
+            flb_free(host);
+            return NULL;
+        }
+    } else if (full_uri && strlen(full_uri) > 0) {
+        ret = flb_utils_url_split(tmp, &protocol, &host, &port, &uri);
+        insecure = strncmp(tmp, "http://", 7) == 0 ? FLB_TRUE : FLB_FALSE;
+    }
+    } else {
+        flb_debug("[aws_credentials] Not initializing ECS/EKS HTTP Provider because"
+                  " %s and %s is not set", AWS_CREDENTIALS_PATH, AWS_CREDENTIALS_FULL_URI);
+        return NULL;
+    }
+
+    host = flb_sds_create_len(AWS_CREDENTIALS_HOST, AWS_CREDENTIALS_HOST_LEN);
     if (!host) {
         flb_errno();
         return NULL;
     }
 
-    path_var = getenv(ECS_CREDENTIALS_PATH_ENV_VAR);
+    path_var = getenv(AWS_CREDENTIALS_PATH);
     if (path_var && strlen(path_var) > 0) {
         path = flb_sds_create(path_var);
         if (!path) {
@@ -327,10 +356,10 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
             return NULL;
         }
 
-        return flb_http_provider_create(config, host, path, generator);
+        return flb_endpoint_provider_create(config, host, path, generator);
     } else {
         flb_debug("[aws_credentials] Not initializing ECS Provider because"
-                  " %s is not set", ECS_CREDENTIALS_PATH_ENV_VAR);
+                  " %s is not set", AWS_CREDENTIALS_PATH);
         flb_sds_destroy(host);
         return NULL;
     }
