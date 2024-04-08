@@ -1019,23 +1019,25 @@ static char *flb_copy_host(const char *string, int pos_init, int pos_end)
     if (string[pos_init] == '[') {            /* IPv6 */
         if (string[pos_end-1] != ']')
             return NULL;
-
+        }
         return mk_string_copy_substr(string, pos_init + 1, pos_end - 1);
     }
-    else
+    else {
         return mk_string_copy_substr(string, pos_init, pos_end);
+    }
 }
 
 static char *flb_copy_host_sds(const char *string, int pos_init, int pos_end)
 {
     if (string[pos_init] == '[') {            /* IPv6 */
-        if (string[pos_end-1] != ']')
+        if (string[pos_end-1] != ']') {
             return NULL;
-
-        return mk_string_copy_substr(string, pos_init + 1, pos_end - 1);
+        }
+        return flb_sds_create_len(string + pos_init + 1, pos_end - 1);
     }
-    else
-        return mk_string_copy_substr(string, pos_init, pos_end);
+    else {
+        return flb_sds_create_len(stringpos_init, pos_end);
+    }
 }
 
 int flb_utils_url_split(const char *in_url, char **out_protocol,
@@ -1136,13 +1138,13 @@ int flb_utils_url_split(const char *in_url, char **out_protocol,
 int flb_utils_url_split_sds(const flb_sds_t in_url, flb_sds_t *out_protocol,
                             flb_sds_t *out_host, flb_sds_t *out_port, flb_sds_t *out_uri)
 {
-    flb_sds_t protocol;
-    flb_sds_t host;
-    flb_sds_t port;
-    flb_sds_t uri;
-    char *p;
-    char *tmp;
-    char *sep;
+    flb_sds_t protocol = NULL;
+    flb_sds_t host = NULL;
+    flb_sds_t port = NULL;
+    flb_sds_t uri = NULL;
+    char *p = NULL;
+    char *tmp = NULL;
+    char *sep = NULL;
 
     /* Protocol */
     p = strstr(in_url, "://");
@@ -1174,7 +1176,7 @@ int flb_utils_url_split_sds(const flb_sds_t in_url, flb_sds_t *out_protocol,
     }
 
     if (tmp) {
-        host = flb_copy_host(p, 0, tmp - p);
+        host = flb_copy_host_sds(p, 0, tmp - p);
         if (!host) {
             flb_errno();
             goto error;
@@ -1184,33 +1186,46 @@ int flb_utils_url_split_sds(const flb_sds_t in_url, flb_sds_t *out_protocol,
         /* Look for an optional URI */
         tmp = strchr(p, '/');
         if (tmp) {
-            port = mk_string_copy_substr(p, 0, tmp - p);
-            uri = flb_strdup(tmp);
+            port = flb_sds_create_len(p, tmp - p);
+            uri = flb_sds_create(tmp);
         }
         else {
-            port = flb_strdup(p);
-            uri = flb_strdup("/");
+            port = flb_sds_create_len(p, tmp - p);
+            uri = flb_sds_create("/");
         }
     }
     else {
         tmp = strchr(p, '/');
         if (tmp) {
-            host = flb_copy_host(p, 0, tmp - p);
-            uri = flb_strdup(tmp);
+            host = flb_copy_host_sds(p, 0, tmp - p);
+            uri = flb_sds_create(tmp);
         }
         else {
-            host = flb_copy_host(p, 0, strlen(p));
-            uri = flb_strdup("/");
+            host = flb_sds_create(p, 0, strlen(p));
+            uri = flb_sds_create("/");
         }
     }
 
     if (!port) {
         if (strcmp(protocol, "http") == 0) {
-            port = flb_strdup("80");
+            port = flb_sds_create("80");
         }
         else if (strcmp(protocol, "https") == 0) {
-            port = flb_strdup("443");
+            port = flb_sds_create("443");
         }
+    }
+
+    if (!host) {
+        flb_errno();
+        goto error;
+    }
+    if (!port) {
+        flb_errno();
+        goto error;
+    }
+    if (!uri) {
+        flb_errno();
+        goto error;
     }
 
     *out_protocol = protocol;
