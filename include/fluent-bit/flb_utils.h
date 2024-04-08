@@ -75,5 +75,7 @@ void flb_utils_set_plugin_string_property(const char *name,
                                           flb_sds_t  new_value);
 static char *flb_copy_host_sds(const char *string, int pos_init, int pos_end);
 static char *flb_copy_host(const char *string, int pos_init, int pos_end);
+int flb_utils_url_split_sds(const flb_sds_t in_url, flb_sds_t *out_protocol,
+                            flb_sds_t *out_host, flb_sds_t *out_port, flb_sds_t *out_uri);
 
 #endif
