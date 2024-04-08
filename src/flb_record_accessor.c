@@ -699,7 +699,7 @@ flb_sds_t flb_ra_translate_return_error(struct flb_record_accessor *ra,
         }
         else if (rp->type == FLB_RA_PARSER_KEYMAP) {
             tmp = ra_translate_keymap(rp, buf, map, &found);
-            if (check == FLB_TRUE && found == FLB_FALSE) {
+            if (found == FLB_FALSE) {
                 *error = rp->key->name;
                 flb_sds_destroy(buf);
                 return NULL;
@@ -721,7 +721,7 @@ flb_sds_t flb_ra_translate_return_error(struct flb_record_accessor *ra,
             tmp = ra_translate_tag_part(rp, buf, tag, tag_len);
             if (!tmp) {
                 // cat fail
-                // can fail if tag does not have that many parts
+                // can fail if tag does not have that many parts, no modify func
             }
         }
 
