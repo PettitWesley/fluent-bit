@@ -62,6 +62,8 @@ struct flb_aws_provider_http {
     /* Host and Path to request credentials */
     flb_sds_t host;
     flb_sds_t path;
+
+    flb_sds_t auth_token; /* optional */
 };
 
 
@@ -230,11 +232,18 @@ static struct flb_aws_provider_vtable http_provider_vtable = {
     .upstream_set = upstream_set_fn_http,
 };
 
+static struct flb_aws_header http_credentials_basic_auth_header = {
+    .key = "Authorization",
+    .key_len = 13,
+    .val = "",
+    .val_len = 0,
+};
+
 struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
                                                       flb_sds_t host,
                                                       flb_sds_t path,
                                                       int port,
-                                                      int inscure,
+                                                      int insecure,
                                                       struct
                                                       flb_aws_client_generator
                                                       *generator)
@@ -243,6 +252,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
     struct flb_aws_provider *provider = NULL;
     struct flb_upstream *upstream = NULL;
     int io_flags = insecure == FLB_TRUE ? FLB_IO_TCP : FLB_IO_TLS;
+    struct flb_aws_header *auth_header = NULL;
 
     flb_debug("[aws_credentials] Configuring HTTP provider with %s:80%s",
               host, path);
@@ -348,7 +358,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
         return NULL;
     }
 
-    return flb_endpoint_provider_create(config, host, path, port, insecure, generator);
+    return flb_endpoint_provider_create(config, host, path, port, insecure, auth_token, generator);
 
 }
 
@@ -361,6 +371,21 @@ static int http_credentials_request(struct flb_aws_provider_http
     struct flb_aws_credentials *creds = NULL;
     struct flb_aws_client *client = implementation->client;
     struct flb_http_client *c = NULL;
+    struct flb_aws_header *auth_header = NULL;
+    if (auth_token != NULL) {
+        auth_header = flb_calloc(1, sizeof(struct flb_aws_header));
+        if (!auth_header) {
+            flb_errno();
+            flb_aws_provider_destroy(provider);
+            flb_upstream_destroy(upstream);
+            flb_error("[aws_credentials] HTTP Provider: client creation error");
+            return NULL;
+        }
+        
+        auth_header->val = auth_token
+        implementation->client->static_headers = auth_header;
+        implementation->client->static_headers_len = 1;
+    }
 
     c = client->client_vtable->request(client, FLB_HTTP_GET,
                                        implementation->path, NULL, 0,
