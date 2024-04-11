@@ -233,6 +233,8 @@ static struct flb_aws_provider_vtable http_provider_vtable = {
 struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
                                                       flb_sds_t host,
                                                       flb_sds_t path,
+                                                      int port,
+                                                      int inscure,
                                                       struct
                                                       flb_aws_client_generator
                                                       *generator)
@@ -240,6 +242,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
     struct flb_aws_provider_http *implementation = NULL;
     struct flb_aws_provider *provider = NULL;
     struct flb_upstream *upstream = NULL;
+    int io_flags = insecure == FLB_TRUE ? FLB_IO_TCP : FLB_IO_TLS;
 
     flb_debug("[aws_credentials] Configuring HTTP provider with %s:80%s",
               host, path);
@@ -267,7 +270,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
     implementation->host = host;
     implementation->path = path;
 
-    upstream = flb_upstream_create(config, host, 80, FLB_IO_TCP, NULL);
+    upstream = flb_upstream_create(config, host, port, io_flags, NULL);
 
     if (!upstream) {
         flb_aws_provider_destroy(provider);
@@ -290,7 +293,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
     implementation->client->provider = NULL;
     implementation->client->region = NULL;
     implementation->client->service = NULL;
-    implementation->client->port = 80;
+    implementation->client->port = port;
     implementation->client->flags = 0;
     implementation->client->proxy = NULL;
     implementation->client->upstream = upstream;
@@ -309,17 +312,18 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
                                                   flb_aws_client_generator
                                                   *generator)
 {
-    char *out_host;
-    char *protocol;
-    flb_sds_t host = NULL;
     flb_sds_t path = NULL;
+    flb_sds_t protocol = NULL;
+    flb_sds_t host = NULL;
+    flb_sds_t port = NULL;
+    int insecure = FLB_TRUE;
     char *relative_uri = NULL;
     char *full_uri = NULL:
 
     relative_uri = getenv(AWS_CREDENTIALS_PATH);
     full_uri = getenv(AWS_CREDENTIALS_FULL_URI);
 
-    if (path_var && strlen(path_var) > 0) {
+    if (relative_uri && strlen(relative_uri) > 0) {
         host = flb_sds_create_len(AWS_CREDENTIALS_HOST, AWS_CREDENTIALS_HOST_LEN);
         if (!host) {
             flb_errno();
@@ -332,8 +336,11 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
             return NULL;
         }
     } else if (full_uri && strlen(full_uri) > 0) {
-        ret = flb_utils_url_split(tmp, &protocol, &host, &port, &uri);
-        insecure = strncmp(tmp, "http://", 7) == 0 ? FLB_TRUE : FLB_FALSE;
+        ret = flb_utils_url_split_sds(full_uri, &protocol, &host, &port, &path);
+        if (ret < 0) {
+            return NULL;
+        }
+        insecure = strncmp(protocol, "http", 4) == 0 ? FLB_TRUE : FLB_FALSE;
     }
     } else {
         flb_debug("[aws_credentials] Not initializing ECS/EKS HTTP Provider because"
@@ -341,28 +348,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
         return NULL;
     }
 
-    host = flb_sds_create_len(AWS_CREDENTIALS_HOST, AWS_CREDENTIALS_HOST_LEN);
-    if (!host) {
-        flb_errno();
-        return NULL;
-    }
-
-    path_var = getenv(AWS_CREDENTIALS_PATH);
-    if (path_var && strlen(path_var) > 0) {
-        path = flb_sds_create(path_var);
-        if (!path) {
-            flb_errno();
-            flb_free(host);
-            return NULL;
-        }
-
-        return flb_endpoint_provider_create(config, host, path, generator);
-    } else {
-        flb_debug("[aws_credentials] Not initializing ECS Provider because"
-                  " %s is not set", AWS_CREDENTIALS_PATH);
-        flb_sds_destroy(host);
-        return NULL;
-    }
+    return flb_endpoint_provider_create(config, host, path, port, insecure, generator);
 
 }
 
