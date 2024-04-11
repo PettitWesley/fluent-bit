@@ -169,6 +169,19 @@ char *removeProtocol (char *endpoint, char *protocol) {
     return endpoint;
 }
 
+struct flb_http_client *flb_aws_client_request_basic_auth(
+                                               struct flb_aws_client *aws_client,
+                                               int method, const char *uri,
+                                               const char *body, size_t body_len,
+                                               struct flb_aws_header
+                                               *dynamic_headers,
+                                               size_t dynamic_headers_len
+                                               flb_sds_t auth_token)
+{
+    
+}
+
+
 struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client,
                                                int method, const char *uri,
                                                const char *body, size_t body_len,
@@ -177,6 +190,18 @@ struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client
                                                size_t dynamic_headers_len)
 {
     struct flb_http_client *c = NULL;
+    struct flb_aws_header *auth_header = NULL;
+    if (auth_token != NULL) {
+        auth_header = flb_calloc(1, sizeof(struct flb_aws_header));
+        if (!auth_header) {
+            flb_errno();
+            return -1;
+        }
+        
+        auth_header->val = auth_token
+        implementation->client->static_headers = auth_header;
+        implementation->client->static_headers_len = 1;
+    }
 
     c = request_do(aws_client, method, uri, body, body_len,
                    dynamic_headers, dynamic_headers_len);
