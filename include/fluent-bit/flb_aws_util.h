@@ -104,6 +104,16 @@ struct flb_aws_client {
     int debug_only;
 };
 
+struct flb_http_client *flb_aws_client_request_basic_auth(
+                                               struct flb_aws_client *aws_client,
+                                               int method, const char *uri,
+                                               const char *body, size_t body_len,
+                                               struct flb_aws_header
+                                               *dynamic_headers,
+                                               size_t dynamic_headers_len,
+                                               char *header_name,
+                                               flb_sds_t auth_token)
+
 /*
  * Frees the aws_client, the internal flb_http_client, error_code,
  * and flb_upstream.
