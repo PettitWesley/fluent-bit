@@ -104,6 +104,7 @@ struct flb_aws_client {
     int debug_only;
 };
 
+/* frees dynamic_headers */
 struct flb_http_client *flb_aws_client_request_basic_auth(
                                                struct flb_aws_client *aws_client,
                                                int method, const char *uri,

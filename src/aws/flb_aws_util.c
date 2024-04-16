@@ -169,6 +169,7 @@ char *removeProtocol (char *endpoint, char *protocol) {
     return endpoint;
 }
 
+/* always frees dynamic_headers */
 struct flb_http_client *flb_aws_client_request_basic_auth(
                                                struct flb_aws_client *aws_client,
                                                int method, const char *uri,
@@ -206,6 +207,7 @@ struct flb_http_client *flb_aws_client_request_basic_auth(
         headers[dynamic_headers_len] = auth_header
         c = flb_aws_client_request(aws_client, method, uri, body, body_len,
                                    headers, dynamic_headers_len + 1);
+        flb_free(headers);
     }
     flb_free(auth_header);
     return c;
