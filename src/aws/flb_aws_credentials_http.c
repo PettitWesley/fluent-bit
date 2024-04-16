@@ -39,6 +39,10 @@
 #define AWS_CREDENTIALS_PATH           "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
 #define AWS_CREDENTIALS_FULL_URI       "AWS_CONTAINER_CREDENTIALS_FULL_URI"
 
+#define AUTH_TOKEN_ENV_VAR             "AWS_CONTAINER_AUTHORIZATION_TOKEN"
+#define AUTH_TOKEN_FILE_ENV_VAR        "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE"
+
+
 
 /* Declarations */
 struct flb_aws_provider_http;
@@ -362,6 +366,13 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
 
 }
 
+// static int get_auth_token(char **web_token, size_t *web_token_size)
+// {
+
+//     ret = flb_read_file(implementation->token_file, &web_token,
+//                         &web_token_size);
+// }
+
 static int http_credentials_request(struct flb_aws_provider_http
                                     *implementation)
 {
@@ -371,12 +382,32 @@ static int http_credentials_request(struct flb_aws_provider_http
     struct flb_aws_credentials *creds = NULL;
     struct flb_aws_client *client = implementation->client;
     struct flb_http_client *c = NULL;
+    int ret;
+    char *auth_token = NULL;
+    size_t auth_token_size = 0;
+    char *auth_token_path = NULL;
 
-    // get auth token if present
 
-    c = client->client_vtable->request(client, FLB_HTTP_GET,
-                                       implementation->path, NULL, 0,
-                                       NULL, 0);
+    auth_token_path = getenv(AUTH_TOKEN_FILE_ENV_VAR);
+    auth_token = getenv(AUTH_TOKEN_ENV_VAR);
+    if (auth_token_path != NULL && strlen(auth_token_path) > 0) {
+        ret = flb_read_file(auth_token_path, &auth_token,
+                            &auth_token_size);
+        if (ret < 0) {
+            return -1;
+        }
+    }
+
+    if (auth_token != NULL && strlen(auth_token) > 0) {
+        c = flb_aws_client_request_basic_auth(client, FLB_HTTP_GET, implementation->path,
+                                              NULL, 0, NULL, 0,
+                                              "Authorization",
+                                              auth_token);
+    } else {
+        c = client->client_vtable->request(client, FLB_HTTP_GET,
+                                           implementation->path, NULL, 0,
+                                           NULL, 0);
+    }
 
     if (!c || c->resp.status != 200) {
         flb_debug("[aws_credentials] http credentials request failed");
