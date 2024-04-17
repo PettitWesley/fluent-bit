@@ -34,8 +34,10 @@
 #define AWS_HTTP_RESPONSE_TOKEN              "Token"
 #define AWS_CREDENTIAL_RESPONSE_EXPIRATION   "Expiration"
 
-#define AWS_CREDENTIALS_HOST           "169.254.170.2"
-#define AWS_CREDENTIALS_HOST_LEN       13
+#define ECS_CREDENTIALS_HOST           "169.254.170.2"
+#define ECS_CREDENTIALS_HOST_LEN       13
+#define EKS_CREDENTIALS_HOST           "169.254.170.23"
+#define EKS_CREDENTIALS_HOST_LEN       14
 #define AWS_CREDENTIALS_PATH           "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
 #define AWS_CREDENTIALS_FULL_URI       "AWS_CONTAINER_CREDENTIALS_FULL_URI"
 
@@ -83,8 +85,8 @@ static int validate_http_credential_uri(flb_sds_t protocol, flb_sds_t host)
     if (strncmp(protocol, "https", 5) == 0) {
         return 0;
     } else if (strncmp(host, "127.", 4) == 0 ||
-               strncmp(host, "169.254.170.2", 13) == 0 ||
-               strncmp(host, "169.254.170.23", 14) == 0 || 
+               strncmp(host, ECS_CREDENTIALS_HOST, ECS_CREDENTIALS_HOST_LEN) == 0 ||
+               strncmp(host, EKS_CREDENTIALS_HOST, EKS_CREDENTIALS_HOST_LEN) == 0 || 
                strstr(host, '::1') != NULL ||
                strstr(host, 'fd00:ec2::23') != NULL ||
                strstr(host, 'fe80:') != NULL) {
@@ -362,7 +364,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
     full_uri = getenv(AWS_CREDENTIALS_FULL_URI);
 
     if (relative_uri && strlen(relative_uri) > 0) {
-        host = flb_sds_create_len(AWS_CREDENTIALS_HOST, AWS_CREDENTIALS_HOST_LEN);
+        host = flb_sds_create_len(ECS_CREDENTIALS_HOST, ECS_CREDENTIALS_HOST_LEN);
         if (!host) {
             flb_errno();
             return NULL;
@@ -381,7 +383,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
         insecure = strncmp(protocol, "http", 4) == 0 ? FLB_TRUE : FLB_FALSE;
         ret = validate_http_credential_uri(protocol, host);
         if (ret < 0) {
-            flb_error("[aws credentials] %s must be set to an https address or a link local IP address."
+            flb_error("[aws credentials] %s must be set to an https:// address or a link local IP address."
                       + " Found protocol=%s, host=%s, port=%s, path=%s", 
                       AWS_CREDENTIALS_FULL_URI, protocol, host, port, path);
             flb_sds_destroy(protocol);
@@ -431,6 +433,8 @@ static int http_credentials_request(struct flb_aws_provider_http
         ret = flb_read_file(auth_token_path, &auth_token,
                             &auth_token_size);
         if (ret < 0) {
+            flb_error("[aws credentials] failed to read authorization token from %s",
+                      auth_token_path);
             return -1;
         }
     }
