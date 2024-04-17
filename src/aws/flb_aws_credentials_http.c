@@ -70,6 +70,30 @@ struct flb_aws_provider_http {
     flb_sds_t auth_token; /* optional */
 };
 
+/* 
+If the resolved URI’s scheme is HTTPS, its hostname may be used in the request. 
+Otherwise, implementations MUST fail to resolve when the URI hostname 
+does not satisfy any of the following conditions:
+
+is within the loopback CIDR (IPv4 127.0.0.0/8, IPv6 ::1/128)
+is the ECS container host 169.254.170.2
+is the EKS container host (IPv4 169.254.170.23, IPv6 fd00:ec2::23)*/
+static int validate_http_credential_uri(flb_sds_t protocol, flb_sds_t host)
+{
+    if (strncmp(protocol, "https", 5) == 0) {
+        return 0;
+    } else if (strncmp(host, "127.", 4) == 0 ||
+               strncmp(host, "169.254.170.2", 13) == 0 ||
+               strncmp(host, "169.254.170.23", 14) == 0 || 
+               strstr(host, '::1') != NULL ||
+               strstr(host, 'fd00:ec2::23') != NULL ||
+               strstr(host, 'fe80:') != NULL) {
+        return 0;
+    }
+
+    return -1;
+}
+
 
 struct flb_aws_credentials *get_credentials_fn_http(struct flb_aws_provider
                                                     *provider)
@@ -355,6 +379,17 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
             return NULL;
         }
         insecure = strncmp(protocol, "http", 4) == 0 ? FLB_TRUE : FLB_FALSE;
+        ret = validate_http_credential_uri(protocol, host);
+        if (ret < 0) {
+            flb_error("[aws credentials] %s must be set to an https address or a link local IP address."
+                      + " Found protocol=%s, host=%s, port=%s, path=%s", 
+                      AWS_CREDENTIALS_FULL_URI, protocol, host, port, path);
+            flb_sds_destroy(protocol);
+            flb_sds_destroy(host);
+            flb_sds_destroy(port);
+            flb_sds_destroy(path);
+            return NULL;
+        }
     }
     } else {
         flb_debug("[aws_credentials] Not initializing ECS/EKS HTTP Provider because"
@@ -366,12 +401,15 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
 
 }
 
-// static int get_auth_token(char **web_token, size_t *web_token_size)
-// {
-
-//     ret = flb_read_file(implementation->token_file, &web_token,
-//                         &web_token_size);
-// }
+static void trim_newline(char *token)
+{
+    int i;
+    for (i = strlen(token) - 1; i > 0; i--) {
+        if (token[i] == '\r' || token[i] == '/n') {
+            token[i] = '\0';
+        }
+    }
+}
 
 static int http_credentials_request(struct flb_aws_provider_http
                                     *implementation)
@@ -387,7 +425,6 @@ static int http_credentials_request(struct flb_aws_provider_http
     size_t auth_token_size = 0;
     char *auth_token_path = NULL;
 
-
     auth_token_path = getenv(AUTH_TOKEN_FILE_ENV_VAR);
     auth_token = getenv(AUTH_TOKEN_ENV_VAR);
     if (auth_token_path != NULL && strlen(auth_token_path) > 0) {
@@ -399,10 +436,12 @@ static int http_credentials_request(struct flb_aws_provider_http
     }
 
     if (auth_token != NULL && strlen(auth_token) > 0) {
+        trim_newline(auth_token);
         c = flb_aws_client_request_basic_auth(client, FLB_HTTP_GET, implementation->path,
                                               NULL, 0, NULL, 0,
                                               "Authorization",
                                               auth_token);
+        flb_free(auth_token);
     } else {
         c = client->client_vtable->request(client, FLB_HTTP_GET,
                                            implementation->path, NULL, 0,
@@ -412,6 +451,10 @@ static int http_credentials_request(struct flb_aws_provider_http
     if (!c || c->resp.status != 200) {
         flb_debug("[aws_credentials] http credentials request failed");
         if (c) {
+            if (c->resp.payload_size > 0) {
+                flb_aws_print_error_code(c->resp.payload, c->resp.payload_size,
+                                         "ContainerCredentialsLocalServer");
+            }
             flb_http_client_destroy(c);
         }
         return -1;
@@ -455,6 +498,7 @@ struct flb_aws_credentials *flb_parse_http_credentials(char *response,
                                       expiration);
 }
 
+//TODO: error code handling
 struct flb_aws_credentials *flb_parse_json_credentials(char *response,
                                                        size_t response_len,
                                                        char* session_token_field,
