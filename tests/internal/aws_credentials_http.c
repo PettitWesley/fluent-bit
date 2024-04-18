@@ -27,6 +27,8 @@
     \"Token\": \"http_token\"\n\
 }"
 
+#define TEST_AUTHORIZATION_TOKEN_FILE AWS_TEST_DATA_PATH("container_authorization_token.txt")
+
 /*
  * Unexpected/invalid HTTP response. The goal of this is not to test anything
  * that might happen in production, but rather to test the error handling
@@ -422,13 +424,15 @@ void cleanup_test(struct flb_aws_provider *provider, struct flb_config *config,
     }
 }
 
-static void test_http_provider_eks_without_token()
+static void test_http_provider_ecs_case()
 {
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     struct flb_config *config;
     struct flb_config *config_fluent;
     int ret;
+
+    setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/iam_credentials/pod1", 1);
 
     setup_test(FLB_AWS_CLIENT_MOCK(
         response(
@@ -492,6 +496,254 @@ static void test_http_provider_eks_without_token()
     cleanup_test(provider, config, config_fluent);
 }
 
+static void test_http_provider_eks_with_token()
+{
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    struct flb_config *config;
+    struct flb_config *config_fluent;
+    int ret;
+
+    setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/iam_credentials/pod1", 1);
+    setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN", "password", 1);
+
+    setup_test(FLB_AWS_CLIENT_MOCK(
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "Authorization", "password"),
+            set(STATUS, 200),
+            set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
+                "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"XACCESSEKSXXX\",\n  \"SecretAccessKey\""
+                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEkSXXXXXXXXXXXXXXX==\",\n"
+                "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
+            set(PAYLOAD_SIZE, 257)
+        ),
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "Authorization", "password"),
+            set(STATUS, 200),
+            set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
+                "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"YACCESSEKSXXX\",\n  \"SecretAccessKey\""
+                " : \"YSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"YTOKENEKSXXXXXXXXXXXXXXX==\",\n"
+                "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
+            set(PAYLOAD_SIZE, 257)
+        )
+    ), &provider, &config, &config_fluent);
+
+    /* Repeated calls to get credentials should return the same set */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("XACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* Retrieve from cache */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("XACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* refresh should return 0 (success) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret == 0);
+
+    /* Retrieve refreshed credentials from cache */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("YACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("YSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("YTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* Check we have exhausted our response list */
+    TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
+
+    cleanup_test(provider, config, config_fluent);
+}
+
+static void test_http_provider_eks_with_token_file()
+{
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    struct flb_config *config;
+    struct flb_config *config_fluent;
+    int ret;
+
+    /* tests validation of valid non-default local loopback IP */
+    setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://127.0.0.7:80/iam_credentials/pod1", 1);
+    setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", TEST_AUTHORIZATION_TOKEN_FILE, 1);
+
+    setup_test(FLB_AWS_CLIENT_MOCK(
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "Authorization", "local-http-credential-server-authorization-token"),
+            set(STATUS, 200),
+            set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
+                "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"XACCESSEKSXXX\",\n  \"SecretAccessKey\""
+                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEkSXXXXXXXXXXXXXXX==\",\n"
+                "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
+            set(PAYLOAD_SIZE, 257)
+        ),
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "Authorization", "local-http-credential-server-authorization-token"),
+            set(STATUS, 200),
+            set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
+                "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"YACCESSEKSXXX\",\n  \"SecretAccessKey\""
+                " : \"YSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"YTOKENEKSXXXXXXXXXXXXXXX==\",\n"
+                "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
+            set(PAYLOAD_SIZE, 257)
+        )
+    ), &provider, &config, &config_fluent);
+
+    /* Repeated calls to get credentials should return the same set */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("XACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* Retrieve from cache */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("XACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* refresh should return 0 (success) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret == 0);
+
+    /* Retrieve refreshed credentials from cache */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("YACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("YSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("YTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* Check we have exhausted our response list */
+    TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
+
+    cleanup_test(provider, config, config_fluent);
+}
+
+
+static void test_http_provider_https_endpoint()
+{
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    struct flb_config *config;
+    struct flb_config *config_fluent;
+    int ret;
+
+    setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "https://customers-vpc-credential-vending-server/iam_credentials/pod1", 1);
+    setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", TEST_AUTHORIZATION_TOKEN_FILE, 1);
+
+    setup_test(FLB_AWS_CLIENT_MOCK(
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "Authorization", "local-http-credential-server-authorization-token"),
+            set(STATUS, 200),
+            set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
+                "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"XACCESSEKSXXX\",\n  \"SecretAccessKey\""
+                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEkSXXXXXXXXXXXXXXX==\",\n"
+                "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
+            set(PAYLOAD_SIZE, 257)
+        ),
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "Authorization", "local-http-credential-server-authorization-token"),
+            set(STATUS, 200),
+            set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
+                "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"YACCESSEKSXXX\",\n  \"SecretAccessKey\""
+                " : \"YSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"YTOKENEKSXXXXXXXXXXXXXXX==\",\n"
+                "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
+            set(PAYLOAD_SIZE, 257)
+        )
+    ), &provider, &config, &config_fluent);
+
+    /* Repeated calls to get credentials should return the same set */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("XACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* Retrieve from cache */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("XACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* refresh should return 0 (success) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret == 0);
+
+    /* Retrieve refreshed credentials from cache */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("YACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("YSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("YTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* Check we have exhausted our response list */
+    TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
+
+    cleanup_test(provider, config, config_fluent);
+}
+
+static void test_http_validator_invalid_host()
+{
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    struct flb_config *config;
+    struct flb_config *config_fluent;
+    int ret;
+
+    setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://104.156.107.142:80/iam_credentials/pod1", 1);
+    setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN", "password", 1);
+
+    flb_aws_client_mock_configure_generator({ 0 });
+
+    config = flb_calloc(1, sizeof(struct flb_config));
+    TEST_ASSERT(config != NULL);
+    mk_list_init(&config->upstreams);
+
+    /* provider creation will fail with error message indicating host was invalid */
+    provider = flb_http_provider_create(config, flb_aws_client_get_mock_generator());
+    TEST_ASSERT(provider == NULL);
+
+    flb_aws_client_mock_destroy_generator();
+    flb_free(config);
+    
+}
+
+//TODO: resp failure, validation, ecs, https
 
 TEST_LIST = {
     { "test_http_provider" , test_http_provider},

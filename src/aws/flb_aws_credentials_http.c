@@ -348,9 +348,9 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
  */
 
  struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
-                                                  struct
-                                                  flb_aws_client_generator
-                                                  *generator)
+                                                   struct
+                                                   flb_aws_client_generator
+                                                   *generator)
 {
     flb_sds_t path = NULL;
     flb_sds_t protocol = NULL;
