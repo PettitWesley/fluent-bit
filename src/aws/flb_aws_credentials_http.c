@@ -262,13 +262,6 @@ static struct flb_aws_provider_vtable http_provider_vtable = {
     .upstream_set = upstream_set_fn_http,
 };
 
-static struct flb_aws_header http_credentials_basic_auth_header = {
-    .key = "Authorization",
-    .key_len = 13,
-    .val = "",
-    .val_len = 0,
-};
-
 struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
                                                       flb_sds_t host,
                                                       flb_sds_t path,
@@ -383,8 +376,8 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
         insecure = strncmp(protocol, "http", 4) == 0 ? FLB_TRUE : FLB_FALSE;
         ret = validate_http_credential_uri(protocol, host);
         if (ret < 0) {
-            flb_error("[aws credentials] %s must be set to an https:// address or a link local IP address."
-                      + " Found protocol=%s, host=%s, port=%s, path=%s", 
+            flb_error("[aws credentials] %s must be set to an https:// address or a link local IP address." +
+                      " Found protocol=%s, host=%s, port=%s, path=%s", 
                       AWS_CREDENTIALS_FULL_URI, protocol, host, port, path);
             flb_sds_destroy(protocol);
             flb_sds_destroy(host);
@@ -392,9 +385,8 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
             flb_sds_destroy(path);
             return NULL;
         }
-    }
     } else {
-        flb_debug("[aws_credentials] Not initializing ECS/EKS HTTP Provider because"
+        flb_debug("[aws_credentials] Not initializing ECS/EKS HTTP Provider because" +
                   " %s and %s is not set", AWS_CREDENTIALS_PATH, AWS_CREDENTIALS_FULL_URI);
         return NULL;
     }
@@ -407,7 +399,7 @@ static void trim_newline(char *token)
 {
     int i;
     for (i = strlen(token) - 1; i > 0; i--) {
-        if (token[i] == '\r' || token[i] == '/n') {
+        if (token[i] == '\r' || token[i] == '\n') {
             token[i] = '\0';
         }
     }
