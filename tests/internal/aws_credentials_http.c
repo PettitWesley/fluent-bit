@@ -577,7 +577,7 @@ static void test_http_provider_eks_with_token_file()
     struct flb_config *config_fluent;
     int ret;
 
-    /* tests validation of valid non-default local loopback IP */
+    /* tests validation of valid non-default  local loopback IP */
     setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://127.0.0.7:80/iam_credentials/pod1", 1);
     setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", TEST_AUTHORIZATION_TOKEN_FILE, 1);
 
@@ -717,6 +717,50 @@ static void test_http_provider_https_endpoint()
     cleanup_test(provider, config, config_fluent);
 }
 
+static void test_http_provider_server_failure()
+{
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    struct flb_config *config;
+    struct flb_config *config_fluent;
+    int ret;
+
+    setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "https://customers-vpc-credential-vending-server/iam_credentials/pod1", 1);
+    setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", TEST_AUTHORIZATION_TOKEN_FILE, 1);
+
+    setup_test(FLB_AWS_CLIENT_MOCK(
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "Authorization", "local-http-credential-server-authorization-token"),
+            set(STATUS, 400),
+            set(PAYLOAD, "{\"Message\": \"Invalid Authorization token\",\"Code\": \"ClientError\"}"),
+            set(PAYLOAD_SIZE, 64)
+        ),
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "Authorization", "local-http-credential-server-authorization-token"),
+            set(STATUS, 500),
+            set(PAYLOAD, "{\"Message\": \"Internal Server Error\",\"Code\": \"ServerError\"}"),
+            set(PAYLOAD_SIZE, 58)
+        )
+    ), &provider, &config, &config_fluent);
+
+    /* Endpoint failure, no creds returnd */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds == NULL);
+
+    /* refresh should return 0 (success) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret != 0);
+
+    /* Check we have exhausted our response list */
+    TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
+
+    cleanup_test(provider, config, config_fluent);
+}
+
 static void test_http_validator_invalid_host()
 {
     struct flb_aws_provider *provider;
@@ -742,8 +786,6 @@ static void test_http_validator_invalid_host()
     flb_free(config);
     
 }
-
-//TODO: resp failure, validation, ecs, https
 
 TEST_LIST = {
     { "test_http_provider" , test_http_provider},
