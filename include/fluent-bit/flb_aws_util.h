@@ -113,7 +113,7 @@ struct flb_http_client *flb_aws_client_request_basic_auth(
                                                *dynamic_headers,
                                                size_t dynamic_headers_len,
                                                char *header_name,
-                                               flb_sds_t auth_token)
+                                               flb_sds_t auth_token);
 
 /*
  * Frees the aws_client, the internal flb_http_client, error_code,
@@ -167,7 +167,7 @@ void flb_aws_print_error(char *response, size_t response_len,
  * Code and Message fields for error responses.
  */
 void flb_aws_print_error_code(char *response, size_t response_len,
-                              char *api)
+                              char *api);
 
 /* Similar to 'flb_aws_print_error', but for APIs that return XML */
 void flb_aws_print_xml_error(char *response, size_t response_len,
