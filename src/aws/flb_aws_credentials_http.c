@@ -347,7 +347,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
  * with the ECS credentials endpoint.
  */
 
- struct flb_aws_provider *flb_ecs_provider_create(struct flb_config *config,
+ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
                                                   struct
                                                   flb_aws_client_generator
                                                   *generator)

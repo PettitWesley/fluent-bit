@@ -12,6 +12,9 @@
 
 #include "flb_tests_internal.h"
 
+#include "../include/aws_client_mock.h"
+#include "../include/aws_client_mock.c"
+
 #define ACCESS_KEY_HTTP "http_akid"
 #define SECRET_KEY_HTTP "http_skid"
 #define TOKEN_HTTP      "http_token"
@@ -372,6 +375,123 @@ static void test_http_provider_malformed_response()
     flb_aws_provider_destroy(provider);
     flb_config_exit(config);
 }
+
+/*
+ * Setup test & Initialize test environment
+ */
+void setup_test(struct flb_aws_client_mock_request_chain *request_chain,
+                struct flb_aws_provider **out_provider, struct flb_config **out_config,
+                struct flb_config **out_config_fluent) {
+    struct flb_aws_provider *provider;
+    struct flb_config *config;
+    struct flb_config *config_fluent;
+
+    /* Initialize test environment */
+    config_fluent = flb_config_init();
+    TEST_ASSERT(config_fluent != NULL);
+
+    flb_aws_client_mock_configure_generator(request_chain);
+
+    /* Init provider */
+    config = flb_calloc(1, sizeof(struct flb_config));
+    TEST_ASSERT(config != NULL);
+    mk_list_init(&config->upstreams);
+    provider = flb_http_provider_create(config, flb_aws_client_get_mock_generator());
+    TEST_ASSERT(provider != NULL);
+
+    *out_config = config;
+    *out_config_fluent = config_fluent;
+    *out_provider = provider;
+}
+
+/* Test clean up */
+void cleanup_test(struct flb_aws_provider *provider, struct flb_config *config,
+                struct flb_config *config_fluent) {
+    flb_aws_client_mock_destroy_generator();
+    if (provider != NULL) {
+        ((struct flb_aws_provider_http *) (provider->implementation))->client = NULL;
+        flb_aws_provider_destroy(provider);
+        provider = NULL;
+    }
+    if (config != NULL) {
+        flb_free(config);
+    }
+    if (config_fluent != NULL) {
+        flb_config_exit(config_fluent);
+        config_fluent = NULL;
+    }
+}
+
+static void test_http_provider_eks_without_token()
+{
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    struct flb_config *config;
+    struct flb_config *config_fluent;
+    int ret;
+
+    setup_test(FLB_AWS_CLIENT_MOCK(
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER_COUNT, 0),
+            set(STATUS, 200),
+            set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
+                "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"XACCESSEKSXXX\",\n  \"SecretAccessKey\""
+                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEkSXXXXXXXXXXXXXXX==\",\n"
+                "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
+            set(PAYLOAD_SIZE, 257)
+        ),
+        response(
+            expect(URI, "/iam_credentials/pod1"),
+            expect(METHOD, FLB_HTTP_GET),
+            expect(HEADER, "X-aws-ec2-metadata-token", "AQAAANjUxxxxxxXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX_Q=="),
+            set(STATUS, 200),
+            set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
+                "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"YACCESSEKSXXX\",\n  \"SecretAccessKey\""
+                " : \"YSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"YTOKENEKSXXXXXXXXXXXXXXX==\",\n"
+                "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"), // Expires Year 3021
+            set(PAYLOAD_SIZE, 257)
+        )
+    ), &provider, &config, &config_fluent);
+
+    /* Repeated calls to get credentials should return the same set */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("XACCESSEKSXXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* Retrieve from cache */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("XACCESSEC2XXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XSECRETEC2XXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XTOKENEC2XXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* refresh should return 0 (success) */
+    ret = provider->provider_vtable->refresh(provider);
+    TEST_CHECK(ret == 0);
+
+    /* Retrieve refreshed credentials from cache */
+    creds = provider->provider_vtable->get_credentials(provider);
+    TEST_ASSERT(creds != NULL);
+    TEST_CHECK(strcmp("YACCESSEC2XXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("YSECRETEC2XXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("YTOKENEC2XXXXXXXXXXXXXXX==", creds->session_token) == 0);
+
+    flb_aws_credentials_destroy(creds);
+
+    /* Check we have exhausted our response list */
+    TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
+
+    cleanup_test(provider, config, config_fluent);
+}
+
 
 TEST_LIST = {
     { "test_http_provider" , test_http_provider},
