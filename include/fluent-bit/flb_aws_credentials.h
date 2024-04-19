@@ -256,15 +256,17 @@ struct flb_aws_provider *flb_aws_env_provider_create();
  * Calling flb_aws_provider_destroy on this provider frees the memory
  * used by host and path.
  */
-struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
-                                                  flb_sds_t host,
-                                                  flb_sds_t path,
-                                                  struct
-                                                  flb_aws_client_generator
-                                                  *generator);
+struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
+                                                      flb_sds_t host,
+                                                      flb_sds_t path,
+                                                      int port,
+                                                      int insecure,
+                                                      struct
+                                                      flb_aws_client_generator
+                                                      *generator)
 
 /*
- * ECS Provider
+ * HTTP Provider for EKS and ECS
  * The ECS Provider is just a wrapper around the HTTP Provider
  * with the ECS credentials endpoint.
  */
