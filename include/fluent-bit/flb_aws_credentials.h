@@ -263,7 +263,7 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
                                                       int insecure,
                                                       struct
                                                       flb_aws_client_generator
-                                                      *generator)
+                                                      *generator);
 
 /*
  * HTTP Provider for EKS and ECS
