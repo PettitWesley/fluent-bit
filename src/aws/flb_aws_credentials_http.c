@@ -275,7 +275,6 @@ struct flb_aws_provider *flb_endpoint_provider_create(struct flb_config *config,
     struct flb_aws_provider *provider = NULL;
     struct flb_upstream *upstream = NULL;
     int io_flags = insecure == FLB_TRUE ? FLB_IO_TCP : FLB_IO_TLS;
-    struct flb_aws_header *auth_header = NULL;
 
     flb_debug("[aws_credentials] Configuring HTTP provider with %s:80%s",
               host, path);
@@ -350,7 +349,7 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
     flb_sds_t port = NULL;
     int insecure = FLB_TRUE;
     char *relative_uri = NULL;
-    char *full_uri = NULL:
+    char *full_uri = NULL;
 
     relative_uri = getenv(AWS_CREDENTIALS_PATH);
     full_uri = getenv(AWS_CREDENTIALS_FULL_URI);
