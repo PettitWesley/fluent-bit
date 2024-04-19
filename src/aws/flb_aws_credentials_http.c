@@ -87,9 +87,9 @@ static int validate_http_credential_uri(flb_sds_t protocol, flb_sds_t host)
     } else if (strncmp(host, "127.", 4) == 0 ||
                strncmp(host, ECS_CREDENTIALS_HOST, ECS_CREDENTIALS_HOST_LEN) == 0 ||
                strncmp(host, EKS_CREDENTIALS_HOST, EKS_CREDENTIALS_HOST_LEN) == 0 || 
-               strstr(host, '::1') != NULL ||
-               strstr(host, 'fd00:ec2::23') != NULL ||
-               strstr(host, 'fe80:') != NULL) {
+               strstr(host, "::1") != NULL ||
+               strstr(host, "fd00:ec2::23") != NULL ||
+               strstr(host, "fe80:") != NULL) {
         return 0;
     }
 
@@ -629,12 +629,12 @@ struct flb_aws_credentials *flb_parse_json_credentials(char *response,
                     goto error;
                 }
                 *expiration = flb_aws_cred_expiration(tmp);
-                flb_sds_destroy(tmp);
                 if (*expiration < 0) {
                     flb_warn("[aws_credentials] '%s' was invalid or "
                              "could not be parsed. Disabling auto-refresh of "
-                             "credentials.", AWS_CREDENTIAL_RESPONSE_EXPIRATION);
+                             "credentials.", tmp);
                 }
+                flb_sds_destroy(tmp);
             }
         }
 
