@@ -350,6 +350,7 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
     int insecure = FLB_TRUE;
     char *relative_uri = NULL;
     char *full_uri = NULL;
+    int ret;
 
     relative_uri = getenv(AWS_CREDENTIALS_PATH);
     full_uri = getenv(AWS_CREDENTIALS_FULL_URI);
@@ -360,7 +361,7 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
             flb_errno();
             return NULL;
         }
-        path = flb_sds_create(path_var);
+        path = flb_sds_create(relative_uri);
         if (!path) {
             flb_errno();
             flb_free(host);
