@@ -389,7 +389,7 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
         return NULL;
     }
 
-    return flb_endpoint_provider_create(config, host, path, port, insecure, auth_token, generator);
+    return flb_endpoint_provider_create(config, host, path, port, insecure, generator);
 
 }
 
