@@ -256,7 +256,6 @@ struct flb_http_client *flb_aws_client_request_basic_auth(
 
 static struct flb_aws_client_vtable client_vtable = {
     .request = flb_aws_client_request,
-    .request_basic_auth = flb_aws_client_request_basic_auth,
 };
 
 struct flb_aws_client *flb_aws_client_create()

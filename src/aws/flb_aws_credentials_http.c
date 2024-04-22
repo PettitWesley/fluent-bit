@@ -22,10 +22,12 @@
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
+#include <fluent-bit/flb_util.h>
 
 #include <fluent-bit/flb_jsmn.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -346,7 +348,8 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
     flb_sds_t path = NULL;
     flb_sds_t protocol = NULL;
     flb_sds_t host = NULL;
-    flb_sds_t port = NULL;
+    flb_sds_t port_sds = NULL;
+    int port = 80;
     int insecure = FLB_TRUE;
     char *relative_uri = NULL;
     char *full_uri = NULL;
@@ -368,19 +371,19 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
             return NULL;
         }
     } else if (full_uri && strlen(full_uri) > 0) {
-        ret = flb_utils_url_split_sds(full_uri, &protocol, &host, &port, &path);
+        ret = flb_utils_url_split_sds(full_uri, &protocol, &host, &port_sds, &path);
         if (ret < 0) {
             return NULL;
         }
         insecure = strncmp(protocol, "http", 4) == 0 ? FLB_TRUE : FLB_FALSE;
         ret = validate_http_credential_uri(protocol, host);
         if (ret < 0) {
-            flb_error("[aws credentials] %s must be set to an https:// address or a link local IP address." +
+            flb_error("[aws credentials] %s must be set to an https:// address or a link local IP address."
                       " Found protocol=%s, host=%s, port=%s, path=%s", 
-                      AWS_CREDENTIALS_FULL_URI, protocol, host, port, path);
+                      AWS_CREDENTIALS_FULL_URI, protocol, host, port_sds, path);
             flb_sds_destroy(protocol);
             flb_sds_destroy(host);
-            flb_sds_destroy(port);
+            flb_sds_destroy(port_sds);
             flb_sds_destroy(path);
             return NULL;
         }
@@ -388,6 +391,20 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
         flb_debug("[aws_credentials] Not initializing ECS/EKS HTTP Provider because" +
                   " %s and %s is not set", AWS_CREDENTIALS_PATH, AWS_CREDENTIALS_FULL_URI);
         return NULL;
+    }
+
+    if (port_sds != NULL) {
+        port = atoi(port_sds);
+        if (port == 0) {
+            flb_error("[aws credentials] invalid port: %s must be set to an https:// address or a link local IP address."
+                      " Found protocol=%s, host=%s, port=%s, path=%s", 
+                      AWS_CREDENTIALS_FULL_URI, protocol, host, port_sds, path);
+            flb_sds_destroy(protocol);
+            flb_sds_destroy(host);
+            flb_sds_destroy(port_sds);
+            flb_sds_destroy(path);
+            return NULL;
+        }
     }
 
     return flb_endpoint_provider_create(config, host, path, port, insecure, generator);

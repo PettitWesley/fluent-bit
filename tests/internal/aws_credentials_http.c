@@ -787,6 +787,32 @@ static void test_http_validator_invalid_host()
     
 }
 
+static void test_http_validator_invalid_port()
+{
+    struct flb_aws_provider *provider;
+    struct flb_aws_credentials *creds;
+    struct flb_config *config;
+    struct flb_config *config_fluent;
+    int ret;
+
+    setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://104.156.107.142:AA/iam_credentials/pod1", 1);
+    setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN", "password", 1);
+
+    flb_aws_client_mock_configure_generator({ 0 });
+
+    config = flb_calloc(1, sizeof(struct flb_config));
+    TEST_ASSERT(config != NULL);
+    mk_list_init(&config->upstreams);
+
+    /* provider creation will fail with error message indicating port was invalid */
+    provider = flb_http_provider_create(config, flb_aws_client_get_mock_generator());
+    TEST_ASSERT(provider == NULL);
+
+    flb_aws_client_mock_destroy_generator();
+    flb_free(config);
+    
+}
+
 TEST_LIST = {
     { "test_http_provider", test_http_provider},
     { "test_http_provider_error_case", test_http_provider_error_case},
@@ -798,5 +824,6 @@ TEST_LIST = {
     { "test_http_provider_https_endpoint", test_http_provider_https_endpoint},
     { "test_http_provider_server_failure", test_http_provider_server_failure},
     { "test_http_validator_invalid_host", test_http_validator_invalid_host},
+    { "test_http_validator_invalid_port", test_http_validator_invalid_port},
     { 0 }
 };
