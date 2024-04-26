@@ -388,7 +388,7 @@ struct flb_aws_provider *flb_http_provider_create(struct flb_config *config,
             return NULL;
         }
     } else {
-        flb_debug("[aws_credentials] Not initializing ECS/EKS HTTP Provider because" +
+        flb_debug("[aws_credentials] Not initializing ECS/EKS HTTP Provider because"
                   " %s and %s is not set", AWS_CREDENTIALS_PATH, AWS_CREDENTIALS_FULL_URI);
         return NULL;
     }
