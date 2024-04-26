@@ -205,8 +205,7 @@ static void test_http_provider()
         return;
     }
 
-    provider = flb_http_provider_create(config, host, path,
-                                 generator_in_test());
+    provider = flb_http_provider_create(config, generator_in_test());
 
     if (!provider) {
         flb_errno();
@@ -284,8 +283,7 @@ static void test_http_provider_error_case()
         return;
     }
 
-    provider = flb_http_provider_create(config, host, path,
-                                        generator_in_test());
+    provider = flb_http_provider_create(config, generator_in_test());
 
     if (!provider) {
         flb_errno();
@@ -347,8 +345,7 @@ static void test_http_provider_malformed_response()
         return;
     }
 
-    provider = flb_http_provider_create(config, host, path,
-                                 generator_in_test());
+    provider = flb_http_provider_create(config, generator_in_test());
 
     if (!provider) {
         flb_errno();
