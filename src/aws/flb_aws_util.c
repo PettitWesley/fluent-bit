@@ -245,7 +245,7 @@ struct flb_http_client *flb_aws_client_request_basic_auth(
             flb_errno();
             return NULL;
         }
-        headers[dynamic_headers_len] = auth_header
+        headers[dynamic_headers_len] = auth_header;
         c = flb_aws_client_request(aws_client, method, uri, body, body_len,
                                    headers, dynamic_headers_len + 1);
         flb_free(headers);

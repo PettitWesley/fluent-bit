@@ -22,7 +22,7 @@
 #include <fluent-bit/flb_http_client.h>
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
-#include <fluent-bit/flb_util.h>
+#include <fluent-bit/flb_utils.h>
 
 #include <fluent-bit/flb_jsmn.h>
 #include <stdlib.h>
