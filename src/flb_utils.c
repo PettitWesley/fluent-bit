@@ -1036,7 +1036,7 @@ char *flb_copy_host_sds(const char *string, int pos_init, int pos_end)
         return flb_sds_create_len(string + pos_init + 1, pos_end - 1);
     }
     else {
-        return flb_sds_create_len(string[pos_init], pos_end);
+        return flb_sds_create_len(string + pos_init, pos_end);
     }
 }
 
@@ -1201,7 +1201,7 @@ int flb_utils_url_split_sds(const flb_sds_t in_url, flb_sds_t *out_protocol,
             uri = flb_sds_create(tmp);
         }
         else {
-            host = flb_sds_create(p, strlen(p));
+            host = flb_copy_host_sds(p, 0, strlen(p));
             uri = flb_sds_create("/");
         }
     }
