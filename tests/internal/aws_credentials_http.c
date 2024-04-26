@@ -15,6 +15,8 @@
 #include "../include/aws_client_mock.h"
 #include "../include/aws_client_mock.c"
 
+#include "aws_credentials_test_internal.h"
+
 #define ACCESS_KEY_HTTP "http_akid"
 #define SECRET_KEY_HTTP "http_skid"
 #define TOKEN_HTTP      "http_token"
