@@ -49,30 +49,9 @@
 
 
 /* Declarations */
-struct flb_aws_provider_http;
 static int http_credentials_request(struct flb_aws_provider_http
                                     *implementation);
 
-
-/*
- * HTTP Credentials Provider - retrieve credentials from a local http server
- * Used to implement the ECS Credentials provider.
- * Equivalent to:
- * https://github.com/aws/aws-sdk-go/tree/master/aws/credentials/endpointcreds
- */
-
-struct flb_aws_provider_http {
-    struct flb_aws_credentials *creds;
-    time_t next_refresh;
-
-    struct flb_aws_client *client;
-
-    /* Host and Path to request credentials */
-    flb_sds_t host;
-    flb_sds_t path;
-
-    flb_sds_t auth_token; /* optional */
-};
 
 /* 
 If the resolved URI’s scheme is HTTPS, its hostname may be used in the request. 
