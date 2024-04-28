@@ -771,7 +771,7 @@ static void test_http_validator_invalid_host()
     setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://104.156.107.142:80/iam_credentials/pod1", 1);
     setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN", "password", 1);
 
-    flb_aws_client_mock_configure_generator({ 0 });
+    flb_aws_client_mock_configure_generator(NULL);
 
     config = flb_calloc(1, sizeof(struct flb_config));
     TEST_ASSERT(config != NULL);
@@ -797,7 +797,7 @@ static void test_http_validator_invalid_port()
     setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://104.156.107.142:AA/iam_credentials/pod1", 1);
     setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN", "password", 1);
 
-    flb_aws_client_mock_configure_generator({ 0 });
+    flb_aws_client_mock_configure_generator(NULL);
 
     config = flb_calloc(1, sizeof(struct flb_config));
     TEST_ASSERT(config != NULL);
