@@ -81,7 +81,7 @@
  *       TEST_CHECK(ptr->member2 > 200);
  *   }
  */
-#define TEST_CHECK_(cond,...)   acutest_check_((cond), __FILE__, __LINE__, __VA_ARGS__)
+#define TEST_CHECK_(cond,...)   acutest_check_((cond), __FILE__, __LINE__, __VA_ARGS__) && flb_info(__VA_ARGS__)
 #define TEST_CHECK(cond)        acutest_check_((cond), __FILE__, __LINE__, "%s", #cond)
 
 
