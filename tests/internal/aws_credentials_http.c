@@ -786,7 +786,6 @@ static void test_http_validator_invalid_host()
 static void test_http_validator_invalid_port()
 {
     struct flb_aws_provider *provider;
-    struct flb_aws_credentials *creds;
     struct flb_config *config;
 
     setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://104.156.107.142:AA/iam_credentials/pod1", 1);
