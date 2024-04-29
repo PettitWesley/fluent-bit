@@ -763,10 +763,7 @@ static void test_http_provider_server_failure()
 static void test_http_validator_invalid_host()
 {
     struct flb_aws_provider *provider;
-    struct flb_aws_credentials *creds;
     struct flb_config *config;
-    struct flb_config *config_fluent;
-    int ret;
 
     setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://104.156.107.142:80/iam_credentials/pod1", 1);
     setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN", "password", 1);
@@ -791,8 +788,6 @@ static void test_http_validator_invalid_port()
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     struct flb_config *config;
-    struct flb_config *config_fluent;
-    int ret;
 
     setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://104.156.107.142:AA/iam_credentials/pod1", 1);
     setenv("AWS_CONTAINER_AUTHORIZATION_TOKEN", "password", 1);
