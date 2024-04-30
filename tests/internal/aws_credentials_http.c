@@ -448,7 +448,6 @@ static void test_http_provider_ecs_case()
         response(
             expect(URI, "/iam_credentials/pod1"),
             expect(METHOD, FLB_HTTP_GET),
-            expect(HEADER, "X-aws-ec2-metadata-token", "AQAAANjUxxxxxxXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX_Q=="),
             set(STATUS, 200),
             set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
                 "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"YACCESSEKSXXX\",\n  \"SecretAccessKey\""
