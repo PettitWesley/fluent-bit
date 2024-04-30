@@ -473,11 +473,11 @@ static void test_http_provider_ecs_case()
     /* Retrieve from cache */
     creds = provider->provider_vtable->get_credentials(provider);
     TEST_ASSERT(creds != NULL);
-    TEST_CHECK(strcmp("XACCESSEC2XXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("XACCESSEKSXXX", creds->access_key_id) == 0);
     flb_info("%s", creds->access_key_id);
-    TEST_CHECK(strcmp("XSECRETEC2XXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("XSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
     flb_info("%s", creds->secret_access_key);
-    TEST_CHECK(strcmp("XTOKENEC2XXXXXXXXXXXXXXX==", creds->session_token) == 0);
+    TEST_CHECK(strcmp("XTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
     flb_info("%s", creds->session_token);
 
     flb_aws_credentials_destroy(creds);
@@ -489,11 +489,11 @@ static void test_http_provider_ecs_case()
     /* Retrieve refreshed credentials from cache */
     creds = provider->provider_vtable->get_credentials(provider);
     TEST_ASSERT(creds != NULL);
-    TEST_CHECK(strcmp("YACCESSEC2XXX", creds->access_key_id) == 0);
+    TEST_CHECK(strcmp("YACCESSEKSXXX", creds->access_key_id) == 0);
     flb_info("%s", creds->access_key_id);
-    TEST_CHECK(strcmp("YSECRETEC2XXXXXXXXXXXXXX", creds->secret_access_key) == 0);
+    TEST_CHECK(strcmp("YSECRETEKSXXXXXXXXXXXXXX", creds->secret_access_key) == 0);
     flb_info("%s", creds->secret_access_key);
-    TEST_CHECK(strcmp("YTOKENEC2XXXXXXXXXXXXXXX==", creds->session_token) == 0);
+    TEST_CHECK(strcmp("YTOKENEKSXXXXXXXXXXXXXXX==", creds->session_token) == 0);
     flb_info("%s", creds->session_token);
 
     flb_aws_credentials_destroy(creds);
