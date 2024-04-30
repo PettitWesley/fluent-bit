@@ -441,7 +441,7 @@ static void test_http_provider_ecs_case()
             set(STATUS, 200),
             set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
                 "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"XACCESSEKSXXX\",\n  \"SecretAccessKey\""
-                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEkSXXXXXXXXXXXXXXX==\",\n"
+                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEKSXXXXXXXXXXXXXXX==\",\n"
                 "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
             set(PAYLOAD_SIZE, 257)
         ),
@@ -523,7 +523,7 @@ static void test_http_provider_eks_with_token()
             set(STATUS, 200),
             set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
                 "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"XACCESSEKSXXX\",\n  \"SecretAccessKey\""
-                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEkSXXXXXXXXXXXXXXX==\",\n"
+                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEKSXXXXXXXXXXXXXXX==\",\n"
                 "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
             set(PAYLOAD_SIZE, 257)
         ),
@@ -597,7 +597,7 @@ static void test_http_provider_eks_with_token_file()
             set(STATUS, 200),
             set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
                 "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"XACCESSEKSXXX\",\n  \"SecretAccessKey\""
-                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEkSXXXXXXXXXXXXXXX==\",\n"
+                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEKSXXXXXXXXXXXXXXX==\",\n"
                 "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
             set(PAYLOAD_SIZE, 257)
         ),
@@ -671,7 +671,7 @@ static void test_http_provider_https_endpoint()
             set(STATUS, 200),
             set(PAYLOAD, "{\n  \"Code\" : \"Success\",\n  \"LastUpdated\" : \"2021-09-16T18:29:09Z\",\n"
                 "  \"Type\" : \"AWS-HMAC\",\n  \"AccessKeyId\" : \"XACCESSEKSXXX\",\n  \"SecretAccessKey\""
-                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEkSXXXXXXXXXXXXXXX==\",\n"
+                " : \"XSECRETEKSXXXXXXXXXXXXXX\",\n  \"Token\" : \"XTOKENEKSXXXXXXXXXXXXXXX==\",\n"
                 "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
             set(PAYLOAD_SIZE, 257)
         ),
