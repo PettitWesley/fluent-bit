@@ -98,7 +98,7 @@ struct flb_aws_credentials *get_credentials_fn_http(struct flb_aws_provider
             http_credentials_request(implementation);
             unlock_provider(provider);
         } else {
-            flb_error("try_lock_provider failed")
+            flb_error("try_lock_provider failed");
         }
     }
 
