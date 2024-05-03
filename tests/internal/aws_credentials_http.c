@@ -408,8 +408,8 @@ void cleanup_test(struct flb_aws_provider *provider, struct flb_config *config) 
         provider = NULL;
     }
     if (config != NULL) {
-        flb_config_exit(config_fluent);
-        config_fluent = NULL;
+        flb_config_exit(config);
+        config = NULL;
     }
 }
 
