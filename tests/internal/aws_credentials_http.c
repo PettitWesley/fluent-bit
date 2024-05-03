@@ -446,6 +446,8 @@ static void test_http_provider_ecs_case()
         )
     ), &provider, &config);
 
+    flb_time_msleep(1000);
+
     /* Repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
     TEST_ASSERT(creds != NULL);
@@ -527,6 +529,8 @@ static void test_http_provider_eks_with_token()
         )
     ), &provider, &config);
 
+    flb_time_msleep(1000);
+
     /* Repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
     TEST_ASSERT(creds != NULL);
@@ -599,6 +603,8 @@ static void test_http_provider_eks_with_token_file()
             set(PAYLOAD_SIZE, 257)
         )
     ), &provider, &config);
+
+    flb_time_msleep(1000);
 
     /* Repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
@@ -673,6 +679,8 @@ static void test_http_provider_https_endpoint()
         )
     ), &provider, &config);
 
+    flb_time_msleep(1000);
+
     /* Repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
     TEST_ASSERT(creds != NULL);
@@ -738,6 +746,8 @@ static void test_http_provider_server_failure()
             set(PAYLOAD_SIZE, 58)
         )
     ), &provider, &config);
+
+    flb_time_msleep(1000);
 
     /* Endpoint failure, no creds returnd */
     creds = provider->provider_vtable->get_credentials(provider);
