@@ -381,33 +381,26 @@ static void test_http_provider_malformed_response()
  * Setup test & Initialize test environment
  */
 void setup_test(struct flb_aws_client_mock_request_chain *request_chain,
-                struct flb_aws_provider **out_provider, struct flb_config **out_config,
-                struct flb_config **out_config_fluent) {
+                struct flb_aws_provider **out_provider, struct flb_config **out_config) {
     struct flb_aws_provider *provider;
     struct flb_config *config;
-    struct flb_config *config_fluent;
 
     /* Initialize test environment */
-    config_fluent = flb_config_init();
-    TEST_ASSERT(config_fluent != NULL);
+    config = flb_config_init();
+    TEST_ASSERT(config != NULL);
 
     flb_aws_client_mock_configure_generator(request_chain);
 
     /* Init provider */
-    config = flb_calloc(1, sizeof(struct flb_config));
-    TEST_ASSERT(config != NULL);
-    mk_list_init(&config->upstreams);
     provider = flb_http_provider_create(config, flb_aws_client_get_mock_generator());
     TEST_ASSERT(provider != NULL);
 
     *out_config = config;
-    *out_config_fluent = config_fluent;
     *out_provider = provider;
 }
 
 /* Test clean up */
-void cleanup_test(struct flb_aws_provider *provider, struct flb_config *config,
-                struct flb_config *config_fluent) {
+void cleanup_test(struct flb_aws_provider *provider, struct flb_config *config) {
     flb_aws_client_mock_destroy_generator();
     if (provider != NULL) {
         ((struct flb_aws_provider_http *) (provider->implementation))->client = NULL;
@@ -415,9 +408,6 @@ void cleanup_test(struct flb_aws_provider *provider, struct flb_config *config,
         provider = NULL;
     }
     if (config != NULL) {
-        flb_free(config);
-    }
-    if (config_fluent != NULL) {
         flb_config_exit(config_fluent);
         config_fluent = NULL;
     }
@@ -428,7 +418,6 @@ static void test_http_provider_ecs_case()
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     struct flb_config *config;
-    struct flb_config *config_fluent;
     int ret;
 
     setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/iam_credentials/pod1", 1);
@@ -455,7 +444,7 @@ static void test_http_provider_ecs_case()
                 "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"), // Expires Year 3021
             set(PAYLOAD_SIZE, 257)
         )
-    ), &provider, &config, &config_fluent);
+    ), &provider, &config);
 
     /* Repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
@@ -500,7 +489,7 @@ static void test_http_provider_ecs_case()
     /* Check we have exhausted our response list */
     TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
 
-    cleanup_test(provider, config, config_fluent);
+    cleanup_test(provider, config);
 }
 
 static void test_http_provider_eks_with_token()
@@ -508,7 +497,6 @@ static void test_http_provider_eks_with_token()
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     struct flb_config *config;
-    struct flb_config *config_fluent;
     int ret;
 
     setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/iam_credentials/pod1", 1);
@@ -537,7 +525,7 @@ static void test_http_provider_eks_with_token()
                 "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
             set(PAYLOAD_SIZE, 257)
         )
-    ), &provider, &config, &config_fluent);
+    ), &provider, &config);
 
     /* Repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
@@ -573,7 +561,7 @@ static void test_http_provider_eks_with_token()
     /* Check we have exhausted our response list */
     TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
 
-    cleanup_test(provider, config, config_fluent);
+    cleanup_test(provider, config);
 }
 
 static void test_http_provider_eks_with_token_file()
@@ -581,7 +569,6 @@ static void test_http_provider_eks_with_token_file()
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     struct flb_config *config;
-    struct flb_config *config_fluent;
     int ret;
 
     /* tests validation of valid non-default  local loopback IP */
@@ -611,7 +598,7 @@ static void test_http_provider_eks_with_token_file()
                 "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
             set(PAYLOAD_SIZE, 257)
         )
-    ), &provider, &config, &config_fluent);
+    ), &provider, &config);
 
     /* Repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
@@ -647,7 +634,7 @@ static void test_http_provider_eks_with_token_file()
     /* Check we have exhausted our response list */
     TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
 
-    cleanup_test(provider, config, config_fluent);
+    cleanup_test(provider, config);
 }
 
 
@@ -656,7 +643,6 @@ static void test_http_provider_https_endpoint()
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     struct flb_config *config;
-    struct flb_config *config_fluent;
     int ret;
 
     setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "https://customers-vpc-credential-vending-server/iam_credentials/pod1", 1);
@@ -685,7 +671,7 @@ static void test_http_provider_https_endpoint()
                 "  \"Expiration\" : \"3021-09-17T00:41:00Z\"\n}"),
             set(PAYLOAD_SIZE, 257)
         )
-    ), &provider, &config, &config_fluent);
+    ), &provider, &config);
 
     /* Repeated calls to get credentials should return the same set */
     creds = provider->provider_vtable->get_credentials(provider);
@@ -721,7 +707,7 @@ static void test_http_provider_https_endpoint()
     /* Check we have exhausted our response list */
     TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
 
-    cleanup_test(provider, config, config_fluent);
+    cleanup_test(provider, config);
 }
 
 static void test_http_provider_server_failure()
@@ -729,7 +715,6 @@ static void test_http_provider_server_failure()
     struct flb_aws_provider *provider;
     struct flb_aws_credentials *creds;
     struct flb_config *config;
-    struct flb_config *config_fluent;
     int ret;
 
     setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "https://customers-vpc-credential-vending-server/iam_credentials/pod1", 1);
@@ -752,7 +737,7 @@ static void test_http_provider_server_failure()
             set(PAYLOAD, "{\"Message\": \"Internal Server Error\",\"Code\": \"ServerError\"}"),
             set(PAYLOAD_SIZE, 58)
         )
-    ), &provider, &config, &config_fluent);
+    ), &provider, &config);
 
     /* Endpoint failure, no creds returnd */
     creds = provider->provider_vtable->get_credentials(provider);
@@ -765,7 +750,7 @@ static void test_http_provider_server_failure()
     /* Check we have exhausted our response list */
     TEST_CHECK(flb_aws_client_mock_generator_count_unused_requests() == 0);
 
-    cleanup_test(provider, config, config_fluent);
+    cleanup_test(provider, config);
 }
 
 static void test_http_validator_invalid_host()
