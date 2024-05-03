@@ -432,7 +432,6 @@ static int http_credentials_request(struct flb_aws_provider_http
                                               NULL, 0, NULL, 0,
                                               "Authorization",
                                               auth_token);
-        flb_free(auth_token);
     } else {
         c = client->client_vtable->request(client, FLB_HTTP_GET,
                                            implementation->path, NULL, 0,

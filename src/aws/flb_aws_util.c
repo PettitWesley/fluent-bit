@@ -219,7 +219,7 @@ struct flb_http_client *flb_aws_client_request_basic_auth(
                                                *dynamic_headers,
                                                size_t dynamic_headers_len,
                                                char *header_name,
-                                               flb_sds_t auth_token)
+                                               char* auth_token)
 {
     struct flb_http_client *c = NULL;
     struct flb_aws_header *auth_header = NULL;
