@@ -236,8 +236,8 @@ struct flb_http_client *flb_aws_client_request_basic_auth(
     auth_header->val_len = strlen(auth_token);
 
     if (dynamic_headers_len == 0) {
-        c = flb_aws_client_request(aws_client, method, uri, body, body_len,
-                                   auth_header, 1);
+        c = client->client_vtable->request(aws_client, method, uri, body, body_len,
+                                           auth_header, 1);
     } else {
         headers = flb_realloc(dynamic_headers, (dynamic_headers_len + 1) * sizeof(struct flb_aws_header));
         if (!headers) {
@@ -246,8 +246,8 @@ struct flb_http_client *flb_aws_client_request_basic_auth(
             return NULL;
         }
         *(headers + dynamic_headers_len) = *auth_header;
-        c = flb_aws_client_request(aws_client, method, uri, body, body_len,
-                                   headers, dynamic_headers_len + 1);
+        c = client->client_vtable->request(aws_client, method, uri, body, body_len,
+                                           headers, dynamic_headers_len + 1);
         flb_free(headers);
     }
     flb_free(auth_header);
