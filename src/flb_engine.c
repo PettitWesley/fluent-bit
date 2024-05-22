@@ -771,6 +771,8 @@ int flb_engine_start(struct flb_config *config)
         return -2;
     }
 
+    flb_info("grace=%d, grace_input=%d", config->grace, config->grace_input);
+
     while (1) {
         mk_event_wait(evl); /* potentially conditional mk_event_wait or mk_event_wait_2 based on bucket queue capacity for one shot events */
         flb_event_priority_live_foreach(event, evl_bktq, evl, FLB_ENGINE_LOOP_MAX_ITER) {
@@ -826,7 +828,11 @@ int flb_engine_start(struct flb_config *config)
                         if (config->grace_count == 1) {
                             flb_task_running_print(config);
                         }
-                        flb_engine_exit(config);
+                        if (config->grace_count < config->grace_input) {
+                            flb_engine_stop_ingestion(config);
+                        } else {
+                            flb_engine_exit(config);
+                        }
                     }
                     else {
                         if (ret > 0) {
@@ -915,6 +921,7 @@ int flb_engine_shutdown(struct flb_config *config)
 {
 
     config->is_running = FLB_FALSE;
+    flb_info("flb_engine_shutdown()");
     flb_input_pause_all(config);
 
 #ifdef FLB_HAVE_STREAM_PROCESSOR
@@ -958,15 +965,21 @@ int flb_engine_exit(struct flb_config *config)
 {
     int ret;
     uint64_t val = FLB_ENGINE_EV_STOP;
-
-    config->is_ingestion_active = FLB_FALSE;
-    config->is_shutting_down = FLB_TRUE;
-
-    flb_input_pause_all(config);
+    flb_info("flb_engine_exit()");
 
     val = FLB_ENGINE_EV_STOP;
     ret = flb_pipe_w(config->ch_manager[1], &val, sizeof(uint64_t));
     return ret;
+}
+
+void flb_engine_stop_ingestion(struct flb_config *config)
+{
+    config->is_ingestion_active = FLB_FALSE;
+    config->is_shutting_down = FLB_TRUE;
+
+    flb_info("flb_engine_stop_ingestion()");
+
+    flb_input_pause_all(config);
 }
 
 int flb_engine_exit_status(struct flb_config *config, int status)

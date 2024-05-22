@@ -928,6 +928,8 @@ int flb_main(int argc, char **argv)
         { NULL, 0, NULL, 0 }
     };
 
+    flb_info("flb_main()");
+
     /* Signal handler */
     flb_signal_init();
 
@@ -1196,6 +1198,7 @@ int flb_main(int argc, char **argv)
 
     while (ctx->status == FLB_LIB_OK && exit_signal == 0) {
         sleep(1);
+        flb_info("flb_main: main thread awoken...");
     }
 
     if (exit_signal) {

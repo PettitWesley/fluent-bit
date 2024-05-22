@@ -57,6 +57,10 @@ struct flb_service_config service_configs[] = {
      FLB_CONF_TYPE_INT,
      offsetof(struct flb_config, grace)},
 
+    {"Grace_Input",
+     FLB_CONF_TYPE_INT,
+     offsetof(struct flb_config, grace_input)},
+
     {FLB_CONF_STR_DAEMON,
      FLB_CONF_TYPE_BOOL,
      offsetof(struct flb_config, daemon)},
@@ -207,6 +211,7 @@ struct flb_config *flb_config_init()
     config->verbose      = 3;
     config->grace        = 5;
     config->grace_count  = 0;
+    config->grace_input  = 2;
     config->exit_status_code = 0;
 
 #ifdef FLB_HAVE_HTTP_SERVER
