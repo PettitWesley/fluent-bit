@@ -49,6 +49,7 @@ struct flb_config {
     double flush;             /* Flush timeout                  */
     int grace;                /* Maximum grace time on shutdown */
     int grace_count;          /* Count of grace shutdown tries  */
+    int grace_input;          /* Shutdown grace to keep inputs ingesting*/
     flb_pipefd_t flush_fd;    /* Timer FD associated to flush   */
 
     int daemon;               /* Run as a daemon ?              */

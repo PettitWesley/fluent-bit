@@ -724,7 +724,6 @@ int flb_stop(flb_ctx_t *ctx)
     }
 
     flb_debug("[lib] sending STOP signal to the engine");
-
     flb_engine_exit(ctx->config);
     ret = pthread_join(tid, NULL);
     if (ret != 0) {

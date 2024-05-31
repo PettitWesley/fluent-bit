@@ -65,6 +65,8 @@ extern struct flb_aws_error_reporter *error_reporter;
 
 FLB_TLS_DEFINE(struct mk_event_loop, flb_engine_evl);
 
+void flb_engine_stop_ingestion(struct flb_config *config);
+
 
 void flb_engine_evl_init()
 {
@@ -551,6 +553,9 @@ int sb_segregate_chunks(struct flb_config *config)
 int flb_engine_start(struct flb_config *config)
 {
     int ret;
+    int tasks = 0;
+    int fs_chunks = 0;
+    int mem_chunks = 0;
     uint64_t ts;
     char tmp[16];
     struct flb_time t_flush;
@@ -771,6 +776,9 @@ int flb_engine_start(struct flb_config *config)
         return -2;
     }
 
+    config->grace_input  = config->grace / 2;
+    flb_info("Shutdown Grace Period=%d, Pause Ingestion on shutdown Grace Period=%d", config->grace, config->grace_input);
+    
     while (1) {
         mk_event_wait(evl); /* potentially conditional mk_event_wait or mk_event_wait_2 based on bucket queue capacity for one shot events */
         flb_event_priority_live_foreach(event, evl_bktq, evl, FLB_ENGINE_LOOP_MAX_ITER) {
@@ -821,19 +829,36 @@ int flb_engine_start(struct flb_config *config)
                      * resources allocated by that co-routine, the best thing is to
                      * wait again for the grace period and re-check again.
                      */
-                    ret = flb_task_running_count(config);
+                    tasks = 0;
+                    mem_chunks = 0;
+                    fs_chunks = 0;
+                    tasks = flb_task_running_count(config);
+                    flb_chunk_count(config, &mem_chunks, &fs_chunks);
+                    ret = tasks + mem_chunks + fs_chunks;
                     if (ret > 0 && config->grace_count < config->grace) {
                         if (config->grace_count == 1) {
                             flb_task_running_print(config);
                         }
-                        flb_engine_exit(config);
+                        if ((mem_chunks + fs_chunks) > 0) {
+                            flb_info("[engine] Pending chunk count: memory=%d, filesystem=%d",
+                                     mem_chunks, fs_chunks);
+                        }
+                        if (config->grace_count < config->grace_input) {
+                            flb_engine_exit(config);
+                        } else {
+                            flb_engine_stop_ingestion(config);
+                        }
                     }
                     else {
-                        if (ret > 0) {
+                        if (tasks > 0) {
                             flb_task_running_print(config);
                         }
+                        if ((mem_chunks + fs_chunks) > 0) {
+                            flb_info("[engine] Pending chunk count: memory=%d, filesystem=%d",
+                                     mem_chunks, fs_chunks);
+                        }
                         flb_info("[engine] service has stopped (%i pending tasks)",
-                                 ret);
+                                 tasks);
                         ret = config->exit_status_code;
                         flb_engine_shutdown(config);
                         config = NULL;
@@ -915,6 +940,7 @@ int flb_engine_shutdown(struct flb_config *config)
 {
 
     config->is_running = FLB_FALSE;
+    config->is_ingestion_active = FLB_FALSE;
     flb_input_pause_all(config);
 
 #ifdef FLB_HAVE_STREAM_PROCESSOR
@@ -959,14 +985,19 @@ int flb_engine_exit(struct flb_config *config)
     int ret;
     uint64_t val = FLB_ENGINE_EV_STOP;
 
-    config->is_ingestion_active = FLB_FALSE;
-    config->is_shutting_down = FLB_TRUE;
-
-    flb_input_pause_all(config);
-
     val = FLB_ENGINE_EV_STOP;
     ret = flb_pipe_w(config->ch_manager[1], &val, sizeof(uint64_t));
     return ret;
+}
+
+void flb_engine_stop_ingestion(struct flb_config *config)
+{
+    config->is_ingestion_active = FLB_FALSE;
+    config->is_shutting_down = FLB_TRUE;
+
+    flb_info("[engine] pausing all inputs..");
+
+    flb_input_pause_all(config);
 }
 
 int flb_engine_exit_status(struct flb_config *config, int status)
