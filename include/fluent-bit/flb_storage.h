@@ -71,4 +71,6 @@ void flb_storage_input_destroy(struct flb_input_instance *in);
 
 struct flb_storage_metrics *flb_storage_metrics_create(struct flb_config *ctx);
 
+void flb_chunk_count(struct flb_config *ctx, int *mem_chunks, int *fs_chunks);
+
 #endif
