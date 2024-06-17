@@ -771,7 +771,7 @@ int flb_engine_start(struct flb_config *config)
 
     ret = sb_segregate_chunks(config);
 
-    if (ret)
+    if (ret < 0)
     {
         flb_error("[engine] could not segregate backlog chunks");
         return -2;
@@ -839,6 +839,11 @@ int flb_engine_start(struct flb_config *config)
                     if (ret > 0 && config->grace_count < config->grace) {
                         if (config->grace_count == 1) {
                             flb_task_running_print(config);
+                            ret = sb_segregate_chunks(config);
+                            if (ret < 0) {
+                                flb_error("[engine] could not segregate backlog chunks");
+                                return -2;
+                            }
                         }
                         if ((mem_chunks + fs_chunks) > 0) {
                             flb_info("[engine] Pending chunk count: memory=%d, filesystem=%d; grace_timer=%d",
